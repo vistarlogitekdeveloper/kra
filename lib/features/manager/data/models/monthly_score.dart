@@ -53,21 +53,33 @@ class MonthlyScore {
   /// upstream). Drives the per-cell "valid" / "missing" UI state.
   bool get isManagerFilled => isNotApplicable || managerRating != null;
 
-  factory MonthlyScore.fromJson(Map<String, dynamic> json) => MonthlyScore(
-        monthlyScoreId:
-            JsonParse.parseString(json['monthlyScoreId']) ?? '',
-        monthId: JsonParse.parseString(json['monthId']) ?? '',
-        monthLabel: JsonParse.parseString(json['monthLabel']) ?? '',
-        monthStatus: ReviewMonthStatus.fromApi(
-            JsonParse.parseString(json['monthStatus']) ?? 'OPEN'),
-        selfRating: JsonParse.parseDouble(json['selfRating']),
-        selfRemark: JsonParse.parseString(json['selfRemark']),
-        managerRating: JsonParse.parseDouble(json['managerRating']),
-        managerRemark: JsonParse.parseString(json['managerRemark']),
-        weightedScore: JsonParse.parseDouble(json['weightedScore']),
-        isNotApplicable:
-            JsonParse.parseBool(json['isNotApplicable']) ?? false,
-      );
+  factory MonthlyScore.fromJson(Map<String, dynamic> json) {
+    // The live backend nests the month label/status under a `month`
+    // object and names the cell id `id`; older spec/mock payloads put
+    // them flat as `monthlyScoreId`/`monthLabel`/`monthStatus`. Read the
+    // live shape first, fall back to the flat one so both work.
+    final month = JsonParse.parseMap(json['month']);
+    return MonthlyScore(
+      monthlyScoreId: JsonParse.parseString(json['id']) ??
+          JsonParse.parseString(json['monthlyScoreId']) ??
+          '',
+      monthId: JsonParse.parseString(json['monthId']) ?? '',
+      monthLabel: JsonParse.parseString(month?['monthLabel']) ??
+          JsonParse.parseString(json['monthLabel']) ??
+          '',
+      monthStatus: ReviewMonthStatus.fromApi(
+          JsonParse.parseString(month?['status']) ??
+              JsonParse.parseString(json['monthStatus']) ??
+              'OPEN'),
+      selfRating: JsonParse.parseDouble(json['selfRating']),
+      selfRemark: JsonParse.parseString(json['selfRemark']),
+      managerRating: JsonParse.parseDouble(json['managerRating']),
+      managerRemark: JsonParse.parseString(json['managerRemark']),
+      weightedScore: JsonParse.parseDouble(json['weightedScore']),
+      isNotApplicable:
+          JsonParse.parseBool(json['isNotApplicable']) ?? false,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'monthlyScoreId': monthlyScoreId,

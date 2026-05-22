@@ -41,8 +41,11 @@ class PendingAction {
             JsonParse.parseString(json['employeeCode']) ?? '',
         monthLabel: JsonParse.parseString(json['monthLabel']) ?? '',
         submittedAt: JsonParse.parseDate(json['submittedAt']),
-        deadlineRemaining:
-            JsonParse.parseInt(json['deadlineRemaining']),
+        // Live backend names this `daysRemaining`; older payloads use
+        // `deadlineRemaining`. Accept either so the deadline/overdue chip
+        // isn't silently stuck at null.
+        deadlineRemaining: JsonParse.parseInt(json['deadlineRemaining']) ??
+            JsonParse.parseInt(json['daysRemaining']),
       );
 
   Map<String, dynamic> toJson() => {

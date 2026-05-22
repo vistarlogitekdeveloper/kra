@@ -52,20 +52,42 @@ class TeamMember {
 
   factory TeamMember.fromJson(Map<String, dynamic> json) {
     final trendList = (json['threeMonthTrend'] as List?) ?? const [];
+    // The live backend identifies the member with `id`/`name`, exposes
+    // `projectLocation` as an object, and nests the review summary under
+    // `currentReview.{id,state,selfTotal,…}`. Older spec/mock payloads
+    // put all of it flat at the top level. Read the live shape first,
+    // fall back to the flat one so both work.
+    final review = JsonParse.parseMap(json['currentReview']);
+    final loc = JsonParse.parseMap(json['projectLocation']);
     return TeamMember(
-      employeeId: JsonParse.parseString(json['employeeId']) ?? '',
+      employeeId: JsonParse.parseString(json['id']) ??
+          JsonParse.parseString(json['employeeId']) ??
+          '',
       employeeCode: JsonParse.parseString(json['employeeCode']) ?? '',
-      fullName: JsonParse.parseString(json['fullName']) ?? '',
+      fullName: JsonParse.parseString(json['name']) ??
+          JsonParse.parseString(json['fullName']) ??
+          '',
       role: JsonParse.parseString(json['role']),
-      projectLocation:
-          JsonParse.parseString(json['projectLocation']),
-      reviewId: JsonParse.parseString(json['reviewId']),
+      // `projectLocation` is an object on the wire — take its name, not
+      // its stringified form. Flat string payloads still read directly.
+      projectLocation: loc != null
+          ? JsonParse.parseString(loc['name'])
+          : JsonParse.parseString(json['projectLocation']),
+      reviewId: JsonParse.parseString(review?['id']) ??
+          JsonParse.parseString(json['reviewId']),
       reviewState: ReviewState.fromApi(
-          JsonParse.parseString(json['reviewState']) ?? 'DRAFT'),
-      selfTotal: JsonParse.parseDouble(json['selfTotal']),
-      managerTotal: JsonParse.parseDouble(json['managerTotal']),
-      finalTotal: JsonParse.parseDouble(json['finalTotal']),
-      isOverdue: JsonParse.parseBool(json['isOverdue']) ?? false,
+          JsonParse.parseString(review?['state']) ??
+              JsonParse.parseString(json['reviewState']) ??
+              'DRAFT'),
+      selfTotal: JsonParse.parseDouble(review?['selfTotal']) ??
+          JsonParse.parseDouble(json['selfTotal']),
+      managerTotal: JsonParse.parseDouble(review?['managerTotal']) ??
+          JsonParse.parseDouble(json['managerTotal']),
+      finalTotal: JsonParse.parseDouble(review?['finalTotal']) ??
+          JsonParse.parseDouble(json['finalTotal']),
+      isOverdue: JsonParse.parseBool(review?['isOverdue']) ??
+          JsonParse.parseBool(json['isOverdue']) ??
+          false,
       threeMonthTrend: trendList
           .map((v) => JsonParse.parseDouble(v))
           .toList(growable: false),
