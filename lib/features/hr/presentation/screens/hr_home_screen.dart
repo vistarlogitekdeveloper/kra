@@ -584,10 +584,34 @@ class _ActionItemsSection extends ConsumerWidget {
   ///
   /// If neither resolves, surface a snackbar rather than fail silently —
   /// the user clicked something and expects feedback.
+  /// Base paths actually registered in the router. A deep-link is only
+  /// followed when it matches one of these — older code navigated to any
+  /// `/hr/` or `/employee/` link, so a backend pointer at an unbuilt
+  /// screen (e.g. `/hr/feeds/...`) dead-ended on the router error page.
+  static const List<String> _navigablePrefixes = [
+    AppRoutes.hrHome,
+    AppRoutes.hrEmployees,
+    AppRoutes.hrTemplates,
+    AppRoutes.hrAssign,
+    AppRoutes.hrCycles,
+    AppRoutes.hrReports,
+    AppRoutes.hrLocations,
+    AppRoutes.hrBulkSetup,
+    AppRoutes.hrAuditLog,
+    AppRoutes.employeeHome,
+    AppRoutes.employeeSelfRate,
+    AppRoutes.employeeHistory,
+    AppRoutes.employeeProfile,
+  ];
+
+  bool _isNavigableDeepLink(String link) {
+    final path = link.split('?').first;
+    return _navigablePrefixes.any((p) => path == p || path.startsWith('$p/'));
+  }
+
   void _openActionItem(BuildContext context, HrActionItem item) {
     final link = item.deepLink ?? '';
-    final isInternal = link.startsWith('/hr/') || link.startsWith('/employee/');
-    if (isInternal) {
+    if (_isNavigableDeepLink(link)) {
       context.go(link);
       return;
     }
@@ -596,8 +620,10 @@ class _ActionItemsSection extends ConsumerWidget {
       context.go(fallback);
       return;
     }
+    // Destination isn't built yet — give feedback instead of navigating
+    // into an unmatched route.
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Coming soon: ${item.headline}')),
+      SnackBar(content: Text('${AppStrings.commonComingSoon}: ${item.headline}')),
     );
   }
 

@@ -71,6 +71,13 @@ class AppStrings {
   static const String commonSelect = 'Select';
   static const String commonClone = 'Clone';
   static const String commonOptional = 'Optional';
+  static const String commonComingSoon = 'Coming soon';
+
+  // ───── Route error / not-found ─────
+  static const String routeErrorTitle = 'Page not available';
+  static const String routeErrorMessage =
+      "This page isn't available yet. Let's get you back on track.";
+  static const String routeErrorGoHome = 'Go to Home';
 
   // ───── HR shell / bottom nav ─────
   static const String hrShellHome = 'Home';

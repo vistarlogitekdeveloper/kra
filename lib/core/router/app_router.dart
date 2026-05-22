@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/data/models/user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../widgets/route_error_screen.dart';
 import '../../features/dashboards/placeholder_dashboard.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
 import '../../features/employee/presentation/screens/history/my_reviews_history_screen.dart';
@@ -192,6 +193,18 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.login,
     refreshListenable: _AuthListenable(ref),
+    // Friendly fallback for unmatched routes (e.g. a backend deep-link to
+    // a screen that isn't built yet). The default go_router error screen's
+    // button targets `/`, which this app never registers, so it dead-ends;
+    // ours routes "Go to Home" to a route that exists — the signed-in
+    // user's dashboard, or /login when signed out.
+    errorBuilder: (context, state) {
+      final auth = ref.read(authStateProvider);
+      final home = auth is AuthAuthenticated
+          ? AppRoutes.dashboardForRole(auth.user.role)
+          : AppRoutes.login;
+      return RouteErrorScreen(homeRoute: home, error: state.error);
+    },
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
       final goingToLogin = state.matchedLocation == AppRoutes.login;
