@@ -10,6 +10,12 @@ class KraTemplate {
   final String? description;
   final bool isActive;
   final List<KraTemplateItem> items;
+
+  /// Item count reported by the list endpoint via `_count.items`. The
+  /// list payload omits the `items` array, so this is the only source
+  /// of the count there. `0` when absent (e.g. on the detail payload,
+  /// where [items] is populated instead).
+  final int itemCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -20,9 +26,20 @@ class KraTemplate {
     this.description,
     this.isActive = true,
     this.items = const [],
+    this.itemCount = 0,
     this.createdAt,
     this.updatedAt,
   });
+
+  /// Number of items to display. Prefers the loaded [items] (accurate
+  /// once a detail/hydrated payload is in hand) and falls back to the
+  /// list endpoint's [itemCount] when items haven't been fetched.
+  int get displayItemCount => items.isNotEmpty ? items.length : itemCount;
+
+  /// True once the per-item weightages are available to total up. The
+  /// list endpoint doesn't return items, so the weightage badge is only
+  /// meaningful after hydration.
+  bool get hasWeightageData => items.isNotEmpty;
 
   /// Total weightage across all items, in percent (0–100).
   /// HR uses this to validate that a template sums to exactly 100.
@@ -43,6 +60,12 @@ class KraTemplate {
         .map(KraTemplateItem.fromJson)
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    // The list endpoint reports the item count under `_count.items`
+    // (the `items` array itself is only on the detail payload).
+    final count = json['_count'];
+    final parsedItemCount = (count is Map && count['items'] is num)
+        ? (count['items'] as num).toInt()
+        : items.length;
     return KraTemplate(
       id: json['id'] as String,
       name: (json['name'] ?? '') as String,
@@ -50,6 +73,7 @@ class KraTemplate {
       description: json['description'] as String?,
       isActive: (json['isActive'] as bool?) ?? true,
       items: items,
+      itemCount: parsedItemCount,
       createdAt: _parseDate(json['createdAt']),
       updatedAt: _parseDate(json['updatedAt']),
     );
@@ -73,6 +97,7 @@ class KraTemplate {
     String? description,
     bool? isActive,
     List<KraTemplateItem>? items,
+    int? itemCount,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -83,6 +108,7 @@ class KraTemplate {
       description: description ?? this.description,
       isActive: isActive ?? this.isActive,
       items: items ?? this.items,
+      itemCount: itemCount ?? this.itemCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

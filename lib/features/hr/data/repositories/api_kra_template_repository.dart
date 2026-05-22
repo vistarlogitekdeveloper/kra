@@ -20,10 +20,24 @@ class ApiKraTemplateRepository implements KraTemplateRepository {
           if (isActive != null) 'isActive': isActive,
         },
       );
-      return unwrapList(response)
+      final summaries = unwrapList(response)
           .whereType<Map<String, dynamic>>()
           .map(KraTemplate.fromJson)
           .toList();
+      // The list endpoint returns the item COUNT (`_count.items`) but not
+      // the items themselves, so the weightage total can't be derived
+      // from it. Hydrate each template's items in parallel so the cards
+      // can show an accurate weightage. A per-template failure degrades
+      // gracefully to the summary (the count still renders via itemCount).
+      return Future.wait(
+        summaries.map((t) async {
+          try {
+            return await getById(t.id);
+          } catch (_) {
+            return t;
+          }
+        }),
+      );
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }
