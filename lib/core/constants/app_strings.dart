@@ -162,6 +162,9 @@ class AppStrings {
       'This will not affect existing assignments, but the template can no longer be used for new ones.';
 
   // ───── KRA template form ─────
+  static const String kraItemDeleteConfirmTitle = 'Remove this KRA?';
+  static const String kraItemDeleteConfirmMessage =
+      'This KRA item will be removed from the template. Nothing is saved until you tap Save.';
   static const String kraTemplateFormCreateTitle = 'Create KRA Template';
   static const String kraTemplateFormEditTitle = 'Edit KRA Template';
   static const String kraTemplateFormName = 'Template name';
