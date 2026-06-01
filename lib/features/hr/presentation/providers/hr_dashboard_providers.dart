@@ -16,8 +16,26 @@ final hrDashboardRepositoryProvider = Provider<HrDashboardRepository>((ref) {
 // ─────────────────────────────────────────────────────────────────────
 // 1. Overview cards — GET /hr/dashboard
 // ─────────────────────────────────────────────────────────────────────
+//
+// Why `ref.keepAlive()` on all of these:
+//
+// The HR home screen is a tall ListView whose sections each watch one of
+// these providers. As the user scrolls past a section's viewport +
+// cacheExtent, Flutter unmounts that section's element — its `ref.watch`
+// drops, the autoDispose timer fires, and the cached AsyncValue is
+// thrown away. Scrolling back re-mounts the section, which triggers a
+// brand-new HTTP fetch. On a slow backend (Render free-tier cold start)
+// this presents as the section "loading forever" because every scroll
+// trip restarts the request from zero — the location heatmap, which
+// sits at the bottom of the page, was the most visible victim.
+//
+// `ref.keepAlive()` retains the resolved AsyncValue for the session, so
+// a remount picks up the cached value instead of refetching. The pull-
+// to-refresh handler still calls `ref.invalidate(...)` explicitly, so
+// the data stays user-refreshable.
 
 final hrOverviewProvider = FutureProvider.autoDispose<HrOverview>((ref) {
+  ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchOverview();
 });
 
@@ -29,6 +47,7 @@ final hrOverviewProvider = FutureProvider.autoDispose<HrOverview>((ref) {
 
 final hrActiveCycleProvider =
     FutureProvider.autoDispose<HrActiveCycle?>((ref) {
+  ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchActiveCycle();
 });
 
@@ -45,6 +64,7 @@ final hrActiveCycleIdProvider = Provider.autoDispose<AsyncValue<String?>>((ref) 
 /// 3. Detailed KPIs
 final hrKpisProvider =
     FutureProvider.autoDispose.family<HrKpis, String>((ref, cycleId) {
+  ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchKpis(cycleId);
 });
 
@@ -52,6 +72,7 @@ final hrKpisProvider =
 final hrPipelineProvider =
     FutureProvider.autoDispose.family<List<HrPipelineItem>, String>(
         (ref, cycleId) {
+  ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchPipeline(cycleId);
 });
 
@@ -59,6 +80,7 @@ final hrPipelineProvider =
 final hrActionItemsProvider =
     FutureProvider.autoDispose.family<List<HrActionItem>, String>(
         (ref, cycleId) {
+  ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchActionItems(cycleId);
 });
 
@@ -66,6 +88,7 @@ final hrActionItemsProvider =
 final hrLocationHeatmapProvider =
     FutureProvider.autoDispose.family<HrLocationHeatmap, String>(
         (ref, cycleId) {
+  ref.keepAlive();
   return ref
       .watch(hrDashboardRepositoryProvider)
       .fetchLocationHeatmap(cycleId);
@@ -74,6 +97,7 @@ final hrLocationHeatmapProvider =
 /// 7. Recent activity — not cycle-scoped
 final hrRecentActivityProvider =
     FutureProvider.autoDispose<List<HrActivityEntry>>((ref) {
+  ref.keepAlive();
   return ref
       .watch(hrDashboardRepositoryProvider)
       .fetchRecentActivity(limit: 15);
@@ -83,5 +107,6 @@ final hrRecentActivityProvider =
 final hrDeadlinesProvider =
     FutureProvider.autoDispose.family<List<HrDeadline>, String>(
         (ref, cycleId) {
+  ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchDeadlines(cycleId);
 });
