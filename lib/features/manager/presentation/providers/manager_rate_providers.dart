@@ -13,19 +13,14 @@ import '../../data/models/manager_review_detail.dart';
 import '../../data/models/monthly_score.dart';
 import '../../data/models/review_row.dart';
 import '../../data/models/transition_error.dart';
-// ignore: unused_import
 import '../../data/repositories/api_manager_rate_repository.dart';
 import '../../data/repositories/manager_rate_repository.dart';
-import '../../data/repositories/mock_manager_rate_repository.dart';
 import 'manager_dashboard_providers.dart';
 import 'manager_review_providers.dart';
 import 'manager_team_providers.dart';
 
 final managerRateRepositoryProvider = Provider<ManagerRateRepository>((ref) {
-  // ignore: unused_local_variable
-  final dio = ref.read(dioProvider);
-  return MockManagerRateRepository();
-  // return ApiManagerRateRepository(dio: dio);
+  return ApiManagerRateRepository(dio: ref.read(dioProvider));
 });
 
 // ────────────────────────────────────────────────────────────────────────

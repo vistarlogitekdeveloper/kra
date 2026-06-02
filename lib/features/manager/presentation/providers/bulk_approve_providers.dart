@@ -5,19 +5,14 @@ import '../../../../core/api/dio_client.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../data/models/bulk_approve_request.dart';
 import '../../data/models/bulk_approve_response.dart';
-// ignore: unused_import
 import '../../data/repositories/api_bulk_approve_repository.dart';
 import '../../data/repositories/bulk_approve_repository.dart';
-import '../../data/repositories/mock_bulk_approve_repository.dart';
 import 'manager_dashboard_providers.dart';
 import 'manager_team_providers.dart';
 
 final bulkApproveRepositoryProvider =
     Provider<BulkApproveRepository>((ref) {
-  // ignore: unused_local_variable
-  final dio = ref.read(dioProvider);
-  return MockBulkApproveRepository();
-  // return ApiBulkApproveRepository(dio: dio);
+  return ApiBulkApproveRepository(dio: ref.read(dioProvider));
 });
 
 // ────────────────────────────────────────────────────────────────────────
