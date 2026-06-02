@@ -69,7 +69,7 @@ class AppStrings {
   static const String commonAll = 'All';
   static const String commonNone = 'None';
   static const String commonSelect = 'Select';
-  static const String commonClone = 'Clone';
+  static const String commonClone = 'Duplicate';
   static const String commonOptional = 'Optional';
   static const String commonComingSoon = 'Coming soon';
 
@@ -111,6 +111,9 @@ class AppStrings {
   static const String employeesTitle = 'Employees';
   static const String employeesSearchHint = 'Search by name, code, or email';
   static const String employeesFilterAll = 'All roles';
+  static const String employeesFilterStatusAll = 'Any status';
+  static const String employeesFilterStatusActive = 'Active only';
+  static const String employeesFilterStatusInactive = 'Inactive only';
   static const String employeesEmptyTitle = 'No employees yet';
   static const String employeesEmptyMessage =
       'Add your first employee to get started.';
@@ -118,6 +121,12 @@ class AppStrings {
   static const String employeesNoSearchResults = 'No matching employees';
   static const String employeesNoSearchHint = 'Try a different search term.';
   static const String employeesActive = 'Active';
+  static const String employeeDetailAssignKra = 'Assign KRA';
+  static const String employeeDetailEditProfile = 'Edit Profile';
+  static const String hrHeatmapMonthlyBreakdown = 'Monthly breakdown';
+  static const String hrHeatmapAverage = 'Cycle average';
+  static const String hrHeatmapReviewsCount = 'reviews';
+  static const String hrHeatmapViewEmployees = 'View employees here';
   static const String employeesInactive = 'Inactive';
   static const String employeesActionEdit = 'Edit';
   static const String employeesActionDeactivate = 'Deactivate';
@@ -162,7 +171,7 @@ class AppStrings {
       'Create a template to standardise KRAs across a role.';
   static const String kraTemplatesEmptyCta = 'Create Template';
   static const String kraTemplatesItems = 'KRAs';
-  static const String kraTemplatesCloneSuccess = 'Template cloned.';
+  static const String kraTemplatesCloneSuccess = 'Template duplicated.';
   static const String kraTemplatesDeleteSuccess = 'Template deleted.';
   static const String kraTemplatesDeleteConfirmTitle = 'Delete template?';
   static const String kraTemplatesDeleteConfirmMessage =
@@ -437,6 +446,7 @@ class AppStrings {
   static const String selfRateSuccessTotalLabel = 'Total submitted';
   static const String selfRateViewSubmission = 'View submission';
   static const String selfRateBackToHome = 'Back to home';
+  static const String selfRateGoToHistory = 'Go to History';
   static const String selfRateLockedTitle = 'Submission locked';
   static const String selfRateLockedAwaitingManager =
       'Awaiting manager review';

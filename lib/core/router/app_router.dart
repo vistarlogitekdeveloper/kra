@@ -18,6 +18,7 @@ import '../../features/employee/presentation/screens/self_rate/self_rate_locked_
 import '../../features/employee/presentation/screens/self_rate/self_rate_review_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_success_screen.dart';
+import '../../features/hr/presentation/screens/audit_log_screen.dart';
 import '../../features/hr/presentation/screens/bonus_slabs_screen.dart';
 import '../../features/hr/presentation/screens/bulk_setup_screen.dart';
 import '../../features/hr/presentation/screens/employee_detail_screen.dart';
@@ -573,6 +574,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => BonusSlabsScreen(
           cycleId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.hrAuditLog,
+        builder: (_, __) => const AuditLogScreen(),
       ),
     ],
   );
