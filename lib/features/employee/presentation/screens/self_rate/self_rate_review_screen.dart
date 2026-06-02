@@ -95,7 +95,10 @@ class _SelfRateReviewScreenState
         children: [
           _TotalHero(weightedTotalPct: state.weightedTotalPct),
           for (final entry in state.entries)
-            _ReviewRow(entry: entry),
+            _ReviewRow(
+              entry: entry,
+              onTap: () => context.go(AppRoutes.employeeSelfRate),
+            ),
         ],
       ),
       bottomNavigationBar: _ReviewSubmitBar(
@@ -173,91 +176,109 @@ class _TotalHero extends StatelessWidget {
 
 class _ReviewRow extends StatelessWidget {
   final KraScoreEntry entry;
-  const _ReviewRow({required this.entry});
+  final VoidCallback onTap;
+  const _ReviewRow({required this.entry, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final hasRemark = entry.selfRemark.trim().isNotEmpty;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Material(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  entry.itemName,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                EmployeeFormatters.weightagePercent(entry.weightagePercent),
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              const SizedBox(width: 10),
-              ScorePill(
-                score: entry.isNotApplicable ? null : entry.selfRating,
-                maxScore: entry.maxScore,
-                tone: ScorePillTone.self,
-                small: true,
-              ),
-            ],
-          ),
-          if (entry.isNotApplicable)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'Marked N/A',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.textMuted,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.divider),
             ),
-          if (hasRemark)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.format_quote_rounded,
-                    size: 14,
-                    color: AppColors.primaryPurple,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      entry.selfRemark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        entry.itemName,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      EmployeeFormatters.weightagePercent(
+                          entry.weightagePercent),
                       style: const TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary,
-                        height: 1.45,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ScorePill(
+                      score:
+                          entry.isNotApplicable ? null : entry.selfRating,
+                      maxScore: entry.maxScore,
+                      tone: ScorePillTone.self,
+                      small: true,
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                  ],
+                ),
+                if (entry.isNotApplicable)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Marked N/A',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textMuted,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),
-                ],
-              ),
+                if (hasRemark)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.format_quote_rounded,
+                          size: 14,
+                          color: AppColors.primaryPurple,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            entry.selfRemark,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.textSecondary,
+                              height: 1.45,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
   }

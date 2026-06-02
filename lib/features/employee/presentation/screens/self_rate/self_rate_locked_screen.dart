@@ -98,45 +98,57 @@ class SelfRateLockedScreen extends ConsumerWidget {
                 Center(child: ReviewStateBadge(state: review.state)),
               ],
               const Spacer(flex: 2),
-              if (review != null)
-                ElevatedButton(
-                  onPressed: () =>
-                      context.go(AppRoutes.employeeReviewDetail(review.id)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryPurple,
-                    foregroundColor: Colors.white,
+              ElevatedButton(
+                onPressed: () => context.go(AppRoutes.employeeHistory),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  AppStrings.selfRateGoToHistory,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+              if (review != null) ...[
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: () => context
+                      .go(AppRoutes.employeeReviewDetail(review.id)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.divider),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                   child: const Text(
                     AppStrings.selfRateViewSubmission,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
+              ],
               const SizedBox(height: 10),
-              OutlinedButton(
+              TextButton(
                 onPressed: () {
                   ref.invalidate(employeeDashboardProvider);
                   context.go(AppRoutes.employeeHome);
                 },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.divider),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
                 child: const Text(
                   AppStrings.selfRateBackToHome,
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
