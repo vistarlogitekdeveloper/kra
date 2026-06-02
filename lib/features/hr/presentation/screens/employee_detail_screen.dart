@@ -129,6 +129,51 @@ class _DetailContent extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => context.push(AppRoutes.hrAssign),
+                icon: const Icon(Icons.assignment_turned_in_outlined,
+                    size: 18),
+                label: const Text(
+                  AppStrings.employeeDetailAssignKra,
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    context.push(AppRoutes.hrEmployeeEdit(employee.id)),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text(
+                  AppStrings.employeeDetailEditProfile,
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.divider),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         if (employee.isActive)
           OutlinedButton.icon(
             onPressed: () => _confirmDeactivate(context),
