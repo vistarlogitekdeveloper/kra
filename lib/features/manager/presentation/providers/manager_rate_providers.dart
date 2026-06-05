@@ -297,7 +297,15 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
   }
 
   Future<void> _maybeFlushAutoSave() async {
-    if (!_hasDirtyChangesSinceSave) return;
+    if (!_hasDirtyChangesSinceSave) {
+      // No edits since the last successful save — the periodic timer
+      // has nothing to do, and re-firing every 5s forever is wasteful.
+      // Tear it down; the next edit will reschedule via setCellRating /
+      // setManagerComment.
+      _autoSaveTimer?.cancel();
+      _autoSaveTimer = null;
+      return;
+    }
     final reviewId = state.reviewId;
     final review = state.review;
     if (reviewId == null || review == null) return;
