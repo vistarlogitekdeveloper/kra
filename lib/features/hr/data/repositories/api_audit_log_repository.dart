@@ -23,9 +23,11 @@ class ApiAuditLogRepository implements AuditLogRepository {
   static const String _basePath =
       '${ApiConstants.hrDashboard}/recent-activity';
 
-  /// Upper bound the temporary endpoint will return. Generous so users
-  /// see a meaningful trail without us pretending to paginate.
-  static const int _maxEntries = 200;
+  /// Upper bound the temporary endpoint will return. The backend
+  /// validator rejects `limit > 50` (VAL_001) — keep this at or below
+  /// that ceiling. When the real /audit-logs route ships we can drop
+  /// this constant entirely.
+  static const int _maxEntries = 50;
 
   @override
   Future<AuditLogPage> fetchLogs({
