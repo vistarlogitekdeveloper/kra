@@ -34,19 +34,42 @@ class PreviousReview {
     this.employeeId,
   });
 
-  factory PreviousReview.fromJson(Map<String, dynamic> json) =>
-      PreviousReview(
-        reviewId: JsonParse.parseString(json['reviewId']) ?? '',
-        cycleName: JsonParse.parseString(json['cycleName']) ?? '',
-        fyLabel: JsonParse.parseString(json['fyLabel']),
-        quarterNum: JsonParse.parseInt(json['quarterNum']),
-        state: ReviewState.fromApi(
-            JsonParse.parseString(json['state']) ?? 'DRAFT'),
-        finalTotal: JsonParse.parseDouble(json['finalTotal']),
-        endDate: JsonParse.parseDate(json['endDate']),
-        employeeName: JsonParse.parseString(json['employeeName']),
-        employeeId: JsonParse.parseString(json['employeeId']),
-      );
+  factory PreviousReview.fromJson(Map<String, dynamic> json) {
+    // Live backend nests cycle data under `reviewCycle` and employee
+    // under `employee`. Older payloads inline both. Read live first,
+    // fall back to flat names — matches the dual-read pattern used
+    // by manager_review_detail.dart.
+    final cycle = json['reviewCycle'] ?? json['cycle'];
+    final cycleMap = cycle is Map<String, dynamic> ? cycle : const {};
+
+    final employee = json['employee'];
+    final empMap = employee is Map<String, dynamic> ? employee : const {};
+
+    return PreviousReview(
+      reviewId: JsonParse.parseString(json['reviewId']) ??
+          JsonParse.parseString(json['id']) ??
+          '',
+      cycleName: JsonParse.parseString(cycleMap['name']) ??
+          JsonParse.parseString(json['cycleName']) ??
+          '',
+      fyLabel: JsonParse.parseString(cycleMap['fyLabel']) ??
+          JsonParse.parseString(json['fyLabel']),
+      quarterNum: JsonParse.parseInt(cycleMap['quarterNum']) ??
+          JsonParse.parseInt(json['quarterNum']),
+      state: ReviewState.fromApi(
+          JsonParse.parseString(json['state']) ?? 'DRAFT'),
+      finalTotal: JsonParse.parseDouble(json['finalTotal']) ??
+          JsonParse.parseDouble(json['finalAvgManagerPct']) ??
+          JsonParse.parseDouble(json['finalAvgSelfPct']),
+      endDate: JsonParse.parseDate(cycleMap['endDate']) ??
+          JsonParse.parseDate(json['endDate']),
+      employeeName: JsonParse.parseString(empMap['name']) ??
+          JsonParse.parseString(empMap['fullName']) ??
+          JsonParse.parseString(json['employeeName']),
+      employeeId: JsonParse.parseString(empMap['id']) ??
+          JsonParse.parseString(json['employeeId']),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'reviewId': reviewId,
