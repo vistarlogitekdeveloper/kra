@@ -6,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/connectivity_wrapper.dart';
-import '../../../auth/data/models/user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 
 /// Bottom-nav shell for the HR module, backed by
@@ -202,8 +201,8 @@ class _HrDrawer extends StatelessWidget {
                   // actually reach it. The router enforces access
                   // again, but a hidden link is cleaner than a
                   // bounce-back for users who never see it.
-                  if (user?.role != null &&
-                      AppRoutes.canAccessManager(user!.role as UserRole))
+                  if (user != null &&
+                      AppRoutes.canAccessManager(user.role))
                     _DrawerItem(
                       icon: Icons.swap_horiz_rounded,
                       label: AppStrings.hrDrawerSwitchToManager,
