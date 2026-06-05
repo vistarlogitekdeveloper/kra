@@ -425,9 +425,10 @@ class AppStrings {
       'Please rate every KRA before submitting.';
   static const String selfRateUnsavedTitle = 'Unsaved changes';
   static const String selfRateUnsavedMessage =
-      'You have unsaved changes. Save as a draft and exit?';
+      'You have unsaved changes. Leaving now will discard them.';
   static const String selfRateUnsavedSave = 'Save draft';
   static const String selfRateUnsavedDiscard = 'Discard';
+  static const String commonKeepEditing = 'Keep editing';
   static const String selfRateResumeTitle = 'Resume your draft?';
   static const String selfRateResumeMessage =
       'You started rating earlier. Continue where you left off?';
