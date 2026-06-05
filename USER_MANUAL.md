@@ -190,9 +190,8 @@ The manager shell has a **mode switcher at the top** — "My Team" (default) and
 
 Every direct report, with the latest cycle's state and a 3-month trend strip per row.
 
-- **Filter chips** — by review state (Pending Self-Rate, Pending Manager, Done, Overdue), by location, by score band.
-- **Long-press a tile** to enter **bulk-select mode**.
-  - App bar swaps to a count + actions row.
+- **Filter chips** — by review state (Pending Self-Rate, Pending Manager, Done, Overdue). Location + score-band axes are planned but not yet wired.
+- **Bulk select** — tap the checklist icon in the app bar to enter selection mode. The app bar swaps to a count + actions row.
   - Pick multiple reviews → **Bulk Approve** → `/manager/team/bulk-approve?ids=…`.
 
 #### 5.2.1 Team Member Profile `/manager/team/list/:employeeId`
@@ -288,7 +287,7 @@ Every past review the employee has done.
 - **Profile header** — photo, name, role, employee code.
 - **Field rows** — email (read-only), phone (editable), location, reporting manager.
 - **My Manager card** — name + role; tap to call/email.
-- **Edit** → `/employee/profile/edit` — currently only `phone` and `photoUrl` are PATCHable; everything else is HR-owned.
+- **Edit** → `/employee/profile/edit` — only `phone` is exposed in the UI today. The repository would also accept `photoUrl`, but the photo picker is marked "coming soon" on the form. Everything else is HR-owned.
 - **Reporting tree** → `/employee/profile/reporting-tree` — visual chain up to the CEO.
 - **Sign out** at the bottom.
 
