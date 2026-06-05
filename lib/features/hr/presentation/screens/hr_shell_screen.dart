@@ -213,11 +213,10 @@ class _HrDrawer extends StatelessWidget {
                     ),
                   const Divider(color: AppColors.divider, height: 24),
                   const _DrawerSectionLabel(title: 'Account'),
-                  _DrawerItem(
-                    icon: Icons.person_outline_rounded,
-                    label: AppStrings.hrDrawerProfile,
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
+                  // No HR-specific profile screen exists yet — the
+                  // drawer item used to no-op (just close the drawer)
+                  // and confuse users. Hide it until /hr/profile is
+                  // built; the drawer header already shows identity.
                   _DrawerItem(
                     icon: Icons.logout_rounded,
                     label: AppStrings.dashboardLogoutTooltip,
