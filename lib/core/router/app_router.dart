@@ -107,11 +107,6 @@ class AppRoutes {
   static const String managerTeamBulkApproveResult =
       '/manager/team/bulk-approve/result';
 
-  static const String managerReviewHome = '/manager/review/home';
-  static const String managerReviewSelfRate = '/manager/review/self-rate';
-  static const String managerReviewHistory = '/manager/review/history';
-  static const String managerReviewProfile = '/manager/review/profile';
-
   // Parameterised manager routes — pushed pages outside the inner shell
   // so they cover the bottom nav when navigated to.
   static String managerTeamMember(String employeeId) =>

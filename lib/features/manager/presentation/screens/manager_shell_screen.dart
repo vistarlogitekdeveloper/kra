@@ -3,16 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/connectivity_wrapper.dart';
-import '../widgets/mode_segmented_switcher.dart';
 
-/// Outer scaffold for the manager module. Hosts:
-///   - The mode segmented switcher (My Team / My Review)
-///   - The active mode's subtree (provided via the navigationShell
-///     param from `StatefulShellRoute.indexedStack` in app_router)
-///
-/// The inner `StatefulShellRoute` keeps each mode's nav stack alive
-/// (so deep-dives survive mode switches), and the switcher widget
-/// drives navigation through the `managerModeProvider`.
+/// Outer scaffold for the manager module. Hosts the active subtree
+/// from the inner StatefulShellRoute. The mode-switcher (My Team /
+/// My Review) was removed because the My Review surface isn't built
+/// — manager-capable roles self-rate via /employee/* directly. The
+/// underlying mode provider + enum stay in place for when the round-
+/// trip UX ships.
 class ManagerShellScreen extends ConsumerWidget {
   final Widget child;
   const ManagerShellScreen({super.key, required this.child});
@@ -22,15 +19,7 @@ class ManagerShellScreen extends ConsumerWidget {
     return ConnectivityWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              const ModeSegmentedSwitcher(),
-              Expanded(child: child),
-            ],
-          ),
-        ),
+        body: SafeArea(bottom: false, child: child),
       ),
     );
   }
