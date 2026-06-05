@@ -253,7 +253,15 @@ These behaviours aren't tied to one screen. Test them opportunistically.
 
 ---
 
-## 9. Known unbuilt — do NOT file as bugs
+## 9. Known issues — do NOT file as bugs
+
+### 9.1 Known backend issues
+
+- **Backend RBAC leak on six HR resource paths** — `/employees`, `/kra-templates`, `/review-cycles`, `/locations`, `/kra-assignments`, `/bonus-slabs` return 200 with full data when called with a Manager token; should return 403. Tracked in [docs/BACKEND_RBAC_FINDINGS.md](docs/BACKEND_RBAC_FINDINGS.md). Pure backend bug — the Flutter app gives no UI path to this leak, so it won't surface in normal manual testing. If a backend tester sees a Manager-token request returning HR data, that's expected on the current build until the backend fix lands.
+- **`/employees` returns `passwordHash`** — even for HR_ADMIN. Critical backend issue; do not log or screenshot the response body. See same document.
+- **Slug vs UUID** on the test env: cycle writes can return 400 because the env seeds with slug IDs (`cyc_q1_fy2627`) but write validators expect UUIDs. Backend issue, not an app bug.
+
+### 9.2 Known unbuilt features
 
 These have been verified by dev as not implemented yet. If you hit them, note them on your sign-off sheet but **do not** create a defect ticket.
 

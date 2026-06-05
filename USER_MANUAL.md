@@ -333,6 +333,8 @@ The app listens to `connectivity_plus`. Going offline shows a thin grey strip ac
 - Every route lives on `AppRoutes` — no raw strings at call sites.
 - The router's redirect rules run on every auth-state change, so logging out from any tab returns to `/login` immediately.
 - Unknown routes hit the **RouteErrorScreen** with a working "Go to Home" button.
+- **Role guards**: `/hr/*` is gated to HR / HR_ADMIN / ADMIN; `/manager/*` is gated to MANAGER / BD_MANAGER / WAREHOUSE_MGR / HR_ADMIN / ADMIN. Deep-links into either area as a non-permitted role are bounced to the user's own dashboard.
+- **`/employee/*` is intentionally shared across roles.** Every authenticated user — including managers and HR_ADMIN — uses the employee surface to self-rate their own KRAs (Step 4 spec design). This is not a leak: managers see only their own KRAs because every employee-side endpoint is scoped to `req.user.id` server-side. If you find an employee-side endpoint that returns someone else's data, *that* would be a bug — file it.
 
 ### 7.7 Audit log
 
