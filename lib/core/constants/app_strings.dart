@@ -23,10 +23,7 @@ class AppStrings {
       'Password reset is coming soon. For now, please contact HR.';
 
   // ───── Dashboard ─────
-  static const String dashboardTitleSuffix = 'Dashboard';
   static const String dashboardLogoutTooltip = 'Logout';
-  static const String dashboardGreeting = 'Hello,';
-  static const String dashboardLoggedInAs = 'You are signed in as';
 
   // ───── Validation ─────
   static const String validationEmailRequired = 'Please enter your email';

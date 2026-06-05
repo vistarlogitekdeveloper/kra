@@ -36,7 +36,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late final Animation<Offset> _slideAnim;
 
   bool _obscurePassword = true;
-  bool _rememberMe = true;
 
   @override
   void initState() {
@@ -295,39 +294,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Widget _buildOptionsRow() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        InkWell(
-          onTap: () => setState(() => _rememberMe = !_rememberMe),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 22,
-                  width: 22,
-                  child: Checkbox(
-                    value: _rememberMe,
-                    onChanged: (val) =>
-                        setState(() => _rememberMe = val ?? false),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  AppStrings.loginRememberMe,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        // 'Remember me' was a UI-only toggle that never persisted —
+        // removed until token-persistence policy needs it back.
         TextButton(
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
