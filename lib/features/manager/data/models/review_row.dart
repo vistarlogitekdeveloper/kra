@@ -58,17 +58,33 @@ class ReviewRow {
     final cells = JsonParse.parseMapList(json['monthlyScores'])
         .map(MonthlyScore.fromJson)
         .toList();
+    // The live backend exposes the row id as `templateItemId`/`id`, the
+    // display copy nested under `templateItem`, the weight as `weight`,
+    // and the ordering as `displayOrder`. Older spec/mock payloads use
+    // the flat `assignmentItemId`/`name`/`weightage`/`sortOrder`. Read
+    // the live names first, fall back to the flat ones.
+    final templateItem = JsonParse.parseMap(json['templateItem']);
     return ReviewRow(
-      assignmentItemId:
-          JsonParse.parseString(json['assignmentItemId']) ?? '',
-      name: JsonParse.parseString(json['name']) ?? '',
-      category: JsonParse.parseString(json['category']),
-      description: JsonParse.parseString(json['description']),
-      weightage: JsonParse.parseDouble(json['weightage']) ?? 0,
+      assignmentItemId: JsonParse.parseString(json['templateItemId']) ??
+          JsonParse.parseString(json['assignmentItemId']) ??
+          JsonParse.parseString(json['id']) ??
+          '',
+      name: JsonParse.parseString(templateItem?['name']) ??
+          JsonParse.parseString(json['name']) ??
+          '',
+      category: JsonParse.parseString(templateItem?['category']) ??
+          JsonParse.parseString(json['category']),
+      description: JsonParse.parseString(templateItem?['description']) ??
+          JsonParse.parseString(json['description']),
+      weightage: JsonParse.parseDouble(json['weight']) ??
+          JsonParse.parseDouble(json['weightage']) ??
+          0,
       maxScore: JsonParse.parseDouble(json['maxScore']) ?? 10,
       scoreSource: ScoreSource.fromApi(
           JsonParse.parseString(json['scoreSource']) ?? 'MANAGER'),
-      sortOrder: JsonParse.parseInt(json['sortOrder']) ?? 0,
+      sortOrder: JsonParse.parseInt(json['displayOrder']) ??
+          JsonParse.parseInt(json['sortOrder']) ??
+          0,
       monthlyScores: cells,
     );
   }

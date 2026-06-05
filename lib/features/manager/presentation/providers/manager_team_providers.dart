@@ -9,17 +9,12 @@ import '../../../../core/constants/app_strings.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/team_member.dart';
 import '../../data/models/team_member_profile.dart';
-// ignore: unused_import
 import '../../data/repositories/api_manager_team_repository.dart';
 import '../../data/repositories/manager_team_repository.dart';
-import '../../data/repositories/mock_manager_team_repository.dart';
 
 final managerTeamRepositoryProvider =
     Provider<ManagerTeamRepository>((ref) {
-  // ignore: unused_local_variable
-  final dio = ref.read(dioProvider);
-  return const MockManagerTeamRepository();
-  // return ApiManagerTeamRepository(dio: dio);
+  return ApiManagerTeamRepository(dio: ref.read(dioProvider));
 });
 
 // ────────────────────────────────────────────────────────────────────────

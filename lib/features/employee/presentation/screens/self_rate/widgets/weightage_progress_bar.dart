@@ -10,8 +10,8 @@ import '../../../widgets/_formatters.dart';
 ///
 /// Colour ramp (matches the deadline chip palette):
 ///   0–49 → muted grey (early)
-///   50–79 → orange (mid)
-///   80–100 → success green (done)
+///   50–99 → orange (mid)
+///   100   → success green (done)
 class WeightageProgressBar extends StatelessWidget {
   final double weightedTotalPct;
   final int filledCount;
@@ -81,7 +81,7 @@ class WeightageProgressBar extends StatelessWidget {
   }
 
   Color _fillColorFor(double pct) {
-    if (pct >= 80) return AppColors.success;
+    if (pct >= 99.95) return AppColors.success;
     if (pct >= 50) return AppColors.accentOrange;
     return AppColors.primaryPurpleLight;
   }

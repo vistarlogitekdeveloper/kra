@@ -117,6 +117,18 @@ class _KraTemplateFormScreenState
     });
   }
 
+  /// Confirms before removing a KRA so an accidental tap on the trash
+  /// icon doesn't silently drop a row the user spent time filling in.
+  Future<void> _confirmDeleteItem(int index) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.kraItemDeleteConfirmTitle,
+      message: AppStrings.kraItemDeleteConfirmMessage,
+      confirmLabel: AppStrings.commonDelete,
+    );
+    if (ok == true) _deleteItem(index);
+  }
+
   void _deleteItem(int index) {
     setState(() {
       _items.removeAt(index);
@@ -413,7 +425,7 @@ class _KraTemplateFormScreenState
               trackingController: _itemControllers[i].tracking,
               weightageController: _itemControllers[i].weightage,
               onChanged: (item) => _onItemChanged(i, item),
-              onDelete: () => _deleteItem(i),
+              onDelete: () => _confirmDeleteItem(i),
             ),
           ),
       ],

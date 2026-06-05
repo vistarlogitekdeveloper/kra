@@ -31,12 +31,12 @@ class EmployeeFilter {
 
   EmployeeFilter copyWith({
     String? search,
-    String? role,
+    Object? role = _sentinel,
     Object? isActive = _sentinel,
   }) {
     return EmployeeFilter(
       search: search ?? this.search,
-      role: role ?? this.role,
+      role: identical(role, _sentinel) ? this.role : role as String?,
       isActive: identical(isActive, _sentinel)
           ? this.isActive
           : isActive as bool?,

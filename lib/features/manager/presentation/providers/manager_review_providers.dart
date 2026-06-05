@@ -4,17 +4,12 @@ import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../data/models/manager_review_detail.dart';
-// ignore: unused_import
 import '../../data/repositories/api_manager_review_repository.dart';
 import '../../data/repositories/manager_review_repository.dart';
-import '../../data/repositories/mock_manager_review_repository.dart';
 
 final managerReviewRepositoryProvider =
     Provider<ManagerReviewRepository>((ref) {
-  // ignore: unused_local_variable
-  final dio = ref.read(dioProvider);
-  return MockManagerReviewRepository();
-  // return ApiManagerReviewRepository(dio: dio);
+  return ApiManagerReviewRepository(dio: ref.read(dioProvider));
 });
 
 /// One review's full payload — used by the detail screen, the rate

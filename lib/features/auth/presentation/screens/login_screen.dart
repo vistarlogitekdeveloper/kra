@@ -81,15 +81,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Show error snackbars when the auth state turns to AuthError.
-    ref.listen<AuthState>(authStateProvider, (previous, next) {
-      if (next is AuthError) {
-        _showErrorSnack(next.message);
-      }
-    });
-
     final authState = ref.watch(authStateProvider);
     final isLoading = authState is AuthLoading;
+    final errorMessage = authState is AuthError ? authState.message : null;
 
     final connectivity = ref.watch(connectivityProvider);
     final isOnline = connectivity.maybeWhen(
@@ -121,6 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             child: _buildLoginCard(
                               isLoading: isLoading,
                               isOnline: isOnline,
+                              errorMessage: errorMessage,
                             ),
                           ),
                         ),
@@ -139,6 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildLoginCard({
     required bool isLoading,
     required bool isOnline,
+    required String? errorMessage,
   }) {
     return Container(
       padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
@@ -202,6 +198,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
             const SizedBox(height: 14),
             _buildOptionsRow(),
+            if (errorMessage != null) ...[
+              const SizedBox(height: 16),
+              _LoginErrorBanner(message: errorMessage),
+            ],
             const SizedBox(height: 24),
             BrandedPrimaryButton(
               label: AppStrings.loginButton,
@@ -241,38 +241,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (v.isEmpty) return AppStrings.validationPasswordRequired;
     if (v.length < 8) return AppStrings.validationPasswordTooShort;
     return null;
-  }
-
-  void _showErrorSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline,
-                  color: Colors.white, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  message,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
   }
 
   Widget _buildHeader() {
@@ -422,6 +390,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
         ),
       ],
+    );
+  }
+}
+
+class _LoginErrorBanner extends StatelessWidget {
+  final String message;
+  const _LoginErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppColors.error.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.error,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

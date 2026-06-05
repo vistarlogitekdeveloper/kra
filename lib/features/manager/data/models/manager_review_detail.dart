@@ -50,8 +50,11 @@ class ManagerReviewDetail {
       isLocked: JsonParse.parseBool(json['isLocked']) ?? false,
       employee: ManagerReviewEmployee.fromJson(
           JsonParse.parseMap(json['employee']) ?? const {}),
-      cycle: ManagerReviewCycle.fromJson(
-          JsonParse.parseMap(json['cycle']) ?? const {}),
+      // Live backend names the cycle block `reviewCycle`; older
+      // spec/mock payloads use `cycle`. Accept either.
+      cycle: ManagerReviewCycle.fromJson(JsonParse.parseMap(json['reviewCycle']) ??
+          JsonParse.parseMap(json['cycle']) ??
+          const {}),
       rows: rows,
       totals: ReviewTotals.fromJson(
           JsonParse.parseMap(json['totals']) ?? const {}),

@@ -5,17 +5,12 @@ import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../data/models/previous_review.dart';
-// ignore: unused_import
 import '../../data/repositories/api_team_history_repository.dart';
-import '../../data/repositories/mock_team_history_repository.dart';
 import '../../data/repositories/team_history_repository.dart';
 
 final teamHistoryRepositoryProvider =
     Provider<TeamHistoryRepository>((ref) {
-  // ignore: unused_local_variable
-  final dio = ref.read(dioProvider);
-  return MockTeamHistoryRepository();
-  // return ApiTeamHistoryRepository(dio: dio);
+  return ApiTeamHistoryRepository(dio: ref.read(dioProvider));
 });
 
 // ────────────────────────────────────────────────────────────────────────

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../data/models/hr_dashboard_models.dart';
 import '../providers/hr_dashboard_providers.dart';
@@ -24,7 +26,7 @@ class LocationHeatmap extends ConsumerWidget {
     return async.when(
       loading: _buildLoading,
       error: (e, _) => _buildError(e.toString(), ref),
-      data: _buildData,
+      data: (heatmap) => _buildData(context, heatmap),
     );
   }
 
@@ -90,7 +92,7 @@ class LocationHeatmap extends ConsumerWidget {
     );
   }
 
-  Widget _buildData(HrLocationHeatmap heatmap) {
+  Widget _buildData(BuildContext context, HrLocationHeatmap heatmap) {
     if (heatmap.locations.isEmpty || heatmap.months.isEmpty) {
       return Container(
         height: 80,
@@ -128,7 +130,12 @@ class LocationHeatmap extends ConsumerWidget {
                 _HeaderRow(months: heatmap.months),
                 const SizedBox(height: 6),
                 for (final loc in heatmap.locations) ...[
-                  _LocationRow(location: loc, months: heatmap.months),
+                  _LocationRow(
+                    location: loc,
+                    months: heatmap.months,
+                    onTap: () =>
+                        _showLocationSheet(context, loc, heatmap.months),
+                  ),
                   const SizedBox(height: 4),
                 ],
               ],
@@ -173,7 +180,12 @@ class _HeaderRow extends StatelessWidget {
 class _LocationRow extends StatelessWidget {
   final HrHeatmapLocation location;
   final List<HrHeatmapMonth> months;
-  const _LocationRow({required this.location, required this.months});
+  final VoidCallback onTap;
+  const _LocationRow({
+    required this.location,
+    required this.months,
+    required this.onTap,
+  });
 
   HrHeatmapCell? _cellFor(String monthId) {
     for (final c in location.cells) {
@@ -184,27 +196,211 @@ class _LocationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 110,
-          child: Text(
-            location.locationName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 110,
+              child: Text(
+                location.locationName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
+            for (final m in months)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+                child: _HeatCell(cell: _cellFor(m.id)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showLocationSheet(
+  BuildContext context,
+  HrHeatmapLocation location,
+  List<HrHeatmapMonth> months,
+) {
+  // Cycle average across the cells that actually have data.
+  double? cycleAvg;
+  int totalReviews = 0;
+  final scored = location.cells.where((c) => c.avgPct != null).toList();
+  if (scored.isNotEmpty) {
+    cycleAvg =
+        scored.map((c) => c.avgPct!).reduce((a, b) => a + b) / scored.length;
+  }
+  for (final c in location.cells) {
+    totalReviews += c.reviewCount;
+  }
+
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                location.locationName,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                cycleAvg == null
+                    ? '$totalReviews ${AppStrings.hrHeatmapReviewsCount}'
+                    : '${AppStrings.hrHeatmapAverage}: '
+                        '${cycleAvg.toStringAsFixed(1)}% '
+                        '· $totalReviews ${AppStrings.hrHeatmapReviewsCount}',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                AppStrings.hrHeatmapMonthlyBreakdown,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final m in months) ...[
+                _MonthBreakdownTile(
+                  month: m,
+                  cell: location.cells
+                      .where((c) => c.monthId == m.id)
+                      .cast<HrHeatmapCell?>()
+                      .firstWhere((_) => true, orElse: () => null),
+                ),
+                const SizedBox(height: 6),
+              ],
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push(AppRoutes.hrEmployees);
+                  },
+                  icon: const Icon(Icons.groups_outlined, size: 18),
+                  label: const Text(
+                    AppStrings.hrHeatmapViewEmployees,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        for (final m in months)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
-            child: _HeatCell(cell: _cellFor(m.id)),
+      );
+    },
+  );
+}
+
+class _MonthBreakdownTile extends StatelessWidget {
+  final HrHeatmapMonth month;
+  final HrHeatmapCell? cell;
+  const _MonthBreakdownTile({required this.month, required this.cell});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = cell?.avgPct;
+    final reviews = cell?.reviewCount ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 60,
+            child: Text(
+              month.label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
           ),
-      ],
+          Expanded(
+            child: Text(
+              '$reviews ${AppStrings.hrHeatmapReviewsCount}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            pct == null ? '—' : '${pct.toStringAsFixed(1)}%',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: pct == null
+                  ? AppColors.textMuted
+                  : AppColors.primaryPurple,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

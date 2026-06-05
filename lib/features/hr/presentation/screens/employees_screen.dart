@@ -119,6 +119,10 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
                 roles: _availableRoles,
                 onChanged: filterCtrl.setRole,
               ),
+              _ActiveFilterChip(
+                value: filter.isActive,
+                onChanged: filterCtrl.setActive,
+              ),
             ],
           ),
           Expanded(
@@ -281,6 +285,71 @@ class _RoleFilterChip extends StatelessWidget {
   String _humanRole(String r) {
     final lower = r.toLowerCase();
     return lower[0].toUpperCase() + lower.substring(1);
+  }
+}
+
+class _ActiveFilterChip extends StatelessWidget {
+  final bool? value;
+  final ValueChanged<bool?> onChanged;
+
+  const _ActiveFilterChip({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<bool?>(
+      tooltip: 'Filter by status',
+      onSelected: onChanged,
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: null,
+          child: Text(AppStrings.employeesFilterStatusAll),
+        ),
+        PopupMenuItem(
+          value: true,
+          child: Text(AppStrings.employeesFilterStatusActive),
+        ),
+        PopupMenuItem(
+          value: false,
+          child: Text(AppStrings.employeesFilterStatusInactive),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              value == false
+                  ? Icons.toggle_off_outlined
+                  : Icons.toggle_on_outlined,
+              color: AppColors.textSecondary,
+              size: 18,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _label(value),
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _label(bool? v) {
+    if (v == null) return AppStrings.employeesFilterStatusAll;
+    return v
+        ? AppStrings.employeesFilterStatusActive
+        : AppStrings.employeesFilterStatusInactive;
   }
 }
 

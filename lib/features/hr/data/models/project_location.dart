@@ -5,6 +5,7 @@ class ProjectLocation {
   final String? code;
   final String? city;
   final String? state;
+  final String? address;
   final String? customer;
   final bool isActive;
 
@@ -14,6 +15,7 @@ class ProjectLocation {
     this.code,
     this.city,
     this.state,
+    this.address,
     this.customer,
     this.isActive = true,
   });
@@ -25,6 +27,7 @@ class ProjectLocation {
       code: json['code'] as String?,
       city: json['city'] as String?,
       state: json['state'] as String?,
+      address: json['address'] as String?,
       customer: json['customer'] as String?,
       isActive: (json['isActive'] as bool?) ?? true,
     );

@@ -139,18 +139,22 @@ class KraTemplateCard extends StatelessWidget {
                   _MetaPill(
                     icon: Icons.format_list_numbered_rounded,
                     label:
-                        '${template.items.length} ${AppStrings.kraTemplatesItems}',
+                        '${template.displayItemCount} ${AppStrings.kraTemplatesItems}',
                   ),
-                  const SizedBox(width: 8),
-                  _MetaPill(
-                    icon: balanced
-                        ? Icons.check_circle_rounded
-                        : Icons.warning_amber_rounded,
-                    label: HrFormatters.weightagePercent(
-                      template.totalWeightage,
+                  // Weightage is only known once items are loaded — the
+                  // list payload omits them, so the card hydrates lazily.
+                  if (template.hasWeightageData) ...[
+                    const SizedBox(width: 8),
+                    _MetaPill(
+                      icon: balanced
+                          ? Icons.check_circle_rounded
+                          : Icons.warning_amber_rounded,
+                      label: HrFormatters.weightagePercent(
+                        template.totalWeightage,
+                      ),
+                      color: balanced ? AppColors.success : AppColors.error,
                     ),
-                    color: balanced ? AppColors.success : AppColors.error,
-                  ),
+                  ],
                 ],
               ),
             ],

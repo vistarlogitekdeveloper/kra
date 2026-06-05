@@ -116,45 +116,125 @@ class SelfRateSuccessScreen extends ConsumerWidget {
   }
 }
 
-class _SuccessIllustration extends StatelessWidget {
+class _SuccessIllustration extends StatefulWidget {
   const _SuccessIllustration();
+
+  @override
+  State<_SuccessIllustration> createState() => _SuccessIllustrationState();
+}
+
+class _SuccessIllustrationState extends State<_SuccessIllustration>
+    with TickerProviderStateMixin {
+  late final AnimationController _ringController;
+  late final AnimationController _checkController;
+
+  late final Animation<double> _outerRing;
+  late final Animation<double> _middleRing;
+  late final Animation<double> _innerScale;
+  late final Animation<double> _checkProgress;
+
+  @override
+  void initState() {
+    super.initState();
+    _ringController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _checkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+
+    _outerRing = CurvedAnimation(
+      parent: _ringController,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+    );
+    _middleRing = CurvedAnimation(
+      parent: _ringController,
+      curve: const Interval(0.15, 0.75, curve: Curves.easeOutCubic),
+    );
+    _innerScale = CurvedAnimation(
+      parent: _ringController,
+      curve: const Interval(0.3, 1.0, curve: Curves.elasticOut),
+    );
+    _checkProgress = CurvedAnimation(
+      parent: _checkController,
+      curve: Curves.easeOutCubic,
+    );
+
+    _ringController.forward();
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (mounted) _checkController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ringController.dispose();
+    _checkController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 132,
-            height: 132,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.success.withValues(alpha: 0.10),
-            ),
-          ),
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.success.withValues(alpha: 0.18),
-            ),
-          ),
-          Container(
-            width: 62,
-            height: 62,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.success,
-            ),
-            child: const Icon(
-              Icons.check_rounded,
-              color: Colors.white,
-              size: 36,
-            ),
-          ),
-        ],
+      child: SizedBox(
+        width: 132,
+        height: 132,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_ringController, _checkController]),
+          builder: (_, __) {
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                Transform.scale(
+                  scale: _outerRing.value,
+                  child: Container(
+                    width: 132,
+                    height: 132,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.success.withValues(alpha: 0.10),
+                    ),
+                  ),
+                ),
+                Transform.scale(
+                  scale: _middleRing.value,
+                  child: Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.success.withValues(alpha: 0.18),
+                    ),
+                  ),
+                ),
+                Transform.scale(
+                  scale: _innerScale.value,
+                  child: Container(
+                    width: 62,
+                    height: 62,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.success,
+                    ),
+                    child: ClipOval(
+                      child: Align(
+                        alignment: const Alignment(0, 0),
+                        widthFactor: _checkProgress.value,
+                        child: const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
