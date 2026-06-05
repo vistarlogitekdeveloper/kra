@@ -64,7 +64,7 @@ class _TeamHistoryScreenState extends ConsumerState<TeamHistoryScreen> {
             review: review,
             employeeName: review.employeeName,
             onTap: () =>
-                context.go(AppRoutes.managerReviewDetail(review.reviewId)),
+                context.push(AppRoutes.managerReviewDetail(review.reviewId)),
           ),
         ),
       ),

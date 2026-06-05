@@ -118,7 +118,7 @@ class TeamListScreen extends ConsumerWidget {
           .toggleSelected(m.reviewId!);
       return;
     }
-    context.go(AppRoutes.managerTeamMember(m.employeeId));
+    context.push(AppRoutes.managerTeamMember(m.employeeId));
   }
 
   void _openBulkApprove(BuildContext context, List<String> reviewIds) {
