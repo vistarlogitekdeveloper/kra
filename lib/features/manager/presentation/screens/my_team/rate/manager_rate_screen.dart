@@ -38,18 +38,15 @@ class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
 
   Future<bool> _confirmDiscardIfDirty() async {
     final state = ref.read(managerRateProvider);
-    // No edits queued → safe to leave.
-    if (state.lastSavedAt != null || !state.isAutoSaving) {
-      // Auto-save means changes are durable on the server — leaving
-      // is safe; just confirm we're not mid-flight.
-      if (!state.isAutoSaving) return true;
-    }
+    // No unsaved edits and no in-flight auto-save → safe to leave
+    // without prompting.
+    if (!state.isDirty && !state.isAutoSaving) return true;
     final ok = await ConfirmActionDialog.show(
       context,
       title: AppStrings.managerRateUnsavedTitle,
       message: AppStrings.managerRateUnsavedMessage,
       confirmLabel: AppStrings.commonDiscard,
-      cancelLabel: AppStrings.commonCancel,
+      cancelLabel: AppStrings.commonKeepEditing,
       icon: Icons.edit_note_rounded,
       accentColor: AppColors.error,
     );
@@ -62,7 +59,7 @@ class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
     final review = state.review;
 
     return PopScope(
-      canPop: !state.isAutoSaving,
+      canPop: !state.isAutoSaving && !state.isDirty,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         if (!await _confirmDiscardIfDirty()) return;
