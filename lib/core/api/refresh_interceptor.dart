@@ -61,9 +61,11 @@ class RefreshInterceptor extends Interceptor {
       return handler.next(err);
     }
 
-    // Don't try to refresh on the auth endpoints themselves.
+    // Don't try to refresh on /auth/login, /auth/refresh, or
+    // /auth/logout — the first two skip auth entirely, and a 401 from
+    // logout just means the session was already invalidated server-side.
     final path = err.requestOptions.path;
-    if (ApiConstants.noAuthEndpoints.contains(path)) {
+    if (ApiConstants.noRefreshOn401Endpoints.contains(path)) {
       return handler.next(err);
     }
 
