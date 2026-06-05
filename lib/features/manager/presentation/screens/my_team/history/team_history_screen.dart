@@ -80,18 +80,18 @@ class _EmptyHistory extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 32),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.inbox_rounded,
+              const Icon(
+                Icons.people_outline_rounded,
                 size: 56,
                 color: AppColors.textMuted,
               ),
-              SizedBox(height: 14),
-              Text(
+              const SizedBox(height: 14),
+              const Text(
                 AppStrings.managerHistoryEmptyTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -100,14 +100,31 @@ class _EmptyHistory extends StatelessWidget {
                   color: AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 6),
-              Text(
+              const SizedBox(height: 6),
+              const Text(
                 AppStrings.managerHistoryEmptyMessage,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                   height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: () => context.go(AppRoutes.managerTeamList),
+                icon: const Icon(Icons.group_outlined, size: 18),
+                label: const Text(AppStrings.managerHistoryOpenTeam),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryPurple,
+                  side: BorderSide(
+                    color: AppColors.primaryPurple.withValues(alpha: 0.4),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],

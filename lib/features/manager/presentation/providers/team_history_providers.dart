@@ -129,6 +129,23 @@ class TeamHistoryListController extends StateNotifier<TeamHistoryListState> {
       page: 0,
       error: null,
     );
+    // The combined `GET /manager/team/history` endpoint does not exist
+    // on the live backend yet — it 404s with a misleading "Employee not
+    // found" because the router treats `history` as an employeeId.
+    // Short-circuit to an empty page so the UI lands on the empty-state
+    // guidance ("pick a team member") instead of a network error.
+    // Per-employee history (called with a real employeeId) is wired and
+    // hits `/manager/team/:id/history`.
+    if (_filter.employeeId == null || _filter.employeeId!.isEmpty) {
+      state = state.copyWith(
+        reviews: const [],
+        page: 1,
+        total: 0,
+        hasMore: false,
+        isInitialLoading: false,
+      );
+      return;
+    }
     try {
       final page = await _repo.listHistory(
         employeeId: _filter.employeeId,

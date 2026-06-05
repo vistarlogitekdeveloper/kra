@@ -767,9 +767,11 @@ class AppStrings {
 
   // ───── Team history ─────
   static const String managerHistoryTitle = 'Team history';
-  static const String managerHistoryEmptyTitle = 'No history yet';
+  static const String managerHistoryEmptyTitle = 'Pick a team member';
   static const String managerHistoryEmptyMessage =
-      'Past quarterly reviews will appear here once a cycle finalises.';
+      'Open a team member from the Team tab to see their quarterly '
+      'review history.';
+  static const String managerHistoryOpenTeam = 'Open Team';
 
   // ───── Drawer / shared ─────
   static const String hrDrawerSwitchToManager = 'Switch to Manager view';
