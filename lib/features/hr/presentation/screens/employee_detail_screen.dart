@@ -133,7 +133,9 @@ class _DetailContent extends StatelessWidget {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => context.push(AppRoutes.hrAssign),
+                onPressed: () => context.push(
+                  '${AppRoutes.hrAssign}?employeeId=${employee.id}',
+                ),
                 icon: const Icon(Icons.assignment_turned_in_outlined,
                     size: 18),
                 label: const Text(

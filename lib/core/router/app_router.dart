@@ -513,7 +513,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // so the bottom nav doesn't show on forms / detail pages.
       GoRoute(
         path: AppRoutes.hrAssign,
-        builder: (_, __) => const KraAssignScreen(),
+        builder: (_, state) => KraAssignScreen(
+          preselectEmployeeId: state.uri.queryParameters['employeeId'],
+        ),
       ),
       GoRoute(
         path: AppRoutes.hrLocations,
