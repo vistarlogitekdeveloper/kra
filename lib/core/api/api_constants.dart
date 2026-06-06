@@ -8,18 +8,15 @@ class ApiConstants {
   ApiConstants._();
 
   // ───── Environment selection ─────
-  // Reads from --dart-define at compile time; falls back to "prod".
-  static const String _environment =
-      String.fromEnvironment('ENV', defaultValue: 'prod');
-
-  static const Map<String, String> _baseUrls = {
-    'dev': 'https://vistar-crm.onrender.com/api/v1/kra/',
-    'staging': 'https://vistar-crm.onrender.com/api/v1/kra/',
-    'prod': 'https://vistar-crm.onrender.com/api/v1/kra/',
-  };
-
-  static String get baseUrl => _baseUrls[_environment] ?? _baseUrls['prod']!;
-  static String get environment => _environment;
+  //
+  // There is only one backend today — the Render-hosted test env.
+  // When staging / prod ship, restore the per-env map and read the
+  // active key via `String.fromEnvironment('ENV')`. Until then,
+  // pretending to switch envs via `--dart-define=ENV=...` is a no-op
+  // and a footgun (callers assume something happens), so the switch
+  // is collapsed to a single constant.
+  static const String baseUrl = 'https://vistar-crm.onrender.com/api/v1/kra/';
+  static const String environment = 'test';
 
   // ───── Endpoint paths (relative to baseUrl) ─────
   static const String authLogin = '/auth/login';
@@ -64,6 +61,17 @@ class ApiConstants {
   static const Set<String> noAuthEndpoints = {
     authLogin,
     authRefresh,
+  };
+
+  // ───── Endpoints that should NOT trigger refresh-and-retry on 401 ─────
+  // The refresh interceptor consults this set before kicking off a
+  // refresh. A 401 from /auth/logout (e.g. token already invalidated
+  // server-side) shouldn't drag us through a refresh loop — local
+  // cleanup runs unconditionally and that's enough.
+  static const Set<String> noRefreshOn401Endpoints = {
+    authLogin,
+    authRefresh,
+    authLogout,
   };
 
   // ───── Timeouts ─────

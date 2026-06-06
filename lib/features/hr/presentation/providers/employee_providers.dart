@@ -26,7 +26,7 @@ class EmployeeFilter {
   const EmployeeFilter({
     this.search = '',
     this.role,
-    this.isActive = true,
+    this.isActive,
   });
 
   EmployeeFilter copyWith({

@@ -21,11 +21,38 @@ import '../../widgets/review_state_badge.dart';
 ///
 /// CTA routes to the review detail so they can still see what they
 /// submitted, plus a "Back to home" escape hatch.
-class SelfRateLockedScreen extends ConsumerWidget {
+class SelfRateLockedScreen extends ConsumerStatefulWidget {
   const SelfRateLockedScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SelfRateLockedScreen> createState() =>
+      _SelfRateLockedScreenState();
+}
+
+class _SelfRateLockedScreenState
+    extends ConsumerState<SelfRateLockedScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Deep-linking straight here (e.g. via a notification) leaves
+    // selfRateProvider in its initial state, so the badge / date /
+    // 'View submission' CTA all silently vanish. Mirror the form's
+    // _ensureLoaded so the screen hydrates from the dashboard.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
+  }
+
+  Future<void> _ensureLoaded() async {
+    final s = ref.read(selfRateProvider);
+    if (s.reviewId != null) return;
+    final dashboard = await ref.read(employeeDashboardProvider.future);
+    final reviewId = dashboard.scorecard?.reviewId;
+    if (!mounted) return;
+    if (reviewId == null || reviewId.isEmpty) return;
+    await ref.read(selfRateProvider.notifier).load(reviewId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(selfRateProvider);
     final review = state.review;
 

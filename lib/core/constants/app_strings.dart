@@ -23,10 +23,7 @@ class AppStrings {
       'Password reset is coming soon. For now, please contact HR.';
 
   // ───── Dashboard ─────
-  static const String dashboardTitleSuffix = 'Dashboard';
   static const String dashboardLogoutTooltip = 'Logout';
-  static const String dashboardGreeting = 'Hello,';
-  static const String dashboardLoggedInAs = 'You are signed in as';
 
   // ───── Validation ─────
   static const String validationEmailRequired = 'Please enter your email';
@@ -425,9 +422,10 @@ class AppStrings {
       'Please rate every KRA before submitting.';
   static const String selfRateUnsavedTitle = 'Unsaved changes';
   static const String selfRateUnsavedMessage =
-      'You have unsaved changes. Save as a draft and exit?';
+      'You have unsaved changes. Leaving now will discard them.';
   static const String selfRateUnsavedSave = 'Save draft';
   static const String selfRateUnsavedDiscard = 'Discard';
+  static const String commonKeepEditing = 'Keep editing';
   static const String selfRateResumeTitle = 'Resume your draft?';
   static const String selfRateResumeMessage =
       'You started rating earlier. Continue where you left off?';
@@ -766,9 +764,11 @@ class AppStrings {
 
   // ───── Team history ─────
   static const String managerHistoryTitle = 'Team history';
-  static const String managerHistoryEmptyTitle = 'No history yet';
+  static const String managerHistoryEmptyTitle = 'Pick a team member';
   static const String managerHistoryEmptyMessage =
-      'Past quarterly reviews will appear here once a cycle finalises.';
+      'Open a team member from the Team tab to see their quarterly '
+      'review history.';
+  static const String managerHistoryOpenTeam = 'Open Team';
 
   // ───── Drawer / shared ─────
   static const String hrDrawerSwitchToManager = 'Switch to Manager view';

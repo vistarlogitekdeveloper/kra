@@ -556,7 +556,7 @@ class _CurrentReviewTab extends StatelessWidget {
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: () =>
-                    context.go(AppRoutes.managerReviewDetail(reviewId)),
+                    context.push(AppRoutes.managerReviewDetail(reviewId)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryPurple,
                   foregroundColor: Colors.white,
@@ -623,7 +623,7 @@ class _HistoryTab extends ConsumerWidget {
         child: HistoryReviewTile(
           review: review,
           onTap: () =>
-              context.go(AppRoutes.managerReviewDetail(review.reviewId)),
+              context.push(AppRoutes.managerReviewDetail(review.reviewId)),
         ),
       ),
     );

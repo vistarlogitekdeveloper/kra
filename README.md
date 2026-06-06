@@ -1,89 +1,82 @@
-# Vistar App — Step 1: Login & Role-Based Routing
+# Vistar KRA & Incentive Management
 
+The company-wide app for setting goals, reviewing performance, and paying out incentive that follows. Every Vistar employee uses it; the surface they see depends on their role.
 
-5 test accounts — all use password Vistar@123:
+Built with Flutter (Android, iOS, Web, Desktop).
 
-Email	Code	Role	Notes
-hr.admin@vistar.test	EMP001	HR_ADMIN	M3 grade
-manager@vistar.test	EMP002	MANAGER	M2, manages EMP003-005
-emp1@vistar.test	EMP003	EMPLOYEE	E1, review state: DRAFT
-emp2@vistar.test	EMP004	EMPLOYEE	E1, review state: EMPLOYEE_SUBMITTED_ALL
-emp3@vistar.test	EMP005	EMPLOYEE	M1, review state: FINALIZED
-ops@vistar.test	EMP006	OPS_EXCELLENCE	M2
-finance@vistar.test	EMP007	FINANCE	
-
-Role	Email
-HR_ADMIN	hr.admin@vistarlogitek.com
-FINANCE	finance@vistarlogitek.com
-OPS_EXCELLENCE	ops@vistarlogitek.com
-MANAGER	manager@vistarlogitek.com
-EMPLOYEE	employee@vistarlogitek.com
-
-
-
-## Setup
+## Quick start
 
 ```bash
 flutter pub get
-flutter run
+flutter analyze        # must report "No issues found"
+flutter test           # must end with "All tests passed!"
+flutter run            # launches on the connected device
 ```
 
 Drop the Vistar logo at `assets/images/vistar_logo.png` if it isn't already there.
 
-## Test Accounts (mock backend)
+## Live test credentials
 
-All passwords are `password123`.
+All passwords are `Vistar@123`. The backend lives at `https://vistar-crm.onrender.com/api/v1/kra/`.
 
-| Employee ID | Name | Role |
-|---|---|---|
-| VLPL0003 | Pravin Wakchware | Employee |
-| VLPL0123 | Amol Veer | Manager |
-| VLPL0107 | Muralidharan K | Ops Excellence |
-| VLPL0610 | Swati Kotkar | HR |
-| VLPL0099 | Sagar Sasane | Finance |
+| Role     | Email                    | Review state for testing               |
+| -------- | ------------------------ | -------------------------------------- |
+| HR_ADMIN | `hr.admin@vistar.test`   |                                        |
+| MANAGER  | `manager@vistar.test`    | manages emp1–emp3                      |
+| EMPLOYEE | `emp1@vistar.test`       | DRAFT (use this to exercise self-rate) |
+| EMPLOYEE | `emp2@vistar.test`       | EMPLOYEE_SUBMITTED_ALL                 |
+| EMPLOYEE | `emp3@vistar.test`       | FINALIZED                              |
 
-You can also log in with email (e.g. `pravin@vistar.com`).
+> **Render cold-start:** the first request after ~15 minutes of inactivity can take 30–60 s. Wait it out before filing a "loading forever" bug.
 
-## Folder Structure
+## Architecture
+
+Feature-first clean architecture. Each module follows `data/{models,repositories}` + `presentation/{providers,screens,widgets}`.
 
 ```
 lib/
-├── core/                    Shared infrastructure
-│   ├── constants/           Colors, strings, asset paths
-│   ├── theme/               Single source of truth for styling
-│   └── router/              GoRouter with auth-aware redirects
+├── core/                shared infra (api, router, theme, widgets, constants, storage)
 └── features/
-    ├── auth/
-    │   ├── data/            Models + repository (mock for now)
-    │   └── presentation/    Login screen, providers, widgets
-    └── dashboards/          Placeholder dashboards per role
+    ├── auth/            login + token lifecycle (live API)
+    ├── hr/              HR Admin module (live API)
+    ├── manager/         Manager surface (live API)
+    └── employee/        Employee surface (live API)
 ```
 
-## When the Real Backend is Ready
+All four modules talk to the live backend.
 
-Open `lib/features/auth/presentation/providers/auth_providers.dart`, find
-this line:
+## Roles → home screens
 
-```dart
-return MockAuthRepository();
+The router picks the landing screen from the authenticated user's role; deep-links to other roles' areas are bounced.
+
+| Role                                    | Lands at                       |
+| --------------------------------------- | ------------------------------ |
+| `HR_ADMIN`, `HR`, `ADMIN`               | `/hr/home`                     |
+| `MANAGER`, `BD_MANAGER`, `WAREHOUSE_MGR`| `/manager/team/dashboard`      |
+| `EMPLOYEE`, `OPS`, `FINANCE`            | `/employee/home`               |
+
+`/employee/*` is intentionally shared across roles — managers and HR_ADMIN self-rate through it.
+
+## Where to read next
+
+- **[USER_MANUAL.md](USER_MANUAL.md)** — what each screen does and how a quarter flows end-to-end (setup → self-rate → manager-rate → finalise → payout).
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** — step-by-step manual test plan with stable case IDs (e.g. *3.5*), credentials, severity rubric, and a known-unbuilt list so testers don't file noise tickets.
+- **[CLAUDE.md](CLAUDE.md)** — project guide for AI assistants (stack, conventions, status).
+- **[docs/BACKEND_RBAC_FINDINGS.md](docs/BACKEND_RBAC_FINDINGS.md)** — current backend role-enforcement audit results + reproducible Node probe script.
+
+## Optional tooling
+
+```bash
+node scripts/probe-rbac.mjs    # probe live backend RBAC; results in docs/BACKEND_RBAC_FINDINGS.md
 ```
 
-Replace it with `ApiAuthRepository()` (a class you'll write that calls
-your real `/api/auth/login` endpoint). The login screen, router, and
-state management do not need any other changes.
+## Status
 
-## What Step 1 Delivers
+| Step | Module    | State                                                                                         |
+| ---- | --------- | --------------------------------------------------------------------------------------------- |
+| 1    | Auth      | ✅ live API                                                                                    |
+| 2    | HR Admin  | ✅ live API (audit log aliased to recent-activity; reports/close-cycle still placeholders)     |
+| 3    | Employee  | ✅ live API                                                                                    |
+| 4    | Manager   | ✅ live API (combined team-history endpoint pending on backend)                                |
 
-- Branded login screen (Vistar colors, logo, animations)
-- Form validation (empty / too-short fields caught before submit)
-- Show/hide password toggle
-- Loading state on the button
-- Error messages via SnackBar
-- Auto-redirect: logged-in users skip login, logged-out users can't reach dashboards
-- 5 placeholder dashboards (employee/manager/ops/hr/finance)
-- Logout works and returns to login
-
-## Step 2 (Next)
-
-Build the **HR Module** — KRA setup, employee master, bonus slabs.
-Without this data nothing else has anything to operate on.
+See [CLAUDE.md §Project Status](CLAUDE.md#project-status) for the full caveat list.

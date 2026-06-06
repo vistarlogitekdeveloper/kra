@@ -53,6 +53,11 @@ class ManagerRateState {
   final DateTime? lastSavedAt;
   final String? autoSaveError;
 
+  /// True when the user has edits (cells or comment) that have not
+  /// yet been persisted via auto-save. Drives the back-press guard.
+  /// Falls back to false on a fresh load / after a successful flush.
+  final bool isDirty;
+
   /// Submit flight.
   final bool isSubmitting;
   final String? submitError;
@@ -75,6 +80,7 @@ class ManagerRateState {
     this.isAutoSaving = false,
     this.lastSavedAt,
     this.autoSaveError,
+    this.isDirty = false,
     this.isSubmitting = false,
     this.submitError,
     this.lastSubmitResponse,
@@ -127,6 +133,7 @@ class ManagerRateState {
     bool? isAutoSaving,
     Object? lastSavedAt = _sentinel,
     Object? autoSaveError = _sentinel,
+    bool? isDirty,
     bool? isSubmitting,
     Object? submitError = _sentinel,
     Object? lastSubmitResponse = _sentinel,
@@ -147,6 +154,7 @@ class ManagerRateState {
       autoSaveError: identical(autoSaveError, _sentinel)
           ? this.autoSaveError
           : autoSaveError as String?,
+      isDirty: isDirty ?? this.isDirty,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       submitError: identical(submitError, _sentinel)
           ? this.submitError
@@ -187,6 +195,12 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
   /// keeps the payload small and avoids races with concurrent saves.
   final Set<String> _dirtyCellIds = {};
 
+  /// The comment value at the most recent successful flush (or load).
+  /// Used to detect comment-only edits — including clearing a
+  /// previously-saved comment back to empty — so the auto-save
+  /// doesn't silently drop them.
+  String _lastSavedComment = '';
+
   ManagerRateNotifier(this._ref, this._repo)
       : super(const ManagerRateState());
 
@@ -207,12 +221,17 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
           (review.state == ReviewState.managerRatedAll
               ? ManagerRateMode.edit
               : ManagerRateMode.create);
+      final loadedComment = review.managerComment ?? '';
+      _lastSavedComment = loadedComment;
+      _hasDirtyChangesSinceSave = false;
+      _dirtyCellIds.clear();
       state = state.copyWith(
         review: review,
         mode: resolvedMode,
-        managerComment: review.managerComment ?? '',
+        managerComment: loadedComment,
         isLoading: false,
         autoSaveError: null,
+        isDirty: false,
       );
     } on ApiError catch (e) {
       state = state.copyWith(isLoading: false, loadError: e.message);
@@ -235,7 +254,7 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
   }
 
   void setManagerComment(String value) {
-    state = state.copyWith(managerComment: value);
+    state = state.copyWith(managerComment: value, isDirty: true);
     _hasDirtyChangesSinceSave = true;
     _scheduleAutoSave();
   }
@@ -259,7 +278,10 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
     if (touchedRow == null || touchedCell == null) return;
     final updatedCell = edit(touchedCell);
     final updatedRow = touchedRow.withUpdatedCell(updatedCell);
-    state = state.copyWith(review: review.withUpdatedRow(updatedRow));
+    state = state.copyWith(
+      review: review.withUpdatedRow(updatedRow),
+      isDirty: true,
+    );
     _dirtyCellIds.add(cellId);
     _hasDirtyChangesSinceSave = true;
     _scheduleAutoSave();
@@ -275,7 +297,15 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
   }
 
   Future<void> _maybeFlushAutoSave() async {
-    if (!_hasDirtyChangesSinceSave) return;
+    if (!_hasDirtyChangesSinceSave) {
+      // No edits since the last successful save — the periodic timer
+      // has nothing to do, and re-firing every 5s forever is wasteful.
+      // Tear it down; the next edit will reschedule via setCellRating /
+      // setManagerComment.
+      _autoSaveTimer?.cancel();
+      _autoSaveTimer = null;
+      return;
+    }
     final reviewId = state.reviewId;
     final review = state.review;
     if (reviewId == null || review == null) return;
@@ -295,8 +325,18 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
           ));
         }
       }
-      if (scores.isEmpty && state.managerComment.isEmpty) {
-        state = state.copyWith(isAutoSaving: false);
+      // Nothing to send if no cells were touched AND the comment
+      // matches the last persisted value. Comparing against
+      // `_lastSavedComment` — not `isEmpty` — means clearing a
+      // previously-saved comment back to empty still produces a
+      // PATCH so the server actually clears it.
+      final commentChanged = state.managerComment != _lastSavedComment;
+      if (scores.isEmpty && !commentChanged) {
+        state = state.copyWith(
+          isAutoSaving: false,
+          // Nothing left to save => no longer dirty.
+          isDirty: false,
+        );
         return;
       }
       await _repo.autoSaveScores(
@@ -309,10 +349,16 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
           autoSubmit: false,
         ),
       );
+      _lastSavedComment = state.managerComment;
       state = state.copyWith(
         isAutoSaving: false,
         lastSavedAt: DateTime.now(),
         autoSaveError: null,
+        // After a successful flush, anything in `_dirtyCellIds`
+        // that arrived during the in-flight save is still dirty;
+        // otherwise we're clean.
+        isDirty:
+            _hasDirtyChangesSinceSave || _dirtyCellIds.isNotEmpty,
       );
     } catch (e, st) {
       assert(() {
@@ -414,6 +460,7 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
     _autoSaveTimer = null;
     _hasDirtyChangesSinceSave = false;
     _dirtyCellIds.clear();
+    _lastSavedComment = '';
     state = const ManagerRateState();
   }
 

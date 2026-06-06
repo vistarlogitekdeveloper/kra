@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/api/api_constants.dart';
 import '../../../../core/api/api_error.dart';
+import '../../../../core/api/envelope.dart';
 import '../../../../core/api/retry_policy.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../models/token_pair.dart';
@@ -51,7 +52,7 @@ class ApiAuthRepository implements AuthRepository {
         ),
       );
 
-      final payload = _unwrap(response);
+      final payload = unwrapObject(response);
       final tokens = TokenPair.fromJson(
         payload['tokenPair'] as Map<String, dynamic>,
       );
@@ -110,7 +111,7 @@ class ApiAuthRepository implements AuthRepository {
   Future<User?> refreshCurrentUser() async {
     try {
       final response = await _dio.get(ApiConstants.authMe);
-      final userJson = _unwrap(response);
+      final userJson = unwrapObject(response);
       final user = User.fromJson(userJson);
       await _storage.writeUserJson(userJson);
       return user;
@@ -120,39 +121,6 @@ class ApiAuthRepository implements AuthRepository {
     } catch (_) {
       return null;
     }
-  }
-
-  /// Returns `data` from the standard envelope, or throws an [ApiError]
-  /// shaped from the envelope's error block.
-  Map<String, dynamic> _unwrap(Response response) {
-    final body = response.data;
-    if (body is! Map<String, dynamic>) {
-      throw const ApiError(
-        type: ApiErrorType.unknown,
-        code: 'BAD_RESPONSE',
-        message: 'Unexpected response from the server. Please try again.',
-      );
-    }
-    if (body[ApiConstants.envelopeSuccess] != true) {
-      final err = body[ApiConstants.envelopeError];
-      final code = err is Map ? err['code'] as String? : null;
-      final msg = err is Map ? err['message'] as String? : null;
-      throw ApiError(
-        type: ApiErrorType.unknown,
-        code: code ?? 'UNKNOWN',
-        message: msg ?? 'Something went wrong. Please try again.',
-        statusCode: response.statusCode,
-      );
-    }
-    final data = body[ApiConstants.envelopeData];
-    if (data is! Map<String, dynamic>) {
-      throw const ApiError(
-        type: ApiErrorType.unknown,
-        code: 'BAD_RESPONSE',
-        message: 'Unexpected response from the server. Please try again.',
-      );
-    }
-    return data;
   }
 
   AuthException _toAuthException(ApiError error) {

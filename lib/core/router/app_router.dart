@@ -6,7 +6,6 @@ import '../../features/auth/data/models/user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../widgets/route_error_screen.dart';
-import '../../features/dashboards/placeholder_dashboard.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
 import '../../features/employee/presentation/screens/history/my_reviews_history_screen.dart';
 import '../../features/employee/presentation/screens/history/review_detail_screen.dart';
@@ -57,9 +56,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String employeeDashboard = '/employee';
   static const String managerDashboard = '/manager';
-  static const String opsDashboard = '/ops';
   static const String hrDashboard = '/hr';
-  static const String financeDashboard = '/finance';
 
   // ── Employee module nested routes ──
   // Every authenticated user (except ADMIN) lands inside /employee/* —
@@ -109,11 +106,6 @@ class AppRoutes {
   static const String managerTeamBulkApprove = '/manager/team/bulk-approve';
   static const String managerTeamBulkApproveResult =
       '/manager/team/bulk-approve/result';
-
-  static const String managerReviewHome = '/manager/review/home';
-  static const String managerReviewSelfRate = '/manager/review/self-rate';
-  static const String managerReviewHistory = '/manager/review/history';
-  static const String managerReviewProfile = '/manager/review/profile';
 
   // Parameterised manager routes — pushed pages outside the inner shell
   // so they cover the bottom nav when navigated to.
@@ -209,11 +201,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
       final goingToLogin = state.matchedLocation == AppRoutes.login;
+      // Match `/hr` exactly OR any `/hr/...` sub-route — but not a
+      // hypothetical sibling like `/hr-self-service`, which a naive
+      // startsWith would have silently inherited the HR-only guard.
+      final loc = state.matchedLocation;
       final goingToHrArea =
-          state.matchedLocation.startsWith(AppRoutes.hrDashboard);
-
-      final goingToManagerArea =
-          state.matchedLocation.startsWith(AppRoutes.managerDashboard);
+          loc == AppRoutes.hrDashboard || loc.startsWith('${AppRoutes.hrDashboard}/');
+      final goingToManagerArea = loc == AppRoutes.managerDashboard ||
+          loc.startsWith('${AppRoutes.managerDashboard}/');
 
       if (authState is AuthAuthenticated) {
         if (goingToLogin) {
@@ -347,17 +342,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
-      ),
-
-      // ───── Other role-specific placeholders ─────
-      GoRoute(
-        path: AppRoutes.opsDashboard,
-        builder: (_, __) => const PlaceholderDashboard(role: UserRole.ops),
-      ),
-      GoRoute(
-        path: AppRoutes.financeDashboard,
-        builder: (_, __) =>
-            const PlaceholderDashboard(role: UserRole.finance),
       ),
 
       // ───── Manager module ─────
@@ -529,7 +513,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // so the bottom nav doesn't show on forms / detail pages.
       GoRoute(
         path: AppRoutes.hrAssign,
-        builder: (_, __) => const KraAssignScreen(),
+        builder: (_, state) => KraAssignScreen(
+          preselectEmployeeId: state.uri.queryParameters['employeeId'],
+        ),
       ),
       GoRoute(
         path: AppRoutes.hrLocations,

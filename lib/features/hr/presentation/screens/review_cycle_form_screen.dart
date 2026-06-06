@@ -147,6 +147,7 @@ class _ReviewCycleFormScreenState
                 current: _selfRating,
                 onPicked: (d) => setState(() => _selfRating = d),
               ),
+              onClear: () => setState(() => _selfRating = null),
             ),
             const SizedBox(height: 12),
             _DateField(
@@ -157,6 +158,7 @@ class _ReviewCycleFormScreenState
                 current: _managerReview,
                 onPicked: (d) => setState(() => _managerReview = d),
               ),
+              onClear: () => setState(() => _managerReview = null),
             ),
             const SizedBox(height: 12),
             _DateField(
@@ -167,6 +169,7 @@ class _ReviewCycleFormScreenState
                 current: _opsScoring,
                 onPicked: (d) => setState(() => _opsScoring = d),
               ),
+              onClear: () => setState(() => _opsScoring = null),
             ),
             const SizedBox(height: 12),
             _DateField(
@@ -177,6 +180,7 @@ class _ReviewCycleFormScreenState
                 current: _financeScoring,
                 onPicked: (d) => setState(() => _financeScoring = d),
               ),
+              onClear: () => setState(() => _financeScoring = null),
             ),
             const SizedBox(height: 28),
             BrandedPrimaryButton(
@@ -214,11 +218,13 @@ class _DateField extends StatelessWidget {
   final String label;
   final DateTime? value;
   final VoidCallback onTap;
+  final VoidCallback? onClear;
   final bool optional;
   const _DateField({
     required this.label,
     required this.value,
     required this.onTap,
+    this.onClear,
     this.optional = false,
   });
 
@@ -281,14 +287,15 @@ class _DateField extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (value != null)
+                if (value != null && onClear != null)
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 16),
-                    onPressed: onTap,
+                    onPressed: onClear,
                     color: AppColors.textMuted,
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
+                    tooltip: 'Clear',
                   ),
               ],
             ),

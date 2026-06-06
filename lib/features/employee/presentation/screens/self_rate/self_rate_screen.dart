@@ -95,12 +95,14 @@ class _SelfRateScreenState extends ConsumerState<SelfRateScreen> {
       context,
       title: AppStrings.selfRateUnsavedTitle,
       message: AppStrings.selfRateUnsavedMessage,
-      confirmLabel: AppStrings.selfRateUnsavedSave,
-      cancelLabel: AppStrings.selfRateUnsavedDiscard,
-      icon: Icons.save_rounded,
-      accentColor: AppColors.primaryPurple,
+      confirmLabel: AppStrings.selfRateUnsavedDiscard,
+      cancelLabel: AppStrings.commonKeepEditing,
+      icon: Icons.edit_note_rounded,
+      accentColor: AppColors.error,
     );
-    return ok != null; // dismissed → stay; any choice → leave
+    // Only the destructive 'Discard' returns true → leave.
+    // 'Keep editing' (false) and outside-tap (null) → stay.
+    return ok == true;
   }
 
   @override

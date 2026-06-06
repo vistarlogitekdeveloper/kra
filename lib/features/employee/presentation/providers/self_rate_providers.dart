@@ -584,17 +584,6 @@ class DraftResumeInfo {
   const DraftResumeInfo({required this.savedAt, required this.entryCount});
 }
 
-/// Public read-only view of the pending draft (if any). Returns `null`
-/// when no draft is pending — the screen hides the resume prompt.
-final selfRateResumeInfoProvider = Provider<DraftResumeInfo?>((ref) {
-  final draft = ref.watch(selfRateProvider.select((s) => s.pendingDraft));
-  if (draft == null) return null;
-  return DraftResumeInfo(
-    savedAt: draft.savedAt,
-    entryCount: draft.entries.length,
-  );
-});
-
 /// The notifier. autoDispose'd so the form's in-memory state is fresh
 /// every time the user enters the self-rate tab — the persisted draft
 /// is the source of truth across re-opens.

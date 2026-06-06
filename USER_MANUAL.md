@@ -190,9 +190,8 @@ The manager shell has a **mode switcher at the top** — "My Team" (default) and
 
 Every direct report, with the latest cycle's state and a 3-month trend strip per row.
 
-- **Filter chips** — by review state (Pending Self-Rate, Pending Manager, Done, Overdue), by location, by score band.
-- **Long-press a tile** to enter **bulk-select mode**.
-  - App bar swaps to a count + actions row.
+- **Filter chips** — by review state (Pending Self-Rate, Pending Manager, Done, Overdue). Location + score-band axes are planned but not yet wired.
+- **Bulk select** — tap the checklist icon in the app bar to enter selection mode. The app bar swaps to a count + actions row.
   - Pick multiple reviews → **Bulk Approve** → `/manager/team/bulk-approve?ids=…`.
 
 #### 5.2.1 Team Member Profile `/manager/team/list/:employeeId`
@@ -288,7 +287,7 @@ Every past review the employee has done.
 - **Profile header** — photo, name, role, employee code.
 - **Field rows** — email (read-only), phone (editable), location, reporting manager.
 - **My Manager card** — name + role; tap to call/email.
-- **Edit** → `/employee/profile/edit` — currently only `phone` and `photoUrl` are PATCHable; everything else is HR-owned.
+- **Edit** → `/employee/profile/edit` — only `phone` is exposed in the UI today. The repository would also accept `photoUrl`, but the photo picker is marked "coming soon" on the form. Everything else is HR-owned.
 - **Reporting tree** → `/employee/profile/reporting-tree` — visual chain up to the CEO.
 - **Sign out** at the bottom.
 
@@ -333,6 +332,8 @@ The app listens to `connectivity_plus`. Going offline shows a thin grey strip ac
 - Every route lives on `AppRoutes` — no raw strings at call sites.
 - The router's redirect rules run on every auth-state change, so logging out from any tab returns to `/login` immediately.
 - Unknown routes hit the **RouteErrorScreen** with a working "Go to Home" button.
+- **Role guards**: `/hr/*` is gated to HR / HR_ADMIN / ADMIN; `/manager/*` is gated to MANAGER / BD_MANAGER / WAREHOUSE_MGR / HR_ADMIN / ADMIN. Deep-links into either area as a non-permitted role are bounced to the user's own dashboard.
+- **`/employee/*` is intentionally shared across roles.** Every authenticated user — including managers and HR_ADMIN — uses the employee surface to self-rate their own KRAs (Step 4 spec design). This is not a leak: managers see only their own KRAs because every employee-side endpoint is scoped to `req.user.id` server-side. If you find an employee-side endpoint that returns someone else's data, *that* would be a bug — file it.
 
 ### 7.7 Audit log
 
@@ -359,8 +360,15 @@ To tie it all together, here is what happens in calendar order in a typical Q1 c
 **Mock backend** (offline / unit tests):
 - HR_ADMIN — `VLPL0610` / `password123` (Swati Kotkar)
 
-**Live backend** (`https://vistar-crm.onrender.com/api/v1/kra/`):
-- `@vistar.test` users, password `Vistar@123`. The test env currently uses slug IDs for cycles (`cyc_q1_fy2627`) but write validators expect UUIDs — flag any write 400s back to the backend team rather than treating them as app bugs.
+**Live backend** (`https://vistar-crm.onrender.com/api/v1/kra/`) — all passwords `Vistar@123`:
+
+| Role | Email |
+|------|-------|
+| HR_ADMIN | `hr.admin@vistar.test` |
+| MANAGER | `manager@vistar.test` |
+| EMPLOYEE | `emp1@vistar.test` (DRAFT) · `emp2@vistar.test` (EMPLOYEE_SUBMITTED_ALL) · `emp3@vistar.test` (FINALIZED) |
+
+The test env currently uses slug IDs for cycles (`cyc_q1_fy2627`) but write validators expect UUIDs — flag any write 400s back to the backend team rather than treating them as app bugs.
 
 ---
 

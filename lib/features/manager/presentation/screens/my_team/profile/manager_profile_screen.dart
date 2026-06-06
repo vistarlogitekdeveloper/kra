@@ -9,18 +9,12 @@ import '../../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../../employee/presentation/screens/profile/widgets/profile_header.dart';
 import '../../../../../employee/presentation/screens/profile/widgets/profile_field_row.dart';
 import '../../../../../hr/presentation/widgets/confirm_action_dialog.dart';
-import '../../../../data/models/enums.dart';
-import '../../../providers/manager_mode_provider.dart';
 
 /// Manager-shell Profile tab. Lighter than the employee profile —
 /// the manager-mode user is the same person who owns the employee
 /// /employee/profile route, so we just surface the logged-in
-/// identity, a manager-mode toggle, and the logout affordance.
-///
-/// Tapping "Switch to My Review" flips the mode and re-routes the
-/// shell to /manager/my-review/home (handled by the parent shell's
-/// IndexedStack). Tapping "View as Employee" deep-links to the
-/// dedicated /employee surface for full profile editing.
+/// identity, a "View as Employee" deep link into /employee/* for
+/// self-rate, and the logout affordance.
 class ManagerProfileScreen extends ConsumerWidget {
   const ManagerProfileScreen({super.key});
 
@@ -44,7 +38,6 @@ class ManagerProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
     final user =
         authState is AuthAuthenticated ? authState.user : null;
-    final mode = ref.watch(managerModeProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -64,12 +57,6 @@ class ManagerProfileScreen extends ConsumerWidget {
           children: [
             if (user != null)
               _IdentityHeader(name: user.fullName, role: user.role.displayName),
-            const SizedBox(height: 16),
-            _ModeSection(
-              currentMode: mode,
-              onPickMode: (m) =>
-                  ref.read(managerModeProvider.notifier).setMode(m),
-            ),
             const SizedBox(height: 16),
             _LinksSection(),
             const SizedBox(height: 20),
@@ -186,122 +173,6 @@ class _IdentityHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ModeSection extends StatelessWidget {
-  final ManagerMode currentMode;
-  final ValueChanged<ManagerMode> onPickMode;
-  const _ModeSection({
-    required this.currentMode,
-    required this.onPickMode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 6),
-          child: Text(
-            AppStrings.managerProfileModeSectionLabel,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textSecondary,
-              letterSpacing: 0.6,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Column(
-            children: [
-              _ModeTile(
-                icon: Icons.groups_rounded,
-                label: AppStrings.managerProfileModeMyTeam,
-                isActive: currentMode == ManagerMode.myTeam,
-                onTap: () => onPickMode(ManagerMode.myTeam),
-              ),
-              const Divider(
-                color: AppColors.divider,
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-              ),
-              _ModeTile(
-                icon: Icons.person_rounded,
-                label: AppStrings.managerProfileModeMyReview,
-                isActive: currentMode == ManagerMode.myReview,
-                onTap: () => onPickMode(ManagerMode.myReview),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ModeTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-  const _ModeTile({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isActive
-                    ? AppColors.primaryPurple
-                    : AppColors.textSecondary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: isActive
-                        ? AppColors.primaryPurple
-                        : AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              if (isActive)
-                const Icon(
-                  Icons.check_rounded,
-                  size: 18,
-                  color: AppColors.primaryPurple,
-                ),
-            ],
-          ),
-        ),
       ),
     );
   }

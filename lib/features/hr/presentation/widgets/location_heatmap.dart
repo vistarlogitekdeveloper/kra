@@ -229,6 +229,13 @@ class _LocationRow extends StatelessWidget {
   }
 }
 
+HrHeatmapCell? _cellForMonth(HrHeatmapLocation location, String monthId) {
+  for (final c in location.cells) {
+    if (c.monthId == monthId) return c;
+  }
+  return null;
+}
+
 Future<void> _showLocationSheet(
   BuildContext context,
   HrHeatmapLocation location,
@@ -308,10 +315,7 @@ Future<void> _showLocationSheet(
               for (final m in months) ...[
                 _MonthBreakdownTile(
                   month: m,
-                  cell: location.cells
-                      .where((c) => c.monthId == m.id)
-                      .cast<HrHeatmapCell?>()
-                      .firstWhere((_) => true, orElse: () => null),
+                  cell: _cellForMonth(location, m.id),
                 ),
                 const SizedBox(height: 6),
               ],

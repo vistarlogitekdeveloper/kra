@@ -185,6 +185,51 @@ void main() {
       expect(c.lastSavedAt, isNull);
     });
   });
+
+  group('ManagerRateState.isDirty', () {
+    // The discard-confirm guard on the rate screen consults isDirty;
+    // a regression here would silently dump unsaved edits when the
+    // user taps back. Make the contract explicit.
+
+    test('defaults to false on a fresh state', () {
+      const s = ManagerRateState();
+      expect(s.isDirty, isFalse);
+    });
+
+    test('copyWith carries isDirty=true through untouched fields', () {
+      const initial = ManagerRateState();
+      final dirty = initial.copyWith(isDirty: true);
+      expect(dirty.isDirty, isTrue);
+      final stillDirty = dirty.copyWith(managerComment: 'edited');
+      expect(stillDirty.isDirty, isTrue,
+          reason: 'isDirty must persist across other-field copyWiths');
+    });
+
+    test('copyWith can clear isDirty back to false after a flush', () {
+      const dirty = ManagerRateState(isDirty: true);
+      final clean = dirty.copyWith(isDirty: false);
+      expect(clean.isDirty, isFalse);
+    });
+
+    test('isDirty is independent of isAutoSaving', () {
+      // The pre-fix screen logic conflated the two — a freshly typed
+      // edit with no autosave in flight was treated as 'safe to leave'.
+      // The new state field separates them.
+      const editingMidTick = ManagerRateState(
+        isDirty: true,
+        isAutoSaving: false,
+      );
+      expect(editingMidTick.isDirty, isTrue);
+      expect(editingMidTick.isAutoSaving, isFalse);
+
+      const flushing = ManagerRateState(
+        isDirty: false,
+        isAutoSaving: true,
+      );
+      expect(flushing.isDirty, isFalse);
+      expect(flushing.isAutoSaving, isTrue);
+    });
+  });
 }
 
 // ─── Test fixture helpers ──────────────────────────────────────────────

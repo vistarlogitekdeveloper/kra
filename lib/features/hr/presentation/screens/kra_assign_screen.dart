@@ -26,7 +26,12 @@ import '../widgets/weightage_indicator.dart';
 /// State is held in [_AssignWizardState] so step transitions don't
 /// re-fetch data. Bulk-assign happens on the final step's confirm tap.
 class KraAssignScreen extends ConsumerStatefulWidget {
-  const KraAssignScreen({super.key});
+  /// Optional employee id to pre-select on entering the wizard —
+  /// pushed in by the employee-detail "Assign KRA" CTA so the user
+  /// doesn't have to search/select the same person twice.
+  final String? preselectEmployeeId;
+
+  const KraAssignScreen({super.key, this.preselectEmployeeId});
 
   @override
   ConsumerState<KraAssignScreen> createState() => _KraAssignScreenState();
@@ -36,6 +41,16 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
   int _step = 0;
 
   final Set<String> _selectedEmployeeIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.preselectEmployeeId;
+    if (id != null && id.isNotEmpty) {
+      _selectedEmployeeIds.add(id);
+    }
+  }
+
   String _employeeSearch = '';
   KraTemplate? _selectedTemplate;
   ReviewCycle? _selectedCycle;

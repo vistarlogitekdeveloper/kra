@@ -366,7 +366,7 @@ class _ReadyToRateSection extends StatelessWidget {
         if (review.permissions.canRate)
           _PrimaryCta(
             label: AppStrings.managerReviewDetailStartRating,
-            onTap: () => context.go(AppRoutes.managerRate(review.id)),
+            onTap: () => context.push(AppRoutes.managerRate(review.id)),
             icon: Icons.rate_review_rounded,
           ),
       ],
@@ -391,7 +391,7 @@ class _RatedSection extends StatelessWidget {
         if (review.permissions.canEdit)
           _PrimaryCta(
             label: AppStrings.managerReviewDetailEditRating,
-            onTap: () => context.go(AppRoutes.managerRate(review.id)),
+            onTap: () => context.push(AppRoutes.managerRate(review.id)),
             icon: Icons.edit_rounded,
           ),
       ],

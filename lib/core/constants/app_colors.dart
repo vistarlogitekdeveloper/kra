@@ -32,18 +32,6 @@ class AppColors {
   // over a white surface, so it round-trips cleanly across screenshots.
   static const Color primaryPurpleSurface = Color(0xFFF1ECF4);
 
-  // The signature Vistar gradient (used sparingly, on hero elements only)
-  static const LinearGradient brandGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      primaryPurple,
-      accentRed,
-      accentOrange,
-      accentYellow,
-    ],
-    stops: [0.0, 0.4, 0.7, 1.0],
-  );
 
   // Subtle background gradient for the login screen
   static const LinearGradient backgroundGradient = LinearGradient(

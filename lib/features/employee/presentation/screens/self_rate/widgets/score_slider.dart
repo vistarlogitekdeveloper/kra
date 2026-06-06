@@ -38,7 +38,12 @@ class ScoreSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = isNotApplicable;
-    final effective = (value ?? 0).clamp(0.0, maxScore);
+    // Slider asserts max > min; some template items can carry a
+    // degenerate maxScore == 0 (or negative on a bad payload), which
+    // crashes the widget. Substitute a positive sentinel so render
+    // succeeds; the slider is then forced disabled below.
+    final safeMax = maxScore > 0 ? maxScore : 1.0;
+    final effective = (value ?? 0).clamp(0.0, safeMax);
     final accent =
         hasError && !disabled ? AppColors.error : AppColors.primaryPurple;
     final label = isNotApplicable
@@ -110,15 +115,18 @@ class ScoreSlider extends StatelessWidget {
                 const RoundSliderOverlayShape(overlayRadius: 22),
           ),
           child: Slider(
-            value: effective.toDouble(),
+            value: effective.toDouble().clamp(0.0, safeMax),
             min: 0,
-            max: maxScore,
+            // Slider asserts max > min, which trips on degenerate
+            // rows whose template item carries maxScore == 0. Use a
+            // safe positive max so the widget renders (disabled).
+            max: safeMax,
             // Half-point snaps. `(maxScore*2).toInt()` divisions gives
             // 21 stops for a 10-point scale.
-            divisions: (maxScore * 2).toInt().clamp(1, 100),
+            divisions: (safeMax * 2).toInt().clamp(1, 100),
             label: EmployeeFormatters.scoreOutOf(effective, maxScore),
-            onChanged: disabled ? null : onChanged,
-            onChangeEnd: disabled ? null : onChangeEnd,
+            onChanged: (disabled || maxScore <= 0) ? null : onChanged,
+            onChangeEnd: (disabled || maxScore <= 0) ? null : onChangeEnd,
           ),
         ),
         const Padding(

@@ -32,21 +32,44 @@ class PendingAction {
   bool get isOverdue =>
       deadlineRemaining != null && deadlineRemaining! < 0;
 
-  factory PendingAction.fromJson(Map<String, dynamic> json) =>
-      PendingAction(
-        reviewId: JsonParse.parseString(json['reviewId']) ?? '',
-        employeeId: JsonParse.parseString(json['employeeId']) ?? '',
-        employeeName: JsonParse.parseString(json['employeeName']) ?? '',
-        employeeCode:
-            JsonParse.parseString(json['employeeCode']) ?? '',
-        monthLabel: JsonParse.parseString(json['monthLabel']) ?? '',
-        submittedAt: JsonParse.parseDate(json['submittedAt']),
-        // Live backend names this `daysRemaining`; older payloads use
-        // `deadlineRemaining`. Accept either so the deadline/overdue chip
-        // isn't silently stuck at null.
-        deadlineRemaining: JsonParse.parseInt(json['deadlineRemaining']) ??
-            JsonParse.parseInt(json['daysRemaining']),
-      );
+  factory PendingAction.fromJson(Map<String, dynamic> json) {
+    // The live backend nests the employee under an `employee` object;
+    // older payloads inline the fields. Read live shape first, fall
+    // back to flat — same pattern as TeamMember.fromJson.
+    final employee = json['employee'];
+    final empMap = employee is Map<String, dynamic> ? employee : const {};
+
+    // Month label may come nested as `month.monthLabel` on live.
+    final month = json['month'];
+    final monthMap = month is Map<String, dynamic> ? month : const {};
+
+    return PendingAction(
+      reviewId: JsonParse.parseString(json['reviewId']) ??
+          JsonParse.parseString(json['id']) ??
+          '',
+      employeeId: JsonParse.parseString(empMap['id']) ??
+          JsonParse.parseString(json['employeeId']) ??
+          '',
+      employeeName: JsonParse.parseString(empMap['name']) ??
+          JsonParse.parseString(empMap['fullName']) ??
+          JsonParse.parseString(json['employeeName']) ??
+          '',
+      employeeCode: JsonParse.parseString(empMap['employeeCode']) ??
+          JsonParse.parseString(empMap['code']) ??
+          JsonParse.parseString(json['employeeCode']) ??
+          '',
+      monthLabel: JsonParse.parseString(monthMap['monthLabel']) ??
+          JsonParse.parseString(monthMap['label']) ??
+          JsonParse.parseString(json['monthLabel']) ??
+          '',
+      submittedAt: JsonParse.parseDate(json['submittedAt']),
+      // Live backend names this `daysRemaining`; older payloads use
+      // `deadlineRemaining`. Accept either so the deadline/overdue chip
+      // isn't silently stuck at null.
+      deadlineRemaining: JsonParse.parseInt(json['deadlineRemaining']) ??
+          JsonParse.parseInt(json['daysRemaining']),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'reviewId': reviewId,

@@ -31,13 +31,15 @@ If you've never touched the app before, read [USER_MANUAL.md](USER_MANUAL.md) fi
 
 ### 1.3 Test credentials
 
-Always sign in with a real test account — never use production credentials.
+Always sign in with a real test account — never use production credentials. All passwords are `Vistar@123`.
 
-| Role | Email | Password |
-|------|-------|----------|
-| HR_ADMIN | `hradmin@vistar.test` | `Vistar@123` |
-| MANAGER | `manager@vistar.test` | `Vistar@123` |
-| EMPLOYEE | `employee@vistar.test` | `Vistar@123` |
+| Role | Email | Notes |
+|------|-------|-------|
+| HR_ADMIN | `hr.admin@vistar.test` | note the dot |
+| MANAGER | `manager@vistar.test` | manages emp1–emp3 |
+| EMPLOYEE | `emp1@vistar.test` | review state DRAFT — exercise full self-rate flow here |
+| EMPLOYEE | `emp2@vistar.test` | review state EMPLOYEE_SUBMITTED_ALL — exercises the manager-rate inbox |
+| EMPLOYEE | `emp3@vistar.test` | review state FINALIZED — read-only history |
 
 If a credential is rotated or removed, ask dev for the current set — don't guess.
 
@@ -253,7 +255,15 @@ These behaviours aren't tied to one screen. Test them opportunistically.
 
 ---
 
-## 9. Known unbuilt — do NOT file as bugs
+## 9. Known issues — do NOT file as bugs
+
+### 9.1 Known backend issues
+
+- **Backend RBAC leak on six HR resource paths** — `/employees`, `/kra-templates`, `/review-cycles`, `/locations`, `/kra-assignments`, `/bonus-slabs` return 200 with full data when called with a Manager token; should return 403. Tracked in [docs/BACKEND_RBAC_FINDINGS.md](docs/BACKEND_RBAC_FINDINGS.md). Pure backend bug — the Flutter app gives no UI path to this leak, so it won't surface in normal manual testing. If a backend tester sees a Manager-token request returning HR data, that's expected on the current build until the backend fix lands.
+- **`/employees` returns `passwordHash`** — even for HR_ADMIN. Critical backend issue; do not log or screenshot the response body. See same document.
+- **Slug vs UUID** on the test env: cycle writes can return 400 because the env seeds with slug IDs (`cyc_q1_fy2627`) but write validators expect UUIDs. Backend issue, not an app bug.
+
+### 9.2 Known unbuilt features
 
 These have been verified by dev as not implemented yet. If you hit them, note them on your sign-off sheet but **do not** create a defect ticket.
 

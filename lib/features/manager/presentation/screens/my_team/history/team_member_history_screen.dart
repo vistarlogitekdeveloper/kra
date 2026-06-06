@@ -82,7 +82,7 @@ class _TeamMemberHistoryScreenState
           child: HistoryReviewTile(
             review: review,
             onTap: () =>
-                context.go(AppRoutes.managerReviewDetail(review.reviewId)),
+                context.push(AppRoutes.managerReviewDetail(review.reviewId)),
           ),
         ),
       ),

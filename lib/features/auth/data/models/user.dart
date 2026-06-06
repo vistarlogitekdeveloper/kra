@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// All roles in the Vistar KRA system.
 /// HR_ADMIN has elevated privileges within the HR module (audit log, dashboard).
 /// ADMIN is the super-user, also routed to the HR dashboard.
@@ -44,6 +46,16 @@ enum UserRole {
         return UserRole.warehouseMgr;
       default:
         // Unknown role from server — default to employee (least privilege).
+        // Log in debug builds so a silently-demoted user is diagnosable:
+        // a new backend role rolling out will look like "every CFO user
+        // lost their dashboards" otherwise.
+        assert(() {
+          debugPrint(
+            'UserRole.fromApi: unknown server role "$value" — '
+            'defaulting to EMPLOYEE',
+          );
+          return true;
+        }());
         return UserRole.employee;
     }
   }
