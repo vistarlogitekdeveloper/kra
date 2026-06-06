@@ -85,4 +85,5 @@ class ApiConstants {
   static const String envelopeError = 'error';
   static const String envelopeErrorCode = 'code';
   static const String envelopeErrorMessage = 'message';
+  static const String envelopeErrorDetails = 'details';
 }
