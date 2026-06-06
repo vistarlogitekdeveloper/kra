@@ -85,29 +85,35 @@ class AmbientBackground extends StatelessWidget {
           ),
         ),
 
-        // Faint rotated S watermark anchored to the right edge.
+        // Faint watermark. Positioned with relative sizing + alignment
+        // so it adapts to whichever asset is bundled — a square-ish
+        // rainbow S mark, the wide wordmark, or the fallback logo all
+        // sit on the canvas without being clipped at the right edge.
+        // Slight rightward bias keeps it off-center for a touch of
+        // asymmetry without crowding the leading content.
         if (showWatermark)
-          Positioned(
-            right: -120,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Opacity(
-                opacity: 0.05,
-                child: Transform.rotate(
-                  angle: 0.07, // ~4°
-                  child: SizedBox(
-                    width: 620,
-                    height: 620,
-                    child: Image.asset(
-                      AppAssets.sMark,
-                      fit: BoxFit.contain,
-                      // Fall back to the legacy logo until the rainbow
-                      // S mark asset is dropped under assets/images/.
-                      errorBuilder: (_, __, ___) => Image.asset(
-                        AppAssets.logo,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Align(
+                alignment: const Alignment(0.55, 0),
+                child: FractionallySizedBox(
+                  widthFactor: 0.6,
+                  child: Opacity(
+                    opacity: 0.06,
+                    child: Transform.rotate(
+                      angle: 0.07, // ~4°
+                      child: Image.asset(
+                        AppAssets.sMark,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        // Fall back to the legacy logo until the
+                        // dedicated S mark is dropped under
+                        // assets/images/vistar_s_mark.png.
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          AppAssets.logo,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) =>
+                              const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   ),
