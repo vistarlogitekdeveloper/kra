@@ -158,17 +158,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
+        // Translucent dark glass card on the aurora canvas — matches the
+        // Vistar Premium spec for the login form panel (--bg2 / --surface).
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.surfaceElevated.withValues(alpha: 0.88),
+            AppColors.surface.withValues(alpha: 0.88),
+          ],
+        ),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 1.2,
+          color: AppColors.dividerStrong,
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryPurple.withValues(alpha: 0.08),
-            blurRadius: 40,
-            offset: const Offset(0, 12),
+            color: AppColors.pink.withValues(alpha: 0.18),
+            blurRadius: 50,
+            spreadRadius: -22,
+            offset: const Offset(0, 18),
           ),
         ],
       ),

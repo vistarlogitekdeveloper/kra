@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/widgets/ambient_background.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -25,9 +26,10 @@ class HrHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text(AppStrings.hrHomeTitle),
-        backgroundColor: AppColors.surface,
+        backgroundColor: Colors.transparent,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         leading: Builder(
@@ -45,37 +47,39 @@ class HrHomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: AppColors.primaryPurple,
-        onRefresh: () async {
-          // Invalidate all root dashboard providers. Family providers
-          // will auto-refresh when they get watched again.
-          ref.invalidate(hrOverviewProvider);
-          ref.invalidate(hrActiveCycleProvider);
-          ref.invalidate(hrRecentActivityProvider);
-          // Wait for the root provider to finish so the pull spinner hides
-          try {
-            await ref.read(hrOverviewProvider.future);
-          } catch (_) {
-            // Ignore errors for refresh pull
-          }
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            _OverviewSection(),
-            SizedBox(height: 24),
-            _SectionHeader(title: AppStrings.hrHomeQuickActions),
-            SizedBox(height: 10),
-            _QuickActionsGrid(),
-            SizedBox(height: 24),
-            _CycleDependentSections(),
-            _SectionHeader(title: AppStrings.hrRecentActivityTitle),
-            SizedBox(height: 6),
-            _RecentActivitySection(),
-            SizedBox(height: 24),
-          ],
+      body: AmbientBackground(
+        child: RefreshIndicator(
+          color: AppColors.pink,
+          onRefresh: () async {
+            // Invalidate all root dashboard providers. Family providers
+            // will auto-refresh when they get watched again.
+            ref.invalidate(hrOverviewProvider);
+            ref.invalidate(hrActiveCycleProvider);
+            ref.invalidate(hrRecentActivityProvider);
+            // Wait for the root provider to finish so the pull spinner hides
+            try {
+              await ref.read(hrOverviewProvider.future);
+            } catch (_) {
+              // Ignore errors for refresh pull
+            }
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: const [
+              _OverviewSection(),
+              SizedBox(height: 24),
+              _SectionHeader(title: AppStrings.hrHomeQuickActions),
+              SizedBox(height: 10),
+              _QuickActionsGrid(),
+              SizedBox(height: 24),
+              _CycleDependentSections(),
+              _SectionHeader(title: AppStrings.hrRecentActivityTitle),
+              SizedBox(height: 6),
+              _RecentActivitySection(),
+              SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -615,36 +619,66 @@ class _ActionItemsSection extends ConsumerWidget {
       context.go(link);
       return;
     }
-    final fallback = _routeForKey(item.key);
+    final fallback = routeForActionKey(item.key);
     if (fallback != null) {
       context.go(fallback);
       return;
     }
-    // Destination isn't built yet — give feedback instead of navigating
-    // into an unmatched route.
+    // Truly unmapped — log so we can grow `_routeForKey` next time, and
+    // surface a snackbar so the tap isn't perceived as a frozen UI.
+    assert(() {
+      debugPrint(
+        'hr action-item: unmapped key="${item.key}" '
+        'deepLink="${item.deepLink}" headline="${item.headline}"',
+      );
+      return true;
+    }());
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${AppStrings.commonComingSoon}: ${item.headline}')),
+      SnackBar(
+        content: Text(
+          'No screen for this action yet — ${item.headline}',
+        ),
+      ),
     );
   }
 
-  String? _routeForKey(String key) {
-    switch (key.toUpperCase()) {
-      case 'PENDING_REVIEWS':
-      case 'OVERDUE_REVIEWS':
-      case 'UNFINALIZED_REVIEWS':
-        return AppRoutes.hrCycles;
-      case 'UNASSIGNED_EMPLOYEES':
-      case 'INACTIVE_EMPLOYEES':
-        return AppRoutes.hrEmployees;
-      case 'MISSING_KRA_TEMPLATES':
-        return AppRoutes.hrTemplates;
-      case 'MISSING_BONUS_SLABS':
-        return AppRoutes.hrCycles;
-      case 'AUDIT_REVIEW_REQUIRED':
-        return AppRoutes.hrAuditLog;
-      default:
-        return null;
-    }
+}
+
+/// Maps a dashboard action-item `key` to the best-fit registered HR route.
+///
+/// Top-level (rather than a private method on the widget) so the mapping
+/// can be unit-tested directly — see `hr_action_item_routing_test.dart`.
+///
+/// Backend ships SCREAMING_SNAKE and snake_case interchangeably — the live
+/// `/hr/dashboard/action-items` response uses `hr_feed_missing` /
+/// `draft_stuck`, while older payloads used `PENDING_REVIEWS`. We
+/// normalise to UPPER then match.
+String? routeForActionKey(String key) {
+  switch (key.toUpperCase()) {
+    // Cycle-scoped work (feeds, stuck reviews, scoring overdue, etc.)
+    // all lands on the cycles list — the umbrella entry-point for any
+    // mid-cycle remediation. There's no per-state review filter screen
+    // yet; cycles is the deepest existing surface.
+    case 'PENDING_REVIEWS':
+    case 'OVERDUE_REVIEWS':
+    case 'UNFINALIZED_REVIEWS':
+    case 'DRAFT_STUCK':
+    case 'HR_FEED_MISSING':
+    case 'MANAGER_REVIEW_OVERDUE':
+    case 'OPS_SCORING_OVERDUE':
+    case 'FINANCE_SCORING_OVERDUE':
+    case 'FINALIZATION_OVERDUE':
+    case 'MISSING_BONUS_SLABS':
+      return AppRoutes.hrCycles;
+    case 'UNASSIGNED_EMPLOYEES':
+    case 'INACTIVE_EMPLOYEES':
+      return AppRoutes.hrEmployees;
+    case 'MISSING_KRA_TEMPLATES':
+      return AppRoutes.hrTemplates;
+    case 'AUDIT_REVIEW_REQUIRED':
+      return AppRoutes.hrAuditLog;
+    default:
+      return null;
   }
 }
 
