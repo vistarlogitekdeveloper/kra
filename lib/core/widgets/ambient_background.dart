@@ -85,38 +85,47 @@ class AmbientBackground extends StatelessWidget {
           ),
         ),
 
-        // Faint watermark. Centred horizontally and vertically, with no
-        // rotation — the wordmark already has a diagonal swoosh built in,
-        // so an extra 4° tilt made the whole thing read as misaligned.
-        // Width is capped at a fraction of the smaller viewport axis so
-        // the watermark fits whether the bundled asset is a square S mark
-        // or the wider wordmark fallback.
+        // Vistar Audit reference layout: the rainbow S swoosh stands tall
+        // along the right edge at decent opacity, taking ~60% of viewport
+        // height and ~28% of width. Anchored to the right (alignment x=1)
+        // and centred vertically. No rotation — the S has a natural
+        // diagonal built in.
+        //
+        // This layout assumes the dedicated `vistar_s_mark.png` is bundled
+        // (square aspect ratio). Until that file is added under
+        // `assets/images/`, `AppAssets.sMark` falls through to the wider
+        // `vistar_logo.png` wordmark, which renders approximately but
+        // won't look identical to the reference.
         if (showWatermark)
           Positioned.fill(
             child: IgnorePointer(
               child: LayoutBuilder(
                 builder: (context, c) {
-                  final maxSide = c.maxWidth < c.maxHeight
-                      ? c.maxWidth
-                      : c.maxHeight;
-                  final size = maxSide * 0.5;
-                  return Center(
-                    child: Opacity(
-                      opacity: 0.05,
-                      child: SizedBox(
-                        width: size,
-                        height: size,
-                        child: Image.asset(
-                          AppAssets.sMark,
-                          fit: BoxFit.contain,
-                          // Fall back to the legacy logo until the
-                          // dedicated S mark is dropped under
-                          // assets/images/vistar_s_mark.png.
-                          errorBuilder: (_, __, ___) => Image.asset(
-                            AppAssets.logo,
+                  final height = c.maxHeight * 0.7;
+                  // Cap width so a wordmark fallback can't sprawl across
+                  // the whole canvas; the dedicated S mark fits naturally.
+                  final width = c.maxWidth * 0.32;
+                  return Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: EdgeInsets.only(right: c.maxWidth * 0.04),
+                      child: Opacity(
+                        opacity: 0.18,
+                        child: SizedBox(
+                          width: width,
+                          height: height,
+                          child: Image.asset(
+                            AppAssets.sMark,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
+                            // Fall back to the legacy logo until the
+                            // dedicated S mark is dropped under
+                            // assets/images/vistar_s_mark.png.
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              AppAssets.logo,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
                           ),
                         ),
                       ),
