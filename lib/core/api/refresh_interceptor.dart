@@ -49,6 +49,33 @@ class RefreshInterceptor extends Interceptor {
   })  : _mainDio = mainDio,
         _storage = storage;
 
+  /// Refresh the access token now if it's expired or about to expire
+  /// (within 30 s). Called by [AuthInterceptor.onRequest] so outgoing
+  /// requests carry a fresh token — without this, every request issued
+  /// after the 15-minute access-token TTL would have to round-trip through
+  /// a 401 first (which is what showed up as `AUTH_002 "Invalid or expired
+  /// token"` in DevTools).
+  ///
+  /// Concurrent callers share the in-flight refresh via [_refreshFuture],
+  /// so a burst of N requests after expiry triggers exactly one refresh.
+  /// Failures are swallowed here — if refresh can't recover, the reactive
+  /// `onError` flow will still observe the 401 and forced-logout via the
+  /// existing path.
+  Future<void> ensureFreshAccessToken() async {
+    final expiry = await _storage.readAccessTokenExpiry();
+    if (expiry == null) return;
+    final freshUntil = expiry.subtract(const Duration(seconds: 30));
+    if (DateTime.now().isBefore(freshUntil)) return;
+    final ok = await (_refreshFuture ??= _doRefresh());
+    _refreshFuture = null;
+    if (!ok && kDebugMode) {
+      debugPrint(
+        'RefreshInterceptor: proactive refresh failed — will fall through '
+        'to reactive flow on the next 401',
+      );
+    }
+  }
+
   @override
   Future<void> onError(
     DioException err,

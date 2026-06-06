@@ -31,8 +31,13 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
 
-  dio.interceptors.add(AuthInterceptor(storage));
-  dio.interceptors.add(RefreshInterceptor(mainDio: dio, storage: storage));
+  // Build the refresh interceptor first so we can hand a reference to
+  // AuthInterceptor (which calls into it for proactive token rotation).
+  // The chain order is unchanged: AuthInterceptor stamps the Bearer
+  // header first, RefreshInterceptor catches 401s second.
+  final refresher = RefreshInterceptor(mainDio: dio, storage: storage);
+  dio.interceptors.add(AuthInterceptor(storage, refresher));
+  dio.interceptors.add(refresher);
   dio.interceptors.add(ApiLoggerInterceptor());
 
   ref.onDispose(() => dio.close(force: true));
