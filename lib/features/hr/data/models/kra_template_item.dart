@@ -77,12 +77,17 @@ class KraTemplateItem {
   ///   * weightage as a fraction (0–1) — canonical persisted form.
   ///   * sortOrder is 1-based on the wire (backend enforces `>= 1` via Zod),
   ///     even though it stays 0-based internally to match list indices.
+  ///   * description / target / trackingMethod are coerced from `null` to
+  ///     `''`. The backend's GET serializes nulls fine, but POST + PATCH
+  ///     Zod schemas demand strings — sending `null` for an optional field
+  ///     the user left blank trips `VAL_001 "Invalid input: expected
+  ///     string, received null"` on the whole payload.
   Map<String, dynamic> toJson() => {
         if (id != null) 'id': id,
         'name': name,
-        'description': description,
-        'target': target,
-        'trackingMethod': trackingMethod,
+        'description': description ?? '',
+        'target': target ?? '',
+        'trackingMethod': trackingMethod ?? '',
         'weightage': weightagePercent / 100,
         'sortOrder': sortOrder + 1,
       };

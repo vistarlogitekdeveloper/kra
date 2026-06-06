@@ -55,6 +55,39 @@ void main() {
       expect(item.sortOrder, 0);
     });
 
+    test(
+        'toJson coerces null description / target / trackingMethod to empty '
+        'strings (backend Zod rejects nulls on POST + PATCH)', () {
+      const item = KraTemplateItem(
+        name: 'Revenue',
+        weightage: 50,
+        sortOrder: 0,
+      );
+
+      final json = item.toJson();
+
+      expect(json['description'], '');
+      expect(json['target'], '');
+      expect(json['trackingMethod'], '');
+    });
+
+    test('toJson preserves non-null strings verbatim', () {
+      const item = KraTemplateItem(
+        name: 'Revenue',
+        description: 'Top-line growth',
+        target: '10 cr',
+        trackingMethod: 'CRM dashboard',
+        weightage: 50,
+        sortOrder: 0,
+      );
+
+      final json = item.toJson();
+
+      expect(json['description'], 'Top-line growth');
+      expect(json['target'], '10 cr');
+      expect(json['trackingMethod'], 'CRM dashboard');
+    });
+
     test('round trip: internal 0,1,2 → wire 1,2,3 → internal 0,1,2', () {
       const items = [
         KraTemplateItem(name: 'A', weightage: 40, sortOrder: 0),
