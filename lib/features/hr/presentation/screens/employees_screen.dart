@@ -231,6 +231,13 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
 }
 
 class _RoleFilterChip extends StatelessWidget {
+  /// Sentinel for "All" inside the popup. PopupMenuButton swallows a literal
+  /// `null` selection (it treats null as "menu dismissed without a choice")
+  /// so the "All" item never fired — picking a specific role and then
+  /// reopening the menu to pick "All" did nothing. The chip uses an empty
+  /// string in-menu and translates it back to `null` for the filter.
+  static const String _allSentinel = '';
+
   final String? value;
   final List<String> roles;
   final ValueChanged<String?> onChanged;
@@ -243,11 +250,13 @@ class _RoleFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String?>(
+    return PopupMenuButton<String>(
       tooltip: 'Filter by role',
-      onSelected: onChanged,
+      onSelected: (picked) =>
+          onChanged(picked == _allSentinel ? null : picked),
       itemBuilder: (_) => [
-        const PopupMenuItem(value: null, child: Text(AppStrings.commonAll)),
+        const PopupMenuItem(
+            value: _allSentinel, child: Text(AppStrings.commonAll)),
         ...roles.map(
           (r) => PopupMenuItem(value: r, child: Text(_humanRole(r))),
         ),
@@ -288,28 +297,49 @@ class _RoleFilterChip extends StatelessWidget {
   }
 }
 
+/// Three-way tri-state mapped to `bool?` at the boundary — see the comment
+/// on [_RoleFilterChip._allSentinel] for why we can't pass `null` as the
+/// value of a PopupMenuItem.
+enum _ActiveChoice { all, active, inactive }
+
 class _ActiveFilterChip extends StatelessWidget {
   final bool? value;
   final ValueChanged<bool?> onChanged;
 
   const _ActiveFilterChip({required this.value, required this.onChanged});
 
+  _ActiveChoice get _choice => switch (value) {
+        null => _ActiveChoice.all,
+        true => _ActiveChoice.active,
+        false => _ActiveChoice.inactive,
+      };
+
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<bool?>(
+    return PopupMenuButton<_ActiveChoice>(
       tooltip: 'Filter by status',
-      onSelected: onChanged,
+      initialValue: _choice,
+      onSelected: (picked) {
+        switch (picked) {
+          case _ActiveChoice.all:
+            onChanged(null);
+          case _ActiveChoice.active:
+            onChanged(true);
+          case _ActiveChoice.inactive:
+            onChanged(false);
+        }
+      },
       itemBuilder: (_) => const [
         PopupMenuItem(
-          value: null,
+          value: _ActiveChoice.all,
           child: Text(AppStrings.employeesFilterStatusAll),
         ),
         PopupMenuItem(
-          value: true,
+          value: _ActiveChoice.active,
           child: Text(AppStrings.employeesFilterStatusActive),
         ),
         PopupMenuItem(
-          value: false,
+          value: _ActiveChoice.inactive,
           child: Text(AppStrings.employeesFilterStatusInactive),
         ),
       ],
