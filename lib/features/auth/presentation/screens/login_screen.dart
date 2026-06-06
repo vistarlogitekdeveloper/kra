@@ -5,6 +5,7 @@ import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/connectivity_service.dart';
+import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../core/widgets/connectivity_wrapper.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/branded_primary_button.dart';
@@ -36,6 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late final Animation<Offset> _slideAnim;
 
   bool _obscurePassword = true;
+  bool _rememberMe = false;
 
   @override
   void initState() {
@@ -56,6 +58,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       curve: Curves.easeOutCubic,
     ));
     _animController.forward();
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final email = await ref.read(secureStorageProvider).readRememberedEmail();
+    if (!mounted || email == null || email.isEmpty) return;
+    setState(() {
+      _emailController.text = email;
+      _rememberMe = true;
+    });
   }
 
   @override
@@ -72,8 +84,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     ref.read(authStateProvider.notifier).clearError();
     if (!_formKey.currentState!.validate()) return;
 
+    final email = _emailController.text.trim();
+    final storage = ref.read(secureStorageProvider);
+    if (_rememberMe) {
+      storage.writeRememberedEmail(email);
+    } else {
+      storage.clearRememberedEmail();
+    }
+
     ref.read(authStateProvider.notifier).login(
-          email: _emailController.text.trim(),
+          email: email,
           password: _passwordController.text,
         );
   }
@@ -294,10 +314,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Widget _buildOptionsRow() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // 'Remember me' was a UI-only toggle that never persisted —
-        // removed until token-persistence policy needs it back.
+        InkWell(
+          onTap: () => setState(() => _rememberMe = !_rememberMe),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: Checkbox(
+                    value: _rememberMe,
+                    onChanged: (v) =>
+                        setState(() => _rememberMe = v ?? false),
+                    activeColor: AppColors.primaryPurple,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  AppStrings.loginRememberMe,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         TextButton(
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
