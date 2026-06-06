@@ -42,6 +42,11 @@ class KraTemplateItem {
     final raw = _parseDouble(json['weightage']) ?? 0;
     // Normalise to percentage (0–100).
     final pct = raw <= 1.0 ? raw * 100 : raw;
+    // Wire format uses 1-based sortOrder; we keep 0-based internally so it
+    // lines up with `_items[i]` in the form. Clamp at 0 so a malformed
+    // payload can't produce a negative index.
+    final wireSortOrder = _parseInt(json['sortOrder']) ?? 1;
+    final internalSortOrder = wireSortOrder > 0 ? wireSortOrder - 1 : 0;
     return KraTemplateItem(
       id: json['id'] as String?,
       name: (json['name'] ?? '') as String,
@@ -49,7 +54,7 @@ class KraTemplateItem {
       target: json['target'] as String?,
       trackingMethod: json['trackingMethod'] as String?,
       weightage: pct,
-      sortOrder: _parseInt(json['sortOrder']) ?? 0,
+      sortOrder: internalSortOrder,
     );
   }
 
@@ -68,8 +73,10 @@ class KraTemplateItem {
     return null;
   }
 
-  /// Wire format sends weightage as a fraction (0–1) — that is the
-  /// canonical form the backend persists.
+  /// Wire format:
+  ///   * weightage as a fraction (0–1) — canonical persisted form.
+  ///   * sortOrder is 1-based on the wire (backend enforces `>= 1` via Zod),
+  ///     even though it stays 0-based internally to match list indices.
   Map<String, dynamic> toJson() => {
         if (id != null) 'id': id,
         'name': name,
@@ -77,7 +84,7 @@ class KraTemplateItem {
         'target': target,
         'trackingMethod': trackingMethod,
         'weightage': weightagePercent / 100,
-        'sortOrder': sortOrder,
+        'sortOrder': sortOrder + 1,
       };
 
   KraTemplateItem copyWith({
