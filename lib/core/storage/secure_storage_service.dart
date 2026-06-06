@@ -13,6 +13,7 @@ class SecureStorageService {
   static const _kRefreshToken = 'vistar.auth.refreshToken';
   static const _kUserJson = 'vistar.auth.user';
   static const _kAccessTokenExpiry = 'vistar.auth.accessTokenExpiry';
+  static const _kRememberedEmail = 'vistar.auth.rememberedEmail';
 
   final FlutterSecureStorage _storage;
 
@@ -83,6 +84,20 @@ class SecureStorageService {
   Future<void> writeUserJson(Map<String, dynamic> json) =>
       _storage.write(key: _kUserJson, value: jsonEncode(json));
 
+  // ───── Remembered email (for "Remember me" pre-fill on login) ─────
+  //
+  // Stored under the same Keychain / EncryptedSharedPreferences scope as the
+  // tokens so it doesn't survive an OS-level uninstall on either platform.
+  // Cleared on explicit opt-out, never on logout — the whole point is to
+  // pre-fill after the user has signed out.
+  Future<String?> readRememberedEmail() => _storage.read(key: _kRememberedEmail);
+
+  Future<void> writeRememberedEmail(String email) =>
+      _storage.write(key: _kRememberedEmail, value: email);
+
+  Future<void> clearRememberedEmail() =>
+      _storage.delete(key: _kRememberedEmail);
+
   // ───── Bulk write after a successful login/refresh ─────
   Future<void> writeAuthBundle({
     required String accessToken,
@@ -99,8 +114,11 @@ class SecureStorageService {
     ]);
   }
 
-  /// Wipes every key this service writes. Safe to call even if some keys
+  /// Wipes the auth bundle (tokens + user). Safe to call even if some keys
   /// are missing — `flutter_secure_storage.delete` is a no-op for missing keys.
+  ///
+  /// The remembered email is intentionally preserved so the next login pre-fills
+  /// after an explicit logout. Use [clearRememberedEmail] to remove it.
   Future<void> clearAll() async {
     _cachedAccessToken = null;
     _cachedRefreshToken = null;

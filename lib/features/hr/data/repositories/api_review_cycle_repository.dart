@@ -47,27 +47,57 @@ class ApiReviewCycleRepository implements ReviewCycleRepository {
     DateTime? opsScoringDeadline,
     DateTime? financeScoringDeadline,
   }) async {
+    // Backend requires `fyLabel`, `quarterNum`, and all four deadline fields
+    // (its Zod schema marks them required, contrary to the early API spec).
+    // We derive fyLabel/quarter from startDate (Indian FY: Apr → Mar) and
+    // default any missing deadline from endDate, matching the offsets the
+    // backend seeds its own auto-created cycles with (+15, +31, +46, +62).
+    final fyLabel = _indianFyLabel(startDate);
+    final quarter = _indianQuarter(startDate);
+    final self = selfRatingDeadline ?? endDate.add(const Duration(days: 15));
+    final mgr =
+        managerReviewDeadline ?? endDate.add(const Duration(days: 31));
+    final ops = opsScoringDeadline ?? endDate.add(const Duration(days: 46));
+    final fin =
+        financeScoringDeadline ?? endDate.add(const Duration(days: 62));
+
     try {
       final response = await _dio.post(
         ApiConstants.reviewCycles,
         data: {
           'name': name,
+          'fyLabel': fyLabel,
+          'quarterNum': quarter,
           'startDate': startDate.toIso8601String(),
           'endDate': endDate.toIso8601String(),
-          if (selfRatingDeadline != null)
-            'selfRatingDeadline': selfRatingDeadline.toIso8601String(),
-          if (managerReviewDeadline != null)
-            'managerReviewDeadline': managerReviewDeadline.toIso8601String(),
-          if (opsScoringDeadline != null)
-            'opsScoringDeadline': opsScoringDeadline.toIso8601String(),
-          if (financeScoringDeadline != null)
-            'financeScoringDeadline': financeScoringDeadline.toIso8601String(),
+          'selfRatingDeadline': self.toIso8601String(),
+          'managerReviewDeadline': mgr.toIso8601String(),
+          'opsScoringDeadline': ops.toIso8601String(),
+          'financeScoringDeadline': fin.toIso8601String(),
         },
       );
       return ReviewCycle.fromJson(unwrapObject(response));
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }
+  }
+
+  /// Indian financial year label for a date — e.g. 2026-05-12 → "FY26-27",
+  /// 2027-01-15 → "FY26-27". FY starts in April.
+  static String _indianFyLabel(DateTime d) {
+    final startYear = d.month >= 4 ? d.year : d.year - 1;
+    final endYear = startYear + 1;
+    String two(int y) => (y % 100).toString().padLeft(2, '0');
+    return 'FY${two(startYear)}-${two(endYear)}';
+  }
+
+  /// Indian FY quarter (1–4) for a date. Apr–Jun=1, Jul–Sep=2, Oct–Dec=3,
+  /// Jan–Mar=4.
+  static int _indianQuarter(DateTime d) {
+    if (d.month >= 4 && d.month <= 6) return 1;
+    if (d.month >= 7 && d.month <= 9) return 2;
+    if (d.month >= 10 && d.month <= 12) return 3;
+    return 4;
   }
 
   @override
