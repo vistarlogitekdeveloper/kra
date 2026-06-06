@@ -58,22 +58,29 @@ class RefreshInterceptor extends Interceptor {
   ///
   /// Concurrent callers share the in-flight refresh via [_refreshFuture],
   /// so a burst of N requests after expiry triggers exactly one refresh.
-  /// Failures are swallowed here — if refresh can't recover, the reactive
-  /// `onError` flow will still observe the 401 and forced-logout via the
-  /// existing path.
-  Future<void> ensureFreshAccessToken() async {
+  ///
+  /// Returns `false` when the session is gone (proactive refresh failed
+  /// AND we just forced logout). The caller — `AuthInterceptor` — uses
+  /// this signal to abort the outgoing request so a parade of 401s
+  /// doesn't pile up while go_router redirects to `/login`. Returns
+  /// `true` otherwise (token is fresh OR was successfully rotated).
+  Future<bool> ensureFreshAccessToken() async {
     final expiry = await _storage.readAccessTokenExpiry();
-    if (expiry == null) return;
+    if (expiry == null) return true; // unknown → let the reactive flow decide
     final freshUntil = expiry.subtract(const Duration(seconds: 30));
-    if (DateTime.now().isBefore(freshUntil)) return;
+    if (DateTime.now().isBefore(freshUntil)) return true;
     final ok = await (_refreshFuture ??= _doRefresh());
     _refreshFuture = null;
-    if (!ok && kDebugMode) {
+    if (ok) return true;
+    // Refresh token itself is gone — boot the user to login now so we
+    // don't burn one visible 401 per concurrent request.
+    if (kDebugMode) {
       debugPrint(
-        'RefreshInterceptor: proactive refresh failed — will fall through '
-        'to reactive flow on the next 401',
+        'RefreshInterceptor: proactive refresh failed — forcing logout',
       );
     }
+    await _forceLogout();
+    return false;
   }
 
   @override

@@ -33,7 +33,20 @@ class AuthInterceptor extends Interceptor {
         ApiConstants.noAuthEndpoints.contains(options.path);
 
     if (!skipAuth) {
-      await _refresher.ensureFreshAccessToken();
+      final sessionAlive = await _refresher.ensureFreshAccessToken();
+      if (!sessionAlive) {
+        // Refresh token is gone — RefreshInterceptor has already wiped
+        // storage and fired ForcedLogoutBus. Abort the outgoing request
+        // so we don't burn a 401 in DevTools per concurrent caller while
+        // the router redirects to /login.
+        return handler.reject(
+          DioException(
+            requestOptions: options,
+            type: DioExceptionType.cancel,
+            message: 'Session ended',
+          ),
+        );
+      }
       final token = await _storage.readAccessToken();
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
