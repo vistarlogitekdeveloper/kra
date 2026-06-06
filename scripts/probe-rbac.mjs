@@ -16,12 +16,17 @@ const BASE = 'https://vistar-crm.onrender.com/api/v1/kra';
 
 const ROLE_CANDIDATES = {
   EMPLOYEE: [
-    'employee@vistar.test', 'emp@vistar.test', 'user@vistar.test',
-    'staff@vistar.test', 'test@vistar.test',
+    // Real test fleet: emp1 (DRAFT), emp2 (EMPLOYEE_SUBMITTED_ALL),
+    // emp3 (FINALIZED). Probe with emp1 since the DRAFT state lets
+    // us exercise self-rate writes against the live backend.
+    'emp1@vistar.test', 'emp2@vistar.test', 'emp3@vistar.test',
+    // Legacy candidates kept so a re-run still works if the fleet
+    // is provisioned differently:
+    'employee@vistar.test', 'emp@vistar.test',
   ],
   MANAGER:  ['manager@vistar.test', 'mgr@vistar.test'],
-  HR:       ['hr@vistar.test', 'hradmin@vistar.test', 'admin@vistar.test',
-             'kraadmin@vistar.test', 'hrops@vistar.test'],
+  HR:       ['hr.admin@vistar.test', 'hr@vistar.test', 'hradmin@vistar.test',
+             'admin@vistar.test'],
 };
 
 const PASSWORD = 'Vistar@123';

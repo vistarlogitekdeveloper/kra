@@ -19,11 +19,13 @@ Drop the Vistar logo at `assets/images/vistar_logo.png` if it isn't already ther
 
 All passwords are `Vistar@123`. The backend lives at `https://vistar-crm.onrender.com/api/v1/kra/`.
 
-| Role     | Email                       |
-| -------- | --------------------------- |
-| HR_ADMIN | `hradmin@vistar.test`       |
-| MANAGER  | `manager@vistar.test`       |
-| EMPLOYEE | `employee@vistar.test`      |
+| Role     | Email                    | Review state for testing               |
+| -------- | ------------------------ | -------------------------------------- |
+| HR_ADMIN | `hr.admin@vistar.test`   |                                        |
+| MANAGER  | `manager@vistar.test`    | manages emp1–emp3                      |
+| EMPLOYEE | `emp1@vistar.test`       | DRAFT (use this to exercise self-rate) |
+| EMPLOYEE | `emp2@vistar.test`       | EMPLOYEE_SUBMITTED_ALL                 |
+| EMPLOYEE | `emp3@vistar.test`       | FINALIZED                              |
 
 > **Render cold-start:** the first request after ~15 minutes of inactivity can take 30–60 s. Wait it out before filing a "loading forever" bug.
 

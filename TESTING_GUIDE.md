@@ -31,13 +31,15 @@ If you've never touched the app before, read [USER_MANUAL.md](USER_MANUAL.md) fi
 
 ### 1.3 Test credentials
 
-Always sign in with a real test account — never use production credentials.
+Always sign in with a real test account — never use production credentials. All passwords are `Vistar@123`.
 
-| Role | Email | Password |
-|------|-------|----------|
-| HR_ADMIN | `hradmin@vistar.test` | `Vistar@123` |
-| MANAGER | `manager@vistar.test` | `Vistar@123` |
-| EMPLOYEE | `employee@vistar.test` | `Vistar@123` |
+| Role | Email | Notes |
+|------|-------|-------|
+| HR_ADMIN | `hr.admin@vistar.test` | note the dot |
+| MANAGER | `manager@vistar.test` | manages emp1–emp3 |
+| EMPLOYEE | `emp1@vistar.test` | review state DRAFT — exercise full self-rate flow here |
+| EMPLOYEE | `emp2@vistar.test` | review state EMPLOYEE_SUBMITTED_ALL — exercises the manager-rate inbox |
+| EMPLOYEE | `emp3@vistar.test` | review state FINALIZED — read-only history |
 
 If a credential is rotated or removed, ask dev for the current set — don't guess.
 

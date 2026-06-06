@@ -48,11 +48,17 @@ Each module follows `data/{models,repositories}` + `presentation/{providers,scre
 - All destructive actions use `ConfirmActionDialog` (red variant)
 
 ## Live Test Credentials
-- HR_ADMIN: `hradmin@vistar.test` / `Vistar@123`
-- MANAGER:  `manager@vistar.test` / `Vistar@123`
-- EMPLOYEE: `employee@vistar.test` / `Vistar@123`
+All passwords are `Vistar@123`.
 
-> The historical `VLPL0610 / password123` accounts only existed in the mock auth repository, which has been deleted. Only `@vistar.test` accounts work today.
+| Role     | Email                    | Notes                                      |
+| -------- | ------------------------ | ------------------------------------------ |
+| HR_ADMIN | `hr.admin@vistar.test`   | (note the dot)                             |
+| MANAGER  | `manager@vistar.test`    | manages emp1–emp3                          |
+| EMPLOYEE | `emp1@vistar.test`       | E1 grade, review state DRAFT               |
+| EMPLOYEE | `emp2@vistar.test`       | E1 grade, review state EMPLOYEE_SUBMITTED_ALL |
+| EMPLOYEE | `emp3@vistar.test`       | M1 grade, review state FINALIZED           |
+
+> The historical `VLPL0610 / password123` accounts only existed in the mock auth repository, which has been deleted. Only the `@vistar.test` accounts above work today.
 
 ## Render cold-start
 The backend is hosted on Render's free tier. The first request after ~15 minutes of inactivity can take 30–60 s. Subsequent requests are fast. Don't file a "loading forever" bug without waiting it out first.

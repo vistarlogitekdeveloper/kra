@@ -360,8 +360,15 @@ To tie it all together, here is what happens in calendar order in a typical Q1 c
 **Mock backend** (offline / unit tests):
 - HR_ADMIN — `VLPL0610` / `password123` (Swati Kotkar)
 
-**Live backend** (`https://vistar-crm.onrender.com/api/v1/kra/`):
-- `@vistar.test` users, password `Vistar@123`. The test env currently uses slug IDs for cycles (`cyc_q1_fy2627`) but write validators expect UUIDs — flag any write 400s back to the backend team rather than treating them as app bugs.
+**Live backend** (`https://vistar-crm.onrender.com/api/v1/kra/`) — all passwords `Vistar@123`:
+
+| Role | Email |
+|------|-------|
+| HR_ADMIN | `hr.admin@vistar.test` |
+| MANAGER | `manager@vistar.test` |
+| EMPLOYEE | `emp1@vistar.test` (DRAFT) · `emp2@vistar.test` (EMPLOYEE_SUBMITTED_ALL) · `emp3@vistar.test` (FINALIZED) |
+
+The test env currently uses slug IDs for cycles (`cyc_q1_fy2627`) but write validators expect UUIDs — flag any write 400s back to the backend team rather than treating them as app bugs.
 
 ---
 
