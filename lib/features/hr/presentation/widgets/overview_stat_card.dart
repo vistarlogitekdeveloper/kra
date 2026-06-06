@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_gradients.dart';
 import '_formatters.dart';
@@ -9,9 +8,11 @@ import '_formatters.dart';
 /// Used in a 2x2 (or 1x4) grid; sizes itself to fill the column.
 ///
 /// Vistar Premium signature: the headline number wears the ribbon gradient
-/// via a [ShaderMask] (spec's `background-clip:text` translated to Flutter),
-/// and a faint "S" accent sits at the bottom-right corner per the spec's
-/// `.card .corner-s` rule.
+/// via a [ShaderMask] (spec's `background-clip:text` translated to Flutter).
+/// The spec also calls for a faint corner-S accent on cards, but that
+/// treatment is shape-dependent — it reads cleanly with a square swoosh
+/// and badly with the wide wordmark fallback. The accent is reintroduced
+/// when assets/images/vistar_s_mark.png lands.
 class OverviewStatCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -53,64 +54,35 @@ class OverviewStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Corner S accent — faint, per spec.
-          Positioned(
-            right: -26,
-            bottom: -30,
-            child: IgnorePointer(
-              child: Opacity(
-                opacity: 0.05,
-                child: SizedBox(
-                  width: 120,
-                  height: 120,
-                  child: Image.asset(
-                    AppAssets.sMark,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Image.asset(
-                      AppAssets.logo,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) =>
-                          const SizedBox.shrink(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppColors.pink.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: Icon(icon, color: iconFg, size: 20),
-                  ),
-                  const Spacer(),
-                  if (trendPercent != null) _TrendPill(value: trendPercent!),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _RibbonValue(value: value, overrideColor: valueColor),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                  letterSpacing: 0.1,
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.pink.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
                 ),
+                child: Icon(icon, color: iconFg, size: 20),
               ),
+              const Spacer(),
+              if (trendPercent != null) _TrendPill(value: trendPercent!),
             ],
+          ),
+          const SizedBox(height: 14),
+          _RibbonValue(value: value, overrideColor: valueColor),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+              letterSpacing: 0.1,
+            ),
           ),
         ],
       ),
