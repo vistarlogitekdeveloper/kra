@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/dio_client.dart';
+import '../../data/models/bulk_assign_result.dart';
 import '../../data/models/kra_assignment.dart';
 import '../../data/models/kra_template_item.dart';
 import '../../data/repositories/api_kra_assignment_repository.dart';
@@ -70,18 +71,18 @@ class KraAssignmentActions {
     return created;
   }
 
-  Future<List<KraAssignment>> bulkAssign({
+  Future<BulkAssignResult> bulkAssign({
     required List<String> employeeIds,
     required String cycleId,
     required String templateId,
   }) async {
-    final created = await _repo.bulkAssign(
+    final result = await _repo.bulkAssign(
       employeeIds: employeeIds,
       cycleId: cycleId,
       templateId: templateId,
     );
     ref.invalidate(kraAssignmentsProvider);
-    return created;
+    return result;
   }
 
   Future<KraAssignment> update(String id, Map<String, dynamic> changes) async {

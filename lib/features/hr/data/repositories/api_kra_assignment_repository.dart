@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/api/api_constants.dart';
+import '../models/bulk_assign_result.dart';
 import '../models/kra_assignment.dart';
 import '../models/kra_template_item.dart';
 import '../../../../core/api/envelope.dart';
@@ -71,7 +72,7 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
   }
 
   @override
-  Future<List<KraAssignment>> bulkAssign({
+  Future<BulkAssignResult> bulkAssign({
     required List<String> employeeIds,
     required String cycleId,
     required String templateId,
@@ -85,12 +86,12 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
           'templateId': templateId,
         },
       );
-      // Bulk endpoint returns a list under `data` (or `data.assignments`).
-      final raw = unwrapList(response);
-      return raw
-          .whereType<Map<String, dynamic>>()
-          .map(KraAssignment.fromJson)
-          .toList();
+      // Wire shape: { data: { createdCount, skippedCount,
+      //                      skippedEmployeeIds, created: [...] } }
+      // — see BulkAssignResult. Trying to parse as a List threw
+      // BAD_RESPONSE on the happy path and the confirm screen surfaced
+      // it as a failure even though the backend had saved everything.
+      return BulkAssignResult.fromJson(unwrapObject(response));
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }

@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
+import '../../data/models/bulk_assign_result.dart';
 import '../../data/models/employee.dart';
 import '../../data/models/kra_template.dart';
 import '../../data/models/review_cycle.dart';
@@ -55,6 +56,7 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
   KraTemplate? _selectedTemplate;
   ReviewCycle? _selectedCycle;
   bool _isSubmitting = false;
+  bool _isLoadingTemplate = false;
   String? _serverError;
 
   @override
@@ -108,7 +110,8 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
         return _Step2Template(
           key: const ValueKey('step2'),
           selected: _selectedTemplate,
-          onSelect: (t) => setState(() => _selectedTemplate = t),
+          isLoading: _isLoadingTemplate,
+          onSelect: _onPickTemplate,
         );
       case 2:
         return _Step3Review(
@@ -129,12 +132,60 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
       case 0:
         return _selectedEmployeeIds.isNotEmpty;
       case 1:
-        return _selectedTemplate != null &&
+        // The templates LIST endpoint returns no items[] — only a count —
+        // so a freshly-tapped template can't be validated until we hydrate
+        // it via getById. _onPickTemplate does that; until it resolves we
+        // hold the Next button disabled.
+        return !_isLoadingTemplate &&
+            _selectedTemplate != null &&
+            _selectedTemplate!.hasWeightageData &&
             _selectedTemplate!.hasValidWeightage;
       case 2:
         return _selectedCycle != null && !_isSubmitting;
       default:
         return false;
+    }
+  }
+
+  /// Hydrates the tapped template before advancing. The list endpoint
+  /// strips `items[]` (only `_count.items` survives) so we need a getById
+  /// round-trip to populate weightages, otherwise both the Next-button
+  /// gate and the step-3 summary read zero items and zero weightage.
+  Future<void> _onPickTemplate(KraTemplate? tpl) async {
+    if (tpl == null) {
+      setState(() => _selectedTemplate = null);
+      return;
+    }
+    // Already hydrated by a previous tap in this session — no need to
+    // refetch, the model carries items[] already.
+    if (_selectedTemplate?.id == tpl.id &&
+        _selectedTemplate!.hasWeightageData) {
+      return;
+    }
+    setState(() {
+      _selectedTemplate = tpl;
+      _isLoadingTemplate = true;
+    });
+    try {
+      final full =
+          await ref.read(kraTemplateRepositoryProvider).getById(tpl.id);
+      if (!mounted || _selectedTemplate?.id != tpl.id) return;
+      setState(() {
+        _selectedTemplate = full;
+        _isLoadingTemplate = false;
+      });
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingTemplate = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.combinedMessage)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingTemplate = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.errorGeneric)),
+      );
     }
   }
 
@@ -222,28 +273,46 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
       _serverError = null;
     });
     try {
-      await ref.read(kraAssignmentActionsProvider).bulkAssign(
-            employeeIds: _selectedEmployeeIds.toList(),
-            cycleId: _selectedCycle!.id,
-            templateId: _selectedTemplate!.id,
-          );
+      final result =
+          await ref.read(kraAssignmentActionsProvider).bulkAssign(
+                employeeIds: _selectedEmployeeIds.toList(),
+                cycleId: _selectedCycle!.id,
+                templateId: _selectedTemplate!.id,
+              );
       if (!mounted) return;
-      final count = _selectedEmployeeIds.length;
-      final msg = count == 1
-          ? AppStrings.kraAssignSuccessOne
-          : AppStrings.kraAssignSuccessMany.replaceAll(
-              '{count}', count.toString());
+      // Backend is idempotent: employees who already have an assignment
+      // for this cycle come back under `skippedEmployeeIds`. Surface that
+      // honestly instead of pretending we created N rows.
+      final msg = _formatBulkResultMessage(result);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg)),
       );
       context.pop();
     } on ApiError catch (e) {
-      setState(() => _serverError = e.message);
+      setState(() => _serverError = e.combinedMessage);
     } catch (_) {
       setState(() => _serverError = AppStrings.errorGeneric);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  String _formatBulkResultMessage(BulkAssignResult result) {
+    final created = result.createdCount;
+    final skipped = result.skippedCount;
+    if (created == 0 && skipped > 0) {
+      return skipped == 1
+          ? 'This employee already has this template for the selected cycle.'
+          : 'All $skipped employees already had this template for the selected cycle.';
+    }
+    if (skipped == 0) {
+      return created == 1
+          ? AppStrings.kraAssignSuccessOne
+          : AppStrings.kraAssignSuccessMany
+              .replaceAll('{count}', created.toString());
+    }
+    return 'Assigned to $created employee${created == 1 ? '' : 's'} '
+        '($skipped already had it).';
   }
 }
 
@@ -540,10 +609,12 @@ class _EmployeeSelectTile extends StatelessWidget {
 
 class _Step2Template extends ConsumerWidget {
   final KraTemplate? selected;
+  final bool isLoading;
   final ValueChanged<KraTemplate?> onSelect;
   const _Step2Template({
     super.key,
     required this.selected,
+    required this.isLoading,
     required this.onSelect,
   });
 
@@ -583,11 +654,13 @@ class _Step2Template extends ConsumerWidget {
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (_, i) {
                   final tpl = list[i];
+                  final isSelected = selected?.id == tpl.id;
                   return _TemplateOptionTile(
                     template: tpl,
-                    selected: selected?.id == tpl.id,
+                    selected: isSelected,
+                    isLoading: isSelected && isLoading,
                     onTap: () =>
-                        onSelect(selected?.id == tpl.id ? null : tpl),
+                        onSelect(isSelected ? null : tpl),
                   );
                 },
               );
@@ -602,10 +675,12 @@ class _Step2Template extends ConsumerWidget {
 class _TemplateOptionTile extends StatelessWidget {
   final KraTemplate template;
   final bool selected;
+  final bool isLoading;
   final VoidCallback onTap;
   const _TemplateOptionTile({
     required this.template,
     required this.selected,
+    required this.isLoading,
     required this.onTap,
   });
 
@@ -624,11 +699,20 @@ class _TemplateOptionTile extends StatelessWidget {
                 color: AppColors.primaryPurple,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.check_rounded,
-                color: Colors.white,
-                size: 14,
-              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
             ),
           ),
       ],
