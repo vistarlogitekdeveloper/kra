@@ -8,7 +8,9 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../data/models/employee.dart';
+import '../../data/models/kra_assignment.dart';
 import '../providers/employee_providers.dart';
+import '../providers/kra_assignment_providers.dart';
 import '../widgets/_formatters.dart';
 import '../widgets/confirm_action_dialog.dart';
 import '../widgets/empty_state.dart';
@@ -92,6 +94,8 @@ class _DetailContent extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 14),
+        _KraAssignmentsSection(employeeId: employee.id),
         const SizedBox(height: 14),
         _DetailCard(
           title: 'Employment',
@@ -233,6 +237,197 @@ class _DetailContent extends StatelessWidget {
       ref.invalidate(employeeDetailProvider(employee.id));
       if (context.mounted) context.pop();
     }
+  }
+}
+
+/// Lists every KRA assignment for the given employee — one card per
+/// (cycle, template) pair. Refreshes automatically after the Assign-KRA
+/// wizard's bulkAssign call invalidates `kraAssignmentsProvider`.
+class _KraAssignmentsSection extends ConsumerWidget {
+  final String employeeId;
+  const _KraAssignmentsSection({required this.employeeId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final assignmentsAsync = ref.watch(
+      kraAssignmentsProvider(KraAssignmentFilter(employeeId: employeeId)),
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'KRA Assignments',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const Spacer(),
+              assignmentsAsync.when(
+                data: (list) => Text(
+                  list.isEmpty ? '—' : '${list.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryPurple,
+                  ),
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          assignmentsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: ShimmerBox(height: 60, borderRadius: 12),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                e.toString(),
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 12.5,
+                ),
+              ),
+            ),
+            data: (list) {
+              if (list.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.assignment_outlined,
+                        size: 18,
+                        color: AppColors.textMuted.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'No KRAs assigned yet. Use the Assign KRA action below.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              // Newest first — the live API doesn't guarantee order.
+              final sorted = [...list]..sort((a, b) {
+                  final aDate = a.createdAt ?? DateTime(1970);
+                  final bDate = b.createdAt ?? DateTime(1970);
+                  return bDate.compareTo(aDate);
+                });
+              return Column(
+                children: [
+                  for (final a in sorted) _AssignmentRow(assignment: a),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssignmentRow extends StatelessWidget {
+  final KraAssignment assignment;
+  const _AssignmentRow({required this.assignment});
+
+  @override
+  Widget build(BuildContext context) {
+    final cycleLabel = assignment.cycleName ?? assignment.cycleId;
+    final templateLabel = assignment.templateName ?? 'Custom KRAs';
+    final itemCount = assignment.items.length;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primaryPurple.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.assignment_turned_in_outlined,
+              size: 18,
+              color: AppColors.primaryPurple,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  cycleLabel,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$templateLabel · $itemCount KRA${itemCount == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (assignment.isLocked)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.textMuted.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_rounded,
+                      size: 11, color: AppColors.textMuted),
+                  SizedBox(width: 4),
+                  Text(
+                    'Locked',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

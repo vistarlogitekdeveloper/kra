@@ -33,14 +33,24 @@ class KraAssignment {
 
   factory KraAssignment.fromJson(Map<String, dynamic> json) {
     final rawItems = (json['items'] ?? const []) as List<dynamic>;
+    // The live API nests references under `employee.*` / `cycle.*` /
+    // `template.*`; the early spec used flat `employeeName` / `cycleName` /
+    // `templateName`. Dual-read keeps both shapes working.
+    final employeeObj = json['employee'];
+    final cycleObj = json['cycle'];
+    final templateObj = json['template'];
+    String? nested(dynamic obj, String key) =>
+        obj is Map<String, dynamic> ? obj[key] as String? : null;
     return KraAssignment(
       id: json['id'] as String,
       employeeId: (json['employeeId'] ?? '') as String,
-      employeeName: json['employeeName'] as String?,
+      employeeName: nested(employeeObj, 'name') ??
+          json['employeeName'] as String?,
       cycleId: (json['cycleId'] ?? '') as String,
-      cycleName: json['cycleName'] as String?,
-      templateId: json['templateId'] as String?,
-      templateName: json['templateName'] as String?,
+      cycleName: nested(cycleObj, 'name') ?? json['cycleName'] as String?,
+      templateId: nested(templateObj, 'id') ?? json['templateId'] as String?,
+      templateName:
+          nested(templateObj, 'name') ?? json['templateName'] as String?,
       items: rawItems
           .whereType<Map<String, dynamic>>()
           .map(KraTemplateItem.fromJson)
