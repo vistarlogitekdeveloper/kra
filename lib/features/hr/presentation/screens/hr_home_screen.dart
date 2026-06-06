@@ -26,10 +26,15 @@ class HrHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      extendBodyBehindAppBar: true,
+      // App bar stays as a solid dark surface above the scrolling content.
+      // Letting the body scroll behind it (extendBodyBehindAppBar: true)
+      // caused the 'HR Dashboard' title to visually overlap whatever card
+      // happened to be at that scroll position. The AmbientBackground
+      // still wraps the body below, so the aurora glows + S watermark
+      // continue underneath without competing with the title.
       appBar: AppBar(
         title: const Text(AppStrings.hrHomeTitle),
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         leading: Builder(
