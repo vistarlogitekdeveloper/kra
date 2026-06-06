@@ -85,13 +85,12 @@ class AmbientBackground extends StatelessWidget {
           ),
         ),
 
-        // Faint watermark. Positioned with relative sizing + alignment so
-        // it adapts to whichever asset is bundled — a square-ish rainbow
-        // S mark or the wide wordmark fallback. The image is centred and
-        // capped at a fraction of the smaller viewport axis so neither
-        // shape extends past the visible canvas (an earlier version
-        // anchored to `Alignment(0.55, 0)` which clipped the wordmark's
-        // trailing letter off-screen).
+        // Faint watermark. Centred horizontally and vertically, with no
+        // rotation — the wordmark already has a diagonal swoosh built in,
+        // so an extra 4° tilt made the whole thing read as misaligned.
+        // Width is capped at a fraction of the smaller viewport axis so
+        // the watermark fits whether the bundled asset is a square S mark
+        // or the wider wordmark fallback.
         if (showWatermark)
           Positioned.fill(
             child: IgnorePointer(
@@ -100,28 +99,24 @@ class AmbientBackground extends StatelessWidget {
                   final maxSide = c.maxWidth < c.maxHeight
                       ? c.maxWidth
                       : c.maxHeight;
-                  final size = maxSide * 0.62;
-                  return Align(
-                    alignment: const Alignment(0.15, 0),
+                  final size = maxSide * 0.5;
+                  return Center(
                     child: Opacity(
-                      opacity: 0.06,
-                      child: Transform.rotate(
-                        angle: 0.07, // ~4°
-                        child: SizedBox(
-                          width: size,
-                          height: size,
-                          child: Image.asset(
-                            AppAssets.sMark,
+                      opacity: 0.05,
+                      child: SizedBox(
+                        width: size,
+                        height: size,
+                        child: Image.asset(
+                          AppAssets.sMark,
+                          fit: BoxFit.contain,
+                          // Fall back to the legacy logo until the
+                          // dedicated S mark is dropped under
+                          // assets/images/vistar_s_mark.png.
+                          errorBuilder: (_, __, ___) => Image.asset(
+                            AppAssets.logo,
                             fit: BoxFit.contain,
-                            // Fall back to the legacy logo until the
-                            // dedicated S mark is dropped under
-                            // assets/images/vistar_s_mark.png.
-                            errorBuilder: (_, __, ___) => Image.asset(
-                              AppAssets.logo,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
-                            ),
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
                           ),
                         ),
                       ),
