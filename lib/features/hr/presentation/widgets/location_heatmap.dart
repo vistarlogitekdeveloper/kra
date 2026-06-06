@@ -256,97 +256,107 @@ Future<void> _showLocationSheet(
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: AppColors.surface,
+    // isScrollControlled lets the sheet exceed the default ~half-screen
+    // ceiling. Combined with the maxHeight cap + SingleChildScrollView
+    // below, the sheet sizes to content when short and scrolls when long
+    // (12-month cycles + tablet-half viewports were overflowing by ~58px).
+    isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (sheetContext) {
+      final maxHeight =
+          MediaQuery.of(sheetContext).size.height * 0.85;
       return SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.divider,
-                    borderRadius: BorderRadius.circular(2),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.divider,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                location.locationName,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.3,
+                const SizedBox(height: 16),
+                Text(
+                  location.locationName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                cycleAvg == null
-                    ? '$totalReviews ${AppStrings.hrHeatmapReviewsCount}'
-                    : '${AppStrings.hrHeatmapAverage}: '
-                        '${cycleAvg.toStringAsFixed(1)}% '
-                        '· $totalReviews ${AppStrings.hrHeatmapReviewsCount}',
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 4),
+                Text(
+                  cycleAvg == null
+                      ? '$totalReviews ${AppStrings.hrHeatmapReviewsCount}'
+                      : '${AppStrings.hrHeatmapAverage}: '
+                          '${cycleAvg.toStringAsFixed(1)}% '
+                          '· $totalReviews ${AppStrings.hrHeatmapReviewsCount}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                AppStrings.hrHeatmapMonthlyBreakdown,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textSecondary,
-                  letterSpacing: 0.6,
+                const SizedBox(height: 18),
+                const Text(
+                  AppStrings.hrHeatmapMonthlyBreakdown,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textSecondary,
+                    letterSpacing: 0.6,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              for (final m in months) ...[
-                _MonthBreakdownTile(
-                  month: m,
-                  cell: _cellForMonth(location, m.id),
+                const SizedBox(height: 8),
+                for (final m in months) ...[
+                  _MonthBreakdownTile(
+                    month: m,
+                    cell: _cellForMonth(location, m.id),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      context.push(AppRoutes.hrEmployees);
+                    },
+                    icon: const Icon(Icons.groups_outlined, size: 18),
+                    label: const Text(
+                      AppStrings.hrHeatmapViewEmployees,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 6),
               ],
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    context.push(AppRoutes.hrEmployees);
-                  },
-                  icon: const Icon(Icons.groups_outlined, size: 18),
-                  label: const Text(
-                    AppStrings.hrHeatmapViewEmployees,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryPurple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       );
