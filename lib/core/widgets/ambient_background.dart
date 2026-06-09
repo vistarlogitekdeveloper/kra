@@ -85,26 +85,27 @@ class AmbientBackground extends StatelessWidget {
           ),
         ),
 
-        // Tall rainbow "S" swoosh anchored along the right edge — matches
-        // the Vistar Audit reference where the standalone S stands at
-        // ~70% of viewport height and ~28% of width, centred vertically
-        // with the right edge near (but not past) the canvas edge.
+        // Rainbow "S" swoosh anchored right-of-centre. The bundled asset
+        // (`assets/images/logo.png`) is 1536×1024 — wider than tall — so
+        // we shape the box to its intrinsic 3:2 aspect ratio. Forcing a
+        // tall-narrow box made BoxFit.contain letterbox the swoosh down
+        // to ~280px and 22% opacity left nothing visible against the dark
+        // canvas + translucent cards on top of it.
         //
-        // BoxFit.contain preserves the asset's intrinsic aspect ratio so
-        // the rainbow stops never stretch. No fallback to vistar_logo.png:
-        // that's the wide wordmark, and silently swapping it in is what
-        // caused the previous "wrong logo on screen" complaint.
+        // Now: width = 45% viewport, height = width / 1.5 (matches asset).
+        // Aligned at (0.95, 0) — right edge, vertically centred. Opacity
+        // 0.35 so the rainbow stops actually read at this size.
         if (showWatermark)
           Positioned.fill(
             child: IgnorePointer(
               child: LayoutBuilder(
                 builder: (context, c) {
-                  final width = c.maxWidth * 0.28;
-                  final height = c.maxHeight * 0.7;
+                  final width = c.maxWidth * 0.45;
+                  final height = width / 1.5;
                   return Align(
-                    alignment: const Alignment(0.92, 0),
+                    alignment: const Alignment(0.95, 0),
                     child: Opacity(
-                      opacity: 0.22,
+                      opacity: 0.35,
                       child: SizedBox(
                         width: width,
                         height: height,
