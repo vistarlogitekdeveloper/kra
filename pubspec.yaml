@@ -48,3 +48,7 @@ flutter:
 
   assets:
     - assets/images/
+    # Listed explicitly so the asset bundle picks up new files even when
+    # the cached AssetManifest from an earlier `flutter run` wouldn't.
+    - assets/images/logo.png
+    - assets/images/vistar_logo.png
