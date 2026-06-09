@@ -85,21 +85,24 @@ class AmbientBackground extends StatelessWidget {
           ),
         ),
 
-        // Rainbow "Vistar" wordmark anchored right-of-centre, sized to a
-        // fraction of the viewport so the asset's natural wordmark aspect
-        // ratio (≈2.5:1 wide) sits cleanly without sprawling. Opacity is
-        // bumped to 0.22 so the rainbow swoosh actually reads at this
-        // size — at < 0.10 the colour stops collapse into a muddy blur.
+        // Tall rainbow "S" swoosh anchored along the right edge — matches
+        // the Vistar Audit reference where the standalone S stands at
+        // ~70% of viewport height and ~28% of width, centred vertically
+        // with the right edge near (but not past) the canvas edge.
+        //
+        // BoxFit.contain preserves the asset's intrinsic aspect ratio so
+        // the rainbow stops never stretch. No fallback to vistar_logo.png:
+        // that's the wide wordmark, and silently swapping it in is what
+        // caused the previous "wrong logo on screen" complaint.
         if (showWatermark)
           Positioned.fill(
             child: IgnorePointer(
               child: LayoutBuilder(
                 builder: (context, c) {
-                  // Width-driven sizing; height follows via BoxFit.contain.
-                  final width = c.maxWidth * 0.5;
-                  final height = c.maxHeight * 0.55;
+                  final width = c.maxWidth * 0.28;
+                  final height = c.maxHeight * 0.7;
                   return Align(
-                    alignment: const Alignment(0.85, 0.25),
+                    alignment: const Alignment(0.92, 0),
                     child: Opacity(
                       opacity: 0.22,
                       child: SizedBox(
@@ -108,12 +111,8 @@ class AmbientBackground extends StatelessWidget {
                         child: Image.asset(
                           AppAssets.sMark,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Image.asset(
-                            AppAssets.logo,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
-                          ),
+                          errorBuilder: (_, __, ___) =>
+                              const SizedBox.shrink(),
                         ),
                       ),
                     ),
