@@ -400,8 +400,21 @@ class _RoleDropdown extends StatelessWidget {
     required this.onChanged,
   });
 
+  String _humanise(String r) {
+    if (r.isEmpty) return r;
+    return r[0].toUpperCase() + r.substring(1).toLowerCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Backend may return a role string that isn't in our standard list —
+    // older accounts have values like 'Ops_excellence'. DropdownButton
+    // asserts when `value` doesn't match exactly one item, so we surface
+    // the orphan as an extra option (mirrors what _LocationDropdown
+    // already does for deactivated locations). Without this, opening the
+    // edit form for those employees crashed the screen.
+    final hasOrphan = value.isNotEmpty && !roles.contains(value);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -430,10 +443,15 @@ class _RoleDropdown extends StatelessWidget {
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               items: [
+                if (hasOrphan)
+                  DropdownMenuItem(
+                    value: value,
+                    child: Text('${_humanise(value)} (current)'),
+                  ),
                 for (final r in roles)
                   DropdownMenuItem(
                     value: r,
-                    child: Text(r[0] + r.substring(1).toLowerCase()),
+                    child: Text(_humanise(r)),
                   ),
               ],
               onChanged: (v) {
