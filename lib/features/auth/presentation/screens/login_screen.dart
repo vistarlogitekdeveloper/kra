@@ -275,25 +275,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accentOrange.withValues(alpha: 0.18),
-                blurRadius: 30,
-                spreadRadius: 4,
-              ),
-            ],
-          ),
-          child: Image.asset(
-            AppAssets.logo,
-            height: 92,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox(
-              height: 92,
-              width: 92,
+        // Transparent-background rainbow S sitting in a soft pink glow.
+        // Was previously `AppAssets.logo` (vistar_logo.png) which has a
+        // white background baked into the PNG — read as a white card on
+        // the dark canvas. `sMark` (logo.png) is transparent, so the
+        // brand mark floats cleanly above the glass card.
+        SizedBox(
+          height: 96,
+          width: 96,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.pink.withValues(alpha: 0.28),
+                  blurRadius: 36,
+                  spreadRadius: -4,
+                ),
+              ],
+            ),
+            child: Image.asset(
+              AppAssets.sMark,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
           ),
         ),
