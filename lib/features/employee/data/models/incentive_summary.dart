@@ -8,8 +8,9 @@ import 'monthly_incentive.dart';
 ///
 /// Eligibility precedence (highest to lowest):
 ///   Review.monthlyIncentiveAmount (snapshot at review creation)
-///     → BonusSlab[cycleId, grade]
-///     → Employee.monthlyIncentiveAmount (org default)
+///     → Employee.monthlyIncentiveAmount (per-employee incentive, set by HR
+///       on the employee form)
+///     → org default (backend)
 ///
 /// `payableIfFinalizedNow` is the projected payout if HR finalised
 /// the cycle right now — only populated once the cycle reaches
@@ -50,8 +51,7 @@ class IncentiveSummary {
           JsonParse.parseMap(json['cycle']) ?? const {}),
       grade: JsonParse.parseString(json['grade']),
       monthlyEligible: JsonParse.parseDouble(json['monthlyEligible']) ?? 0,
-      quarterlyEligible:
-          JsonParse.parseDouble(json['quarterlyEligible']) ?? 0,
+      quarterlyEligible: JsonParse.parseDouble(json['quarterlyEligible']) ?? 0,
       earnedSoFar: JsonParse.parseDouble(json['earnedSoFar']) ?? 0,
       payableIfFinalizedNow:
           JsonParse.parseDouble(json['payableIfFinalizedNow']),

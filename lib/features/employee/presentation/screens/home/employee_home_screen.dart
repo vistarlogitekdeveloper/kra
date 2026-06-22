@@ -114,8 +114,13 @@ class _DeadlineBannerSection extends ConsumerWidget {
     final dashboardAsync = ref.watch(employeeDashboardProvider);
     return dashboardAsync.maybeWhen(
       data: (dashboard) {
+        // Don't nag once the employee has already submitted everything for
+        // the cycle — the monthly deadline only matters while work is open.
+        final submittedAll =
+            dashboard.scorecard?.state.hasSubmittedAll ?? false;
         final days = dashboard.selfRatingDaysRemaining;
-        final showBanner = days != null &&
+        final showBanner = !submittedAll &&
+            days != null &&
             (dashboard.isSelfRatingOverdue || days <= _bannerThresholdDays);
         if (!showBanner) return const SizedBox.shrink();
         return DeadlineBanner(
@@ -270,8 +275,7 @@ class _SectionError extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.error.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          border:
-              Border.all(color: AppColors.error.withValues(alpha: 0.30)),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.30)),
         ),
         child: Row(
           children: [

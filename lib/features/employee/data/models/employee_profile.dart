@@ -28,8 +28,9 @@ class EmployeeProfile {
   /// changes happen at the IdP, not here.
   final String? authMethod;
 
-  /// Per-employee override of the bonus slab. Falls through to slab
-  /// → org default on the backend (see incentive-summary spec).
+  /// Per-employee override of the performance incentive. Falls through to
+  /// the grade incentive → org default on the backend (see
+  /// incentive-summary spec).
   final double? monthlyIncentiveAmount;
 
   final DateTime? joinedDate;

@@ -170,13 +170,11 @@ class SelfRateState {
 
   /// True iff every applicable cell has been rated or marked N/A.
   /// Submit button gates on this — server enforces the same rule.
-  bool get isComplete =>
-      entries.isNotEmpty && entries.every((e) => e.isFilled);
+  bool get isComplete => entries.isNotEmpty && entries.every((e) => e.isFilled);
 
   /// True iff there are local changes not yet persisted to the
   /// server (used for the dirty-form back-press guard).
-  bool get isDirty =>
-      entries.any((e) => e.isFilled) && !(isSubmitting);
+  bool get isDirty => entries.any((e) => e.isFilled) && !(isSubmitting);
 
   SelfRateState copyWith({
     MyReview? review,
@@ -259,8 +257,7 @@ class SelfRateNotifier extends StateNotifier<SelfRateState> {
     try {
       // We reuse the review-detail provider so a freshly-saved review
       // is available immediately to History without an extra round-trip.
-      final review =
-          await _ref.read(myReviewDetailProvider(reviewId).future);
+      final review = await _ref.read(myReviewDetailProvider(reviewId).future);
 
       // Pick the active month — the latest OPEN month, falling back to
       // the latest month overall if none are open.
@@ -373,6 +370,33 @@ class SelfRateNotifier extends StateNotifier<SelfRateState> {
     _scheduleAutoSave();
   }
 
+  /// Attaches a locally-picked proof file to a cell. Stored in the
+  /// draft only — there is no server upload endpoint yet.
+  void setAttachment(String monthlyScoreId, String name, String path) {
+    final updated = [
+      for (final e in state.entries)
+        if (e.monthlyScoreId == monthlyScoreId)
+          e.copyWith(attachmentName: name, attachmentPath: path)
+        else
+          e,
+    ];
+    state = state.copyWith(entries: updated);
+    _scheduleAutoSave();
+  }
+
+  /// Removes a cell's attached proof file.
+  void clearAttachment(String monthlyScoreId) {
+    final updated = [
+      for (final e in state.entries)
+        if (e.monthlyScoreId == monthlyScoreId)
+          e.copyWith(attachmentName: null, attachmentPath: null)
+        else
+          e,
+    ];
+    state = state.copyWith(entries: updated);
+    _scheduleAutoSave();
+  }
+
   void toggleNotApplicable(String monthlyScoreId, bool isNotApplicable) {
     final updated = [
       for (final e in state.entries)
@@ -402,8 +426,8 @@ class SelfRateNotifier extends StateNotifier<SelfRateState> {
     final reviewId = state.reviewId;
     if (reviewId == null) return null;
     if (!state.isComplete) {
-      state = state.copyWith(
-          submitError: AppStrings.selfRateErrorIncompleteScores);
+      state =
+          state.copyWith(submitError: AppStrings.selfRateErrorIncompleteScores);
       return null;
     }
     state = state.copyWith(isSubmitting: true, submitError: null);
@@ -588,8 +612,7 @@ class DraftResumeInfo {
 /// every time the user enters the self-rate tab — the persisted draft
 /// is the source of truth across re-opens.
 final selfRateProvider =
-    StateNotifierProvider.autoDispose<SelfRateNotifier, SelfRateState>(
-        (ref) {
+    StateNotifierProvider.autoDispose<SelfRateNotifier, SelfRateState>((ref) {
   return SelfRateNotifier(
     ref,
     ref.watch(selfRateRepositoryProvider),

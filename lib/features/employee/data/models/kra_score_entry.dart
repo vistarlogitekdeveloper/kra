@@ -67,6 +67,15 @@ class KraScoreEntry {
   /// skips like "employee on extended leave for the month".
   final bool isNotApplicable;
 
+  /// Display name of a locally-attached proof file (image/PDF), or
+  /// `null` when none. Stored in the local draft only — there is no
+  /// server upload endpoint yet, so this is never sent on the wire.
+  final String? attachmentName;
+
+  /// Absolute path to the attached proof file on the device. Kept
+  /// alongside [attachmentName] so the draft can re-surface the file.
+  final String? attachmentPath;
+
   const KraScoreEntry({
     required this.monthlyScoreId,
     required this.reviewRowId,
@@ -85,9 +94,15 @@ class KraScoreEntry {
     this.selfRating,
     this.selfRemark = '',
     this.isNotApplicable = false,
+    this.attachmentName,
+    this.attachmentPath,
   });
 
   double get weightagePercent => weight <= 1.0 ? weight * 100 : weight;
+
+  /// True when the cell has a locally-attached proof file.
+  bool get hasAttachment =>
+      attachmentName != null && attachmentName!.isNotEmpty;
 
   /// True once the user has supplied a value (or N/A flag) for this
   /// cell. Drives the submit button's enabled state.
@@ -147,19 +162,20 @@ class KraScoreEntry {
       trackingMethod: json['trackingMethod'] as String?,
       weight: w is num ? w.toDouble() : double.tryParse('$w') ?? 0,
       maxScore: m is num ? m.toDouble() : double.tryParse('$m') ?? 10,
-      scoreSource: ScoreSource.fromApi(
-          (json['scoreSource'] ?? 'MANAGER') as String),
+      scoreSource:
+          ScoreSource.fromApi((json['scoreSource'] ?? 'MANAGER') as String),
       displayOrder: (json['displayOrder'] is int)
           ? json['displayOrder'] as int
           : int.tryParse('${json['displayOrder']}') ?? 0,
       monthLabel: (json['monthLabel'] ?? '') as String,
-      monthStatus: ReviewMonthStatus.fromApi(
-          (json['monthStatus'] ?? 'OPEN') as String),
-      selfRating: s == null
-          ? null
-          : (s is num ? s.toDouble() : double.tryParse('$s')),
+      monthStatus:
+          ReviewMonthStatus.fromApi((json['monthStatus'] ?? 'OPEN') as String),
+      selfRating:
+          s == null ? null : (s is num ? s.toDouble() : double.tryParse('$s')),
       selfRemark: (json['selfRemark'] ?? '') as String,
       isNotApplicable: (json['isNotApplicable'] ?? false) as bool,
+      attachmentName: json['attachmentName'] as String?,
+      attachmentPath: json['attachmentPath'] as String?,
     );
   }
 
@@ -181,6 +197,8 @@ class KraScoreEntry {
         'selfRating': selfRating,
         'selfRemark': selfRemark,
         'isNotApplicable': isNotApplicable,
+        'attachmentName': attachmentName,
+        'attachmentPath': attachmentPath,
       };
 
   KraScoreEntry copyWith({
@@ -201,6 +219,8 @@ class KraScoreEntry {
     Object? selfRating = _sentinel,
     String? selfRemark,
     bool? isNotApplicable,
+    Object? attachmentName = _sentinel,
+    Object? attachmentPath = _sentinel,
   }) {
     return KraScoreEntry(
       monthlyScoreId: monthlyScoreId ?? this.monthlyScoreId,
@@ -222,6 +242,12 @@ class KraScoreEntry {
           : selfRating as double?,
       selfRemark: selfRemark ?? this.selfRemark,
       isNotApplicable: isNotApplicable ?? this.isNotApplicable,
+      attachmentName: identical(attachmentName, _sentinel)
+          ? this.attachmentName
+          : attachmentName as String?,
+      attachmentPath: identical(attachmentPath, _sentinel)
+          ? this.attachmentPath
+          : attachmentPath as String?,
     );
   }
 

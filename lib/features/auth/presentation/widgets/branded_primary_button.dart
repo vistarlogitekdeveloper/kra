@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
 
-/// Primary action button using the brand gradient.
-/// Handles loading state internally — pass `isLoading: true` and the button
-/// disables itself and shows a spinner.
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_gradients.dart';
+
+/// Hero "Vistar Premium" CTA — wears the rainbow ribbon gradient with a
+/// pink-glow drop shadow. Disabled state collapses to a flat muted surface
+/// so it can't be confused with an idle ribbon button.
+///
+/// Handles loading state internally — pass `isLoading: true` and the
+/// button disables itself and shows a spinner.
 class BrandedPrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -25,25 +30,20 @@ class BrandedPrimaryButton extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        gradient: disabled
-            ? null
-            : const LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  AppColors.primaryPurple,
-                  AppColors.primaryPurpleLight,
-                ],
-              ),
-        color: disabled ? AppColors.divider : null,
+        borderRadius: BorderRadius.circular(11),
+        gradient: disabled ? null : AppGradients.ribbon,
+        color: disabled ? AppColors.surfaceElevated : null,
+        border: disabled
+            ? Border.all(color: AppColors.divider)
+            : null,
         boxShadow: disabled
             ? null
             : [
                 BoxShadow(
-                  color: AppColors.primaryPurple.withValues(alpha: 0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+                  color: AppColors.pink.withValues(alpha: 0.45),
+                  blurRadius: 34,
+                  spreadRadius: -10,
+                  offset: const Offset(0, 14),
                 ),
               ],
       ),
@@ -51,7 +51,7 @@ class BrandedPrimaryButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: disabled ? null : onPressed,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(11),
           child: Container(
             height: 56,
             alignment: Alignment.center,
@@ -74,9 +74,9 @@ class BrandedPrimaryButton extends StatelessWidget {
                           color: disabled
                               ? AppColors.textMuted
                               : Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.4,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
                         ),
                       ),
                       if (icon != null) ...[

@@ -100,6 +100,48 @@ void main() {
       expect(restored.isFilled, isFalse);
     });
   });
+
+  group('KraScoreEntry attachment (local proof)', () {
+    test('hasAttachment reflects whether a file name is set', () {
+      expect(_entry().hasAttachment, isFalse);
+      expect(
+        _entry()
+            .copyWith(attachmentName: 'proof.pdf', attachmentPath: '/x')
+            .hasAttachment,
+        isTrue,
+      );
+    });
+
+    test('attachment round-trips through draft JSON', () {
+      final original = _entry(selfRating: 6.0).copyWith(
+        attachmentName: 'evidence.png',
+        attachmentPath: '/tmp/evidence.png',
+      );
+      final restored = KraScoreEntry.fromJson(original.toJson());
+      expect(restored.attachmentName, 'evidence.png');
+      expect(restored.attachmentPath, '/tmp/evidence.png');
+      expect(restored.hasAttachment, isTrue);
+    });
+
+    test('copyWith can clear the attachment back to null', () {
+      final withFile = _entry().copyWith(
+        attachmentName: 'a.jpg',
+        attachmentPath: '/a.jpg',
+      );
+      final cleared =
+          withFile.copyWith(attachmentName: null, attachmentPath: null);
+      expect(cleared.hasAttachment, isFalse);
+      expect(cleared.attachmentPath, isNull);
+    });
+
+    test('copyWith preserves the attachment when untouched', () {
+      final withFile = _entry().copyWith(
+        attachmentName: 'a.jpg',
+        attachmentPath: '/a.jpg',
+      );
+      expect(withFile.copyWith(selfRemark: 'x').attachmentName, 'a.jpg');
+    });
+  });
 }
 
 KraScoreEntry _entry({

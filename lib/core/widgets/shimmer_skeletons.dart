@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_gradients.dart';
 import '../constants/app_strings.dart';
+import 'ambient_background.dart';
 import 'shimmer_box.dart';
 
 /// Pre-built shimmer skeletons for the screens this app will gain.
@@ -186,71 +188,301 @@ class KraTableSkeleton extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Splash / boot — logo + 3 shimmer lines, no spinner
+// Splash / boot — the Vistar Premium "S-orbit" loader. Two counter-
+// spinning rings around a breathing S mark, plus the wordmark and a
+// ribbon progress bar. Reproduces the CSS `.s-orbit` + `.splash-bar`
+// recipes from the design system spec.
 // ─────────────────────────────────────────────────────────────────
 class FullScreenLoadingSkeleton extends StatelessWidget {
   const FullScreenLoadingSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
+      body: AmbientBackground(
         child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.accentOrange
-                                .withValues(alpha: 0.18),
-                            blurRadius: 30,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        AppAssets.logo,
-                        height: 92,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox(
-                          height: 92,
-                          width: 92,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    const ShimmerBox(height: 14, width: 220, borderRadius: 7),
-                    const SizedBox(height: 10),
-                    const ShimmerBox(height: 14, borderRadius: 7),
-                    const SizedBox(height: 10),
-                    const ShimmerBox(height: 14, width: 160, borderRadius: 7),
-                    const SizedBox(height: 36),
-                    const Text(
-                      AppStrings.companyName,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ],
+          child: Center(child: _SplashOrbitColumn()),
+        ),
+      ),
+    );
+  }
+}
+
+class _SplashOrbitColumn extends StatelessWidget {
+  const _SplashOrbitColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SOrbitLoader(),
+            const SizedBox(height: 32),
+            const Text(
+              AppStrings.appName,
+              style: TextStyle(
+                fontFamily: 'BricolageGrotesque',
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              AppStrings.appTagline,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 3.0,
+              ),
+            ),
+            const SizedBox(height: 28),
+            const _RibbonProgressBar(),
+            const SizedBox(height: 28),
+            Text(
+              AppStrings.companyName,
+              style: TextStyle(
+                fontSize: 10.5,
+                color: AppColors.textMuted.withValues(alpha: 0.9),
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Two counter-spinning rings + a breathing S in the center. Per the
+/// design spec: outer ring 1.6s forward, inner ring 2.2s reverse, S
+/// breathes on 2.2s. Renders the rainbow-S asset with a graceful fallback.
+class SOrbitLoader extends StatefulWidget {
+  final double size;
+  const SOrbitLoader({super.key, this.size = 180});
+
+  @override
+  State<SOrbitLoader> createState() => _SOrbitLoaderState();
+}
+
+class _SOrbitLoaderState extends State<SOrbitLoader>
+    with TickerProviderStateMixin {
+  late final AnimationController _outer;
+  late final AnimationController _inner;
+  late final AnimationController _breath;
+
+  @override
+  void initState() {
+    super.initState();
+    _outer = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+    _inner = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: false);
+    _breath = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _outer.dispose();
+    _inner.dispose();
+    _breath.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = widget.size;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Outer ring — pink + orange arcs.
+          AnimatedBuilder(
+            animation: _outer,
+            builder: (_, __) => Transform.rotate(
+              angle: _outer.value * 2 * 3.1415926,
+              child: CustomPaint(
+                size: Size.square(size),
+                painter: _OrbitRingPainter(
+                  color1: AppColors.pink.withValues(alpha: 0.65),
+                  color2: AppColors.orange.withValues(alpha: 0.40),
+                  strokeWidth: 1.6,
                 ),
               ),
             ),
+          ),
+          // Inner ring — violet + amber arcs, reversed.
+          AnimatedBuilder(
+            animation: _inner,
+            builder: (_, __) => Transform.rotate(
+              angle: -_inner.value * 2 * 3.1415926,
+              child: CustomPaint(
+                size: Size.square(size - 44),
+                painter: _OrbitRingPainter(
+                  color1: AppColors.violet.withValues(alpha: 0.65),
+                  color2: AppColors.amber.withValues(alpha: 0.45),
+                  strokeWidth: 1.6,
+                  startAngle: 3.1415926 / 2,
+                ),
+              ),
+            ),
+          ),
+          // Breathing S mark.
+          ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1.04).animate(
+              CurvedAnimation(parent: _breath, curve: Curves.easeInOut),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.pink.withValues(alpha: 0.55),
+                    blurRadius: 28,
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: 96,
+                height: 96,
+                child: Image.asset(
+                  AppAssets.sMark,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    AppAssets.logo,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) =>
+                        const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Paints two opposite arc segments of a circle. Two stops per pass
+/// reproduces the CSS `border-top-color + border-right-color` effect.
+class _OrbitRingPainter extends CustomPainter {
+  final Color color1;
+  final Color color2;
+  final double strokeWidth;
+  final double startAngle;
+
+  _OrbitRingPainter({
+    required this.color1,
+    required this.color2,
+    required this.strokeWidth,
+    this.startAngle = 0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(
+      strokeWidth,
+      strokeWidth,
+      size.width - strokeWidth * 2,
+      size.height - strokeWidth * 2,
+    );
+    final paint1 = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = strokeWidth
+      ..color = color1;
+    final paint2 = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = strokeWidth
+      ..color = color2;
+    canvas.drawArc(rect, startAngle, 3.1415926 * 0.5, false, paint1);
+    canvas.drawArc(rect, startAngle + 3.1415926, 3.1415926 * 0.5, false, paint2);
+  }
+
+  @override
+  bool shouldRepaint(_OrbitRingPainter old) =>
+      old.color1 != color1 ||
+      old.color2 != color2 ||
+      old.startAngle != startAngle ||
+      old.strokeWidth != strokeWidth;
+}
+
+class _RibbonProgressBar extends StatefulWidget {
+  const _RibbonProgressBar();
+
+  @override
+  State<_RibbonProgressBar> createState() => _RibbonProgressBarState();
+}
+
+class _RibbonProgressBarState extends State<_RibbonProgressBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 200,
+      height: 4,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.dividerStrong,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: AnimatedBuilder(
+            animation: _ctrl,
+            builder: (_, __) {
+              // -110% → +260% sweep, matching @keyframes load in the spec.
+              final t = _ctrl.value;
+              final dx = -1.1 + (3.7 * t); // moves -110% → +260%
+              return FractionalTranslation(
+                translation: Offset(dx, 0),
+                child: Container(
+                  width: 80,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.ribbon,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

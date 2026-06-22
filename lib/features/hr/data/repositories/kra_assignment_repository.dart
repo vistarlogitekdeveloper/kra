@@ -1,3 +1,4 @@
+import '../models/bulk_assign_result.dart';
 import '../models/kra_assignment.dart';
 import '../models/kra_template_item.dart';
 
@@ -18,8 +19,10 @@ abstract class KraAssignmentRepository {
   Future<KraAssignment> update(String id, Map<String, dynamic> changes);
 
   /// Bulk-assigns the same [templateId] to N employees in one round
-  /// trip. Returns the freshly-created assignments.
-  Future<List<KraAssignment>> bulkAssign({
+  /// trip. The backend is idempotent — employees that already have an
+  /// assignment for this cycle land in [BulkAssignResult.skippedEmployeeIds]
+  /// rather than producing an error.
+  Future<BulkAssignResult> bulkAssign({
     required List<String> employeeIds,
     required String cycleId,
     required String templateId,

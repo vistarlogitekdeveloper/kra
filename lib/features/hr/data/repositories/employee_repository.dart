@@ -24,6 +24,7 @@ abstract class EmployeeRepository {
     String? projectLocationId,
     String? managerId,
     String? grade,
+    double? monthlyIncentiveAmount,
     DateTime? joinedDate,
   });
 

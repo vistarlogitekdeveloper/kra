@@ -18,7 +18,6 @@ import '../../features/employee/presentation/screens/self_rate/self_rate_review_
 import '../../features/employee/presentation/screens/self_rate/self_rate_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_success_screen.dart';
 import '../../features/hr/presentation/screens/audit_log_screen.dart';
-import '../../features/hr/presentation/screens/bonus_slabs_screen.dart';
 import '../../features/hr/presentation/screens/bulk_setup_screen.dart';
 import '../../features/hr/presentation/screens/employee_detail_screen.dart';
 import '../../features/hr/presentation/screens/employee_form_screen.dart';
@@ -94,7 +93,6 @@ class AppRoutes {
   static String hrEmployeeDetail(String id) => '/hr/employees/$id';
   static String hrEmployeeEdit(String id) => '/hr/employees/$id/edit';
   static String hrTemplateEdit(String id) => '/hr/kra-templates/$id';
-  static String hrCycleSlabs(String id) => '/hr/cycles/$id/slabs';
 
   // ── Manager module nested routes ──
   // Two modes share the /manager root: My Team (default) and
@@ -205,8 +203,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // hypothetical sibling like `/hr-self-service`, which a naive
       // startsWith would have silently inherited the HR-only guard.
       final loc = state.matchedLocation;
-      final goingToHrArea =
-          loc == AppRoutes.hrDashboard || loc.startsWith('${AppRoutes.hrDashboard}/');
+      final goingToHrArea = loc == AppRoutes.hrDashboard ||
+          loc.startsWith('${AppRoutes.hrDashboard}/');
       final goingToManagerArea = loc == AppRoutes.managerDashboard ||
           loc.startsWith('${AppRoutes.managerDashboard}/');
 
@@ -352,8 +350,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // (rate, review detail, bulk-approve) live outside the inner
       // shell so they cover the bottom nav.
       ShellRoute(
-        builder: (context, state, child) =>
-            ManagerShellScreen(child: child),
+        builder: (context, state, child) => ManagerShellScreen(child: child),
         routes: [
           StatefulShellRoute.indexedStack(
             builder: (context, state, navigationShell) =>
@@ -556,12 +553,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const ReviewCycleFormScreen(),
       ),
       GoRoute(
-        path: '/hr/cycles/:id/slabs',
-        builder: (_, state) => BonusSlabsScreen(
-          cycleId: state.pathParameters['id']!,
-        ),
-      ),
-      GoRoute(
         path: AppRoutes.hrAuditLog,
         builder: (_, __) => const AuditLogScreen(),
       ),
@@ -572,9 +563,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 /// The HR module is locked down to HR + HR_ADMIN + ADMIN.
 /// Other roles deep-linking to `/hr/*` get redirected to their own dashboard.
 bool _canAccessHr(UserRole role) =>
-    role == UserRole.hr ||
-    role == UserRole.hrAdmin ||
-    role == UserRole.admin;
+    role == UserRole.hr || role == UserRole.hrAdmin || role == UserRole.admin;
 
 /// Bridges Riverpod auth state changes into GoRouter's refresh
 /// mechanism so the redirect rules re-run on login / logout / forced-logout.

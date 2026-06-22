@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
+import '../../../../../../core/utils/monthly_deadlines.dart';
 import '../../../../../../core/widgets/shimmer_box.dart';
 import '../../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../../employee/data/models/enums.dart';
@@ -58,8 +59,7 @@ class ReviewDetailScreen extends ConsumerWidget {
         loading: () => const _DetailLoading(),
         error: (e, _) => _DetailError(
           message: e.toString(),
-          onRetry: () =>
-              ref.invalidate(managerReviewDetailProvider(reviewId)),
+          onRetry: () => ref.invalidate(managerReviewDetailProvider(reviewId)),
         ),
         data: (review) => _DetailBody(review: review),
       ),
@@ -81,7 +81,15 @@ class _DetailBody extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 32),
       children: [
         _Header(review: review),
-        DeadlineWarningCard(permissions: review.permissions),
+        // The manager-rating deadline is the fixed 10th-of-month rule, not
+        // the backend's per-cycle date — override the days-remaining the
+        // warning card counts down to.
+        DeadlineWarningCard(
+          permissions: review.permissions.copyWith(
+            deadlineRemaining: MonthlyDeadlines.daysRemaining(
+                MonthlyDeadlines.managerRating()),
+          ),
+        ),
         PermissionsBanner(
           state: review.state,
           permissions: review.permissions,
@@ -132,11 +140,9 @@ class _Header extends StatelessWidget {
                   height: 52,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color:
-                        AppColors.primaryPurple.withValues(alpha: 0.14),
+                    color: AppColors.primaryPurple.withValues(alpha: 0.14),
                     border: Border.all(
-                      color: AppColors.primaryPurple
-                          .withValues(alpha: 0.40),
+                      color: AppColors.primaryPurple.withValues(alpha: 0.40),
                       width: 1.8,
                     ),
                   ),
@@ -467,14 +473,10 @@ class _RowPreviewTile extends StatelessWidget {
   double? _avgScore() {
     final usable = row.monthlyScores.where((c) => !c.isNotApplicable);
     if (usable.isEmpty) return null;
-    final mgr =
-        usable.map((c) => c.managerRating).whereType<double>().toList();
+    final mgr = usable.map((c) => c.managerRating).whereType<double>().toList();
     final pool = mgr.isNotEmpty
         ? mgr
-        : usable
-            .map((c) => c.selfRating)
-            .whereType<double>()
-            .toList();
+        : usable.map((c) => c.selfRating).whereType<double>().toList();
     if (pool.isEmpty) return null;
     final sum = pool.fold<double>(0, (a, b) => a + b);
     return sum / pool.length;

@@ -55,7 +55,7 @@ class EmployeeFormatters {
   }
 
   static String scoreOutOf(double value, num maxScore) =>
-      '${score(value)}/${maxScore.toString()}';
+      '${score(value)}/${score(maxScore.toDouble())}';
 
   static String percent(double value, {int fractionDigits = 1}) {
     final pretty = score(value, fractionDigits: fractionDigits);

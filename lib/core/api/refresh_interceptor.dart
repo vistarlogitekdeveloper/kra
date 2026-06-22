@@ -49,6 +49,40 @@ class RefreshInterceptor extends Interceptor {
   })  : _mainDio = mainDio,
         _storage = storage;
 
+  /// Refresh the access token now if it's expired or about to expire
+  /// (within 30 s). Called by [AuthInterceptor.onRequest] so outgoing
+  /// requests carry a fresh token — without this, every request issued
+  /// after the 15-minute access-token TTL would have to round-trip through
+  /// a 401 first (which is what showed up as `AUTH_002 "Invalid or expired
+  /// token"` in DevTools).
+  ///
+  /// Concurrent callers share the in-flight refresh via [_refreshFuture],
+  /// so a burst of N requests after expiry triggers exactly one refresh.
+  ///
+  /// Returns `false` when the session is gone (proactive refresh failed
+  /// AND we just forced logout). The caller — `AuthInterceptor` — uses
+  /// this signal to abort the outgoing request so a parade of 401s
+  /// doesn't pile up while go_router redirects to `/login`. Returns
+  /// `true` otherwise (token is fresh OR was successfully rotated).
+  Future<bool> ensureFreshAccessToken() async {
+    final expiry = await _storage.readAccessTokenExpiry();
+    if (expiry == null) return true; // unknown → let the reactive flow decide
+    final freshUntil = expiry.subtract(const Duration(seconds: 30));
+    if (DateTime.now().isBefore(freshUntil)) return true;
+    final ok = await (_refreshFuture ??= _doRefresh());
+    _refreshFuture = null;
+    if (ok) return true;
+    // Refresh token itself is gone — boot the user to login now so we
+    // don't burn one visible 401 per concurrent request.
+    if (kDebugMode) {
+      debugPrint(
+        'RefreshInterceptor: proactive refresh failed — forcing logout',
+      );
+    }
+    await _forceLogout();
+    return false;
+  }
+
   @override
   Future<void> onError(
     DioException err,

@@ -1,3 +1,5 @@
+import '../../../../core/api/json_parse.dart';
+
 /// Employee master record returned by /employees.
 ///
 /// Field names mirror the API contract verbatim so JSON round-trips
@@ -16,6 +18,12 @@ class Employee {
   final String? managerId;
   final String? managerName;
   final String? grade;
+
+  /// Per-employee monthly performance-incentive amount. `null` means the
+  /// employee has no override and falls through to the org default on the
+  /// backend (see the incentive-summary precedence).
+  final double? monthlyIncentiveAmount;
+
   final bool isActive;
   final DateTime? joinedDate;
   final DateTime? createdAt;
@@ -33,6 +41,7 @@ class Employee {
     this.managerId,
     this.managerName,
     this.grade,
+    this.monthlyIncentiveAmount,
     this.isActive = true,
     this.joinedDate,
     this.createdAt,
@@ -51,9 +60,11 @@ class Employee {
       projectLocationId: _readNestedId(json['projectLocation']) ??
           json['projectLocationId'] as String?,
       managerId: json['managerId'] as String?,
-      managerName: _readNestedName(json['manager']) ??
-          json['managerName'] as String?,
+      managerName:
+          _readNestedName(json['manager']) ?? json['managerName'] as String?,
       grade: json['grade'] as String?,
+      monthlyIncentiveAmount:
+          JsonParse.parseDouble(json['monthlyIncentiveAmount']),
       isActive: (json['isActive'] as bool?) ?? true,
       joinedDate: _parseDate(json['joinedDate']),
       createdAt: _parseDate(json['createdAt']),
@@ -85,6 +96,7 @@ class Employee {
         'managerId': managerId,
         'managerName': managerName,
         'grade': grade,
+        'monthlyIncentiveAmount': monthlyIncentiveAmount,
         'isActive': isActive,
         'joinedDate': joinedDate?.toIso8601String(),
         'createdAt': createdAt?.toIso8601String(),
@@ -103,6 +115,7 @@ class Employee {
     String? managerId,
     String? managerName,
     String? grade,
+    double? monthlyIncentiveAmount,
     bool? isActive,
     DateTime? joinedDate,
     DateTime? createdAt,
@@ -120,6 +133,8 @@ class Employee {
       managerId: managerId ?? this.managerId,
       managerName: managerName ?? this.managerName,
       grade: grade ?? this.grade,
+      monthlyIncentiveAmount:
+          monthlyIncentiveAmount ?? this.monthlyIncentiveAmount,
       isActive: isActive ?? this.isActive,
       joinedDate: joinedDate ?? this.joinedDate,
       createdAt: createdAt ?? this.createdAt,

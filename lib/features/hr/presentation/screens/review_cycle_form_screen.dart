@@ -58,12 +58,41 @@ class _ReviewCycleFormScreenState
     return !_endDate!.isBefore(_startDate!);
   }
 
+  /// Backend rejects any deadline that doesn't satisfy
+  ///   endDate ≤ selfRating ≤ managerReview ≤ opsScoring ≤ financeScoring.
+  /// Catching it here keeps the user from round-tripping to a 400.
+  String? _validateDeadlineOrdering() {
+    if (_endDate == null) return null;
+    DateTime? prev = _endDate;
+    String prevLabel = AppStrings.reviewCycleFormEndDate;
+    final stages = <(DateTime?, String)>[
+      (_selfRating, AppStrings.reviewCycleFormSelfRating),
+      (_managerReview, AppStrings.reviewCycleFormManagerReview),
+      (_opsScoring, AppStrings.reviewCycleFormOpsScoring),
+      (_financeScoring, AppStrings.reviewCycleFormFinanceScoring),
+    ];
+    for (final (value, label) in stages) {
+      if (value == null) continue;
+      if (value.isBefore(prev!)) {
+        return '$label must be on or after $prevLabel';
+      }
+      prev = value;
+      prevLabel = label;
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
     setState(() => _serverError = null);
     final ok = _formKey.currentState?.validate() ?? false;
     if (!ok) return;
     if (!_datesValid()) {
       setState(() => _serverError = AppStrings.reviewCycleFormDateOrder);
+      return;
+    }
+    final orderingError = _validateDeadlineOrdering();
+    if (orderingError != null) {
+      setState(() => _serverError = orderingError);
       return;
     }
     setState(() => _isSubmitting = true);
@@ -83,7 +112,7 @@ class _ReviewCycleFormScreenState
       );
       context.pop();
     } on ApiError catch (e) {
-      setState(() => _serverError = e.message);
+      setState(() => _serverError = e.combinedMessage);
     } catch (_) {
       setState(() => _serverError = AppStrings.errorGeneric);
     } finally {

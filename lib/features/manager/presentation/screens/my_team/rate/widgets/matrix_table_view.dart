@@ -260,12 +260,14 @@ class _CellPicker extends StatelessWidget {
     final monthClosed = month.status != ReviewMonthStatus.open;
     if (isFeed || monthClosed || cell.isNotApplicable) {
       return ReadonlyScoreCell(
+        key: ValueKey('ro_${cell.monthlyScoreId}'),
         cell: cell,
         maxScore: row.maxScore,
         isFeedRow: isFeed,
       );
     }
     return ScoreCell(
+      key: ValueKey(cell.monthlyScoreId),
       cell: cell,
       maxScore: row.maxScore,
       onScoreChanged: (v) =>

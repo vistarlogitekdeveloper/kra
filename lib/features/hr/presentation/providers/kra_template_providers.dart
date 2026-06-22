@@ -84,10 +84,17 @@ class KraTemplateActions {
   }
 
   Future<KraTemplate> update(String id, KraTemplate template) async {
+    // PATCH /kra-templates/:id rejects `description: null` with
+    // `VAL_001 "Invalid input: expected string, received null"` — the
+    // backend Zod schema makes description nullable on the model but
+    // the PATCH validator only accepts a string. Empty string is fine
+    // (and gives the user a real way to clear an existing description
+    // by emptying the field). Coerce null → '' so the request is always
+    // well-formed regardless of what the form holds.
     final updated = await _repo.update(id, {
       'name': template.name,
       'role': template.role,
-      'description': template.description,
+      'description': template.description ?? '',
       'items': template.items.map((e) => e.toJson()).toList(),
     });
     ref.invalidate(kraTemplatesProvider);

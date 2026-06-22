@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/api/json_parse.dart';
+
 /// All roles in the Vistar KRA system.
 /// HR_ADMIN has elevated privileges within the HR module (audit log, dashboard).
 /// ADMIN is the super-user, also routed to the HR dashboard.
@@ -112,15 +114,19 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     // The login endpoint returns `name`; /auth/me returns `fullName`.
     // Tolerate both so clients work against either response shape.
+    // Read every field tolerantly — some backends serialise ids as
+    // numbers. A hard `as String` cast on a numeric id would throw a
+    // TypeError that surfaces as a generic "Something went wrong" on
+    // login (or a wiped cache on boot), with no clue to the real cause.
     final displayName =
-        (json['fullName'] ?? json['name'] ?? '') as String;
+        JsonParse.parseString(json['fullName'] ?? json['name']) ?? '';
     return User(
-      id: (json['id'] ?? '') as String,
-      email: (json['email'] ?? '') as String,
+      id: JsonParse.parseString(json['id']) ?? '',
+      email: JsonParse.parseString(json['email']) ?? '',
       fullName: displayName,
-      role: UserRole.fromApi((json['role'] ?? 'EMPLOYEE') as String),
-      organizationId: (json['organizationId'] ?? '') as String,
-      projectLocationId: json['projectLocationId'] as String?,
+      role: UserRole.fromApi(JsonParse.parseString(json['role']) ?? 'EMPLOYEE'),
+      organizationId: JsonParse.parseString(json['organizationId']) ?? '',
+      projectLocationId: JsonParse.parseString(json['projectLocationId']),
     );
   }
 

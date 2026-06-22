@@ -25,8 +25,7 @@ class EmployeeFormScreen extends ConsumerStatefulWidget {
   bool get isEdit => employeeId != null;
 
   @override
-  ConsumerState<EmployeeFormScreen> createState() =>
-      _EmployeeFormScreenState();
+  ConsumerState<EmployeeFormScreen> createState() => _EmployeeFormScreenState();
 }
 
 class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
@@ -37,6 +36,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   final _emailController = TextEditingController();
   final _departmentController = TextEditingController();
   final _gradeController = TextEditingController();
+  final _monthlyIncentiveController = TextEditingController();
 
   String _role = 'EMPLOYEE';
   String? _projectLocationId;
@@ -70,6 +70,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       _emailController,
       _departmentController,
       _gradeController,
+      _monthlyIncentiveController,
     ]) {
       c.addListener(() => setState(() => _isDirty = true));
     }
@@ -82,6 +83,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _emailController.dispose();
     _departmentController.dispose();
     _gradeController.dispose();
+    _monthlyIncentiveController.dispose();
     super.dispose();
   }
 
@@ -92,6 +94,9 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _emailController.text = e.email;
     _departmentController.text = e.department ?? '';
     _gradeController.text = e.grade ?? '';
+    _monthlyIncentiveController.text = e.monthlyIncentiveAmount == null
+        ? ''
+        : e.monthlyIncentiveAmount!.toStringAsFixed(0);
     setState(() {
       _role = e.role;
       _projectLocationId = e.projectLocationId;
@@ -140,6 +145,12 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
 
     setState(() => _isSubmitting = true);
     final repo = ref.read(employeeRepositoryProvider);
+    // Empty field clears the per-employee override (falls back to the org
+    // default); a value sets it. Parsed leniently — the validator has
+    // already rejected non-numeric input.
+    final incentiveText = _monthlyIncentiveController.text.trim();
+    final monthlyIncentive =
+        incentiveText.isEmpty ? null : double.tryParse(incentiveText);
     try {
       if (widget.isEdit) {
         final updated = await repo.update(widget.employeeId!, {
@@ -154,8 +165,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           'grade': _gradeController.text.trim().isEmpty
               ? null
               : _gradeController.text.trim(),
-          if (_joinedDate != null)
-            'joinedDate': _joinedDate!.toIso8601String(),
+          'monthlyIncentiveAmount': monthlyIncentive,
+          if (_joinedDate != null) 'joinedDate': _joinedDate!.toIso8601String(),
         });
         ref.read(employeeListProvider.notifier).replaceUpdated(updated);
         ref.invalidate(employeeDetailProvider(updated.id));
@@ -177,6 +188,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           grade: _gradeController.text.trim().isEmpty
               ? null
               : _gradeController.text.trim(),
+          monthlyIncentiveAmount: monthlyIncentive,
           joinedDate: _joinedDate,
         );
         ref.read(employeeListProvider.notifier).prependCreated(created);
@@ -201,6 +213,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             'department',
             'projectLocationId',
             'grade',
+            'monthlyIncentiveAmount',
             'joinedDate',
           ]) {
             if (e.technicalMessage!.contains(f)) {
@@ -239,16 +252,13 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
         ),
-        body: widget.isEdit
-            ? _buildEditBody()
-            : _buildForm(),
+        body: widget.isEdit ? _buildEditBody() : _buildForm(),
       ),
     );
   }
 
   Widget _buildEditBody() {
-    final detail =
-        ref.watch(employeeDetailProvider(widget.employeeId!));
+    final detail = ref.watch(employeeDetailProvider(widget.employeeId!));
     return detail.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(16),
@@ -359,6 +369,26 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             value: _joinedDate,
             onTap: _pickDate,
           ),
+          const SizedBox(height: 20),
+          const _SectionHeader(title: AppStrings.employeeFormIncentiveSection),
+          const SizedBox(height: 12),
+          BrandedTextField(
+            controller: _monthlyIncentiveController,
+            label: AppStrings.employeeFormMonthlyIncentive,
+            hint: AppStrings.employeeFormMonthlyIncentiveHint,
+            prefixIcon: Icons.payments_outlined,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.done,
+            validator: (v) {
+              final t = v?.trim() ?? '';
+              if (t.isEmpty) return null; // optional — clears the override
+              final parsed = double.tryParse(t);
+              if (parsed == null || parsed < 0) {
+                return AppStrings.validationNumberRequired;
+              }
+              return _fieldErrors['monthlyIncentiveAmount'];
+            },
+          ),
           const SizedBox(height: 28),
           BrandedPrimaryButton(
             label: AppStrings.commonSave,
@@ -400,8 +430,21 @@ class _RoleDropdown extends StatelessWidget {
     required this.onChanged,
   });
 
+  String _humanise(String r) {
+    if (r.isEmpty) return r;
+    return r[0].toUpperCase() + r.substring(1).toLowerCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Backend may return a role string that isn't in our standard list —
+    // older accounts have values like 'Ops_excellence'. DropdownButton
+    // asserts when `value` doesn't match exactly one item, so we surface
+    // the orphan as an extra option (mirrors what _LocationDropdown
+    // already does for deactivated locations). Without this, opening the
+    // edit form for those employees crashed the screen.
+    final hasOrphan = value.isNotEmpty && !roles.contains(value);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -430,10 +473,15 @@ class _RoleDropdown extends StatelessWidget {
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               items: [
+                if (hasOrphan)
+                  DropdownMenuItem(
+                    value: value,
+                    child: Text('${_humanise(value)} (current)'),
+                  ),
                 for (final r in roles)
                   DropdownMenuItem(
                     value: r,
-                    child: Text(r[0] + r.substring(1).toLowerCase()),
+                    child: Text(_humanise(r)),
                   ),
               ],
               onChanged: (v) {

@@ -8,13 +8,12 @@ import 'status_badge.dart';
 
 /// Compact card representing a [ReviewCycle] in the cycles list. Shows
 /// name, status, date range, and exposes action buttons for activating
-/// (DRAFT → ACTIVE) or closing (ACTIVE → CLOSED), plus a slabs link.
+/// (DRAFT → ACTIVE) or closing (ACTIVE → CLOSED).
 class ReviewCycleCard extends StatelessWidget {
   final ReviewCycle cycle;
   final VoidCallback? onTap;
   final VoidCallback? onActivate;
   final VoidCallback? onClose;
-  final VoidCallback? onViewSlabs;
   final VoidCallback? onEdit;
 
   const ReviewCycleCard({
@@ -23,7 +22,6 @@ class ReviewCycleCard extends StatelessWidget {
     this.onTap,
     this.onActivate,
     this.onClose,
-    this.onViewSlabs,
     this.onEdit,
   });
 
@@ -78,8 +76,7 @@ class ReviewCycleCard extends StatelessWidget {
               if (cycle.status == ReviewCycleStatus.active)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: _DaysRemainingBar(
-                      daysRemaining: cycle.daysRemaining),
+                  child: _DaysRemainingBar(daysRemaining: cycle.daysRemaining),
                 ),
               const SizedBox(height: 12),
               const Divider(color: AppColors.divider, height: 1),
@@ -88,33 +85,29 @@ class ReviewCycleCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (onActivate != null && cycle.status == ReviewCycleStatus.draft)
+                  if (onActivate != null &&
+                      cycle.status == ReviewCycleStatus.draft)
                     _ActionChip(
                       icon: Icons.play_arrow_rounded,
                       label: AppStrings.reviewCyclesActivate,
                       color: AppColors.success,
                       onTap: onActivate!,
                     ),
-                  if (onClose != null && cycle.status == ReviewCycleStatus.active)
+                  if (onClose != null &&
+                      cycle.status == ReviewCycleStatus.active)
                     _ActionChip(
                       icon: Icons.lock_outline_rounded,
                       label: AppStrings.reviewCyclesClose,
                       color: AppColors.error,
                       onTap: onClose!,
                     ),
-                  if (onEdit != null && cycle.status != ReviewCycleStatus.closed)
+                  if (onEdit != null &&
+                      cycle.status != ReviewCycleStatus.closed)
                     _ActionChip(
                       icon: Icons.edit_outlined,
                       label: AppStrings.commonEdit,
                       color: AppColors.primaryPurple,
                       onTap: onEdit!,
-                    ),
-                  if (onViewSlabs != null)
-                    _ActionChip(
-                      icon: Icons.payments_outlined,
-                      label: AppStrings.reviewCyclesViewSlabs,
-                      color: AppColors.accentOrange,
-                      onTap: onViewSlabs!,
                     ),
                 ],
               ),

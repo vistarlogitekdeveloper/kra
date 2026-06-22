@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import 'api_constants.dart';
 import 'api_error.dart';
+import 'json_parse.dart';
 
 /// Shared response-envelope helpers for repositories. Every module
 /// (auth / HR / employee / manager / ops) imports from here — there
@@ -87,11 +88,15 @@ Map<String, dynamic> unwrapPaged(Response response) {
   }
   if (data is List) {
     if (meta is Map<String, dynamic>) {
+      // Use the tolerant parsers, not raw `as int` — the backend can
+      // serialise numeric fields as strings (Prisma Decimal) or as JSON
+      // doubles, either of which would throw on a hard cast and turn a
+      // whole paginated list into an error screen.
       final pageSize =
-          (meta['limit'] ?? meta['pageSize'] ?? data.length) as int;
-      final total = (meta['total'] ?? data.length) as int;
-      final page = (meta['page'] ?? 1) as int;
-      final totalPages = (meta['totalPages'] as int?) ??
+          JsonParse.parseInt(meta['limit'] ?? meta['pageSize']) ?? data.length;
+      final total = JsonParse.parseInt(meta['total']) ?? data.length;
+      final page = JsonParse.parseInt(meta['page']) ?? 1;
+      final totalPages = JsonParse.parseInt(meta['totalPages']) ??
           (pageSize > 0 ? (total / pageSize).ceil() : 1);
       return {
         'items': data,

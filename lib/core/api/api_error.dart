@@ -20,12 +20,17 @@ enum ApiErrorType {
 /// Single, sanitised error type that crosses the data → UI boundary.
 /// `message` is always safe to show to the end user (Indian English, polite).
 /// `technicalMessage` is for logs / Sentry only.
+/// `fieldErrors` carries per-field validation messages from the backend's
+/// `error.details` envelope (e.g. `{ "selfRatingDeadline": ["...must be on
+/// or after endDate"] }`) — empty when there are none. Forms can surface
+/// these inline; otherwise [combinedMessage] flattens them for a banner.
 class ApiError implements Exception {
   final ApiErrorType type;
   final String code;
   final String message;
   final String? technicalMessage;
   final int? statusCode;
+  final Map<String, List<String>> fieldErrors;
 
   const ApiError({
     required this.type,
@@ -33,7 +38,23 @@ class ApiError implements Exception {
     required this.message,
     this.technicalMessage,
     this.statusCode,
+    this.fieldErrors = const {},
   });
+
+  /// User-facing message that includes any backend field errors. When the
+  /// backend returns `details`, that is almost always more useful than the
+  /// generic "Validation failed" — e.g. it tells the user that the self-
+  /// rating deadline must come on or after the cycle end date.
+  String get combinedMessage {
+    if (fieldErrors.isEmpty) return message;
+    final lines = <String>[];
+    for (final entry in fieldErrors.entries) {
+      for (final msg in entry.value) {
+        lines.add(msg);
+      }
+    }
+    return lines.isEmpty ? message : lines.join('\n');
+  }
 
   @override
   String toString() =>
@@ -119,15 +140,18 @@ class ApiError implements Exception {
       );
     }
 
-    // ── Try to read the standard envelope: { success, error: { code, message } } ──
+    // ── Try to read the standard envelope:
+    //    { success, error: { code, message, details?: {field: [msg, …]} } } ──
     String? backendCode;
     String? backendMessage;
+    Map<String, List<String>> fieldErrors = const {};
     final body = response.data;
     if (body is Map<String, dynamic>) {
       final err = body[ApiConstants.envelopeError];
       if (err is Map<String, dynamic>) {
         backendCode = err[ApiConstants.envelopeErrorCode] as String?;
         backendMessage = err[ApiConstants.envelopeErrorMessage] as String?;
+        fieldErrors = _parseFieldErrors(err[ApiConstants.envelopeErrorDetails]);
       }
     }
 
@@ -139,6 +163,7 @@ class ApiError implements Exception {
         message: 'Our servers are having trouble. Please try again in a moment.',
         technicalMessage: backendMessage ?? 'HTTP $status',
         statusCode: status,
+        fieldErrors: fieldErrors,
       );
     }
 
@@ -150,6 +175,7 @@ class ApiError implements Exception {
         message: _codeMessages['RATE_LIMITED']!,
         technicalMessage: backendMessage,
         statusCode: status,
+        fieldErrors: fieldErrors,
       );
     }
 
@@ -174,6 +200,7 @@ class ApiError implements Exception {
             'The email or password you entered is incorrect.',
         technicalMessage: backendMessage,
         statusCode: status,
+        fieldErrors: fieldErrors,
       );
     }
 
@@ -185,6 +212,7 @@ class ApiError implements Exception {
         message: _codeMessages['NOT_FOUND']!,
         technicalMessage: backendMessage,
         statusCode: status,
+        fieldErrors: fieldErrors,
       );
     }
 
@@ -198,6 +226,7 @@ class ApiError implements Exception {
             _codeMessages['VALIDATION_ERROR']!,
         technicalMessage: backendMessage,
         statusCode: status,
+        fieldErrors: fieldErrors,
       );
     }
 
@@ -207,6 +236,26 @@ class ApiError implements Exception {
       message: 'Something went wrong. Please try again.',
       technicalMessage: backendMessage,
       statusCode: status,
+      fieldErrors: fieldErrors,
     );
+  }
+
+  /// Normalises the `error.details` payload, which the backend sends as
+  /// `{ "fieldName": ["msg1", "msg2"], ... }`. Any non-conforming shape
+  /// (string, list, missing) is dropped silently — this is a UX hint, not
+  /// a contract — so a backend change can never break the error pipeline.
+  static Map<String, List<String>> _parseFieldErrors(dynamic raw) {
+    if (raw is! Map) return const {};
+    final out = <String, List<String>>{};
+    raw.forEach((key, value) {
+      if (key is! String) return;
+      if (value is List) {
+        final msgs = value.whereType<String>().toList();
+        if (msgs.isNotEmpty) out[key] = msgs;
+      } else if (value is String) {
+        out[key] = [value];
+      }
+    });
+    return out;
   }
 }

@@ -158,17 +158,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
+        // Translucent dark glass card on the aurora canvas — matches the
+        // Vistar Premium spec for the login form panel (--bg2 / --surface).
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.surfaceElevated.withValues(alpha: 0.88),
+            AppColors.surface.withValues(alpha: 0.88),
+          ],
+        ),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 1.2,
+          color: AppColors.dividerStrong,
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryPurple.withValues(alpha: 0.08),
-            blurRadius: 40,
-            offset: const Offset(0, 12),
+            color: AppColors.pink.withValues(alpha: 0.18),
+            blurRadius: 50,
+            spreadRadius: -22,
+            offset: const Offset(0, 18),
           ),
         ],
       ),
@@ -265,25 +275,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accentOrange.withValues(alpha: 0.18),
-                blurRadius: 30,
-                spreadRadius: 4,
-              ),
-            ],
-          ),
-          child: Image.asset(
-            AppAssets.logo,
-            height: 92,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox(
-              height: 92,
-              width: 92,
+        // Transparent-background rainbow S sitting in a soft pink glow.
+        // Was previously `AppAssets.logo` (vistar_logo.png) which has a
+        // white background baked into the PNG — read as a white card on
+        // the dark canvas. `sMark` (logo.png) is transparent, so the
+        // brand mark floats cleanly above the glass card.
+        SizedBox(
+          height: 96,
+          width: 96,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.pink.withValues(alpha: 0.28),
+                  blurRadius: 36,
+                  spreadRadius: -4,
+                ),
+              ],
+            ),
+            child: Image.asset(
+              AppAssets.sMark,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
           ),
         ),

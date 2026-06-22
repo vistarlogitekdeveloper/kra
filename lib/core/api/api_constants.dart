@@ -31,7 +31,6 @@ class ApiConstants {
   static const String kraAssignments = '/kra-assignments';
   static const String kraAssignmentsBulk = '/kra-assignments/bulk';
   static const String reviewCycles = '/review-cycles';
-  static const String bonusSlabs = '/bonus-slabs';
   static const String hrDashboard = '/hr/dashboard';
 
   // Employee module endpoints — every authenticated user, regardless of
@@ -48,8 +47,7 @@ class ApiConstants {
   static const String managerDashboard = '/manager/dashboard';
   static const String managerTeam = '/manager/team';
   static const String managerReviews = '/manager/reviews';
-  static const String managerBulkApprove =
-      '/manager/reviews/bulk-approve';
+  static const String managerBulkApprove = '/manager/reviews/bulk-approve';
   // Shared per-review scores endpoint used for manager auto-save.
   // Body must include `side: 'MANAGER'`.
   static const String reviewsScores = '/reviews';
@@ -85,4 +83,5 @@ class ApiConstants {
   static const String envelopeError = 'error';
   static const String envelopeErrorCode = 'code';
   static const String envelopeErrorMessage = 'message';
+  static const String envelopeErrorDetails = 'details';
 }

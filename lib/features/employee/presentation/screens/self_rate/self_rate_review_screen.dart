@@ -26,8 +26,7 @@ class SelfRateReviewScreen extends ConsumerStatefulWidget {
       _SelfRateReviewScreenState();
 }
 
-class _SelfRateReviewScreenState
-    extends ConsumerState<SelfRateReviewScreen> {
+class _SelfRateReviewScreenState extends ConsumerState<SelfRateReviewScreen> {
   @override
   void initState() {
     super.initState();
@@ -224,8 +223,7 @@ class _ReviewRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     ScorePill(
-                      score:
-                          entry.isNotApplicable ? null : entry.selfRating,
+                      score: entry.isNotApplicable ? null : entry.selfRating,
                       maxScore: entry.maxScore,
                       tone: ScorePillTone.self,
                       small: true,
@@ -269,6 +267,32 @@ class _ReviewRow extends StatelessWidget {
                               fontSize: 12.5,
                               color: AppColors.textSecondary,
                               height: 1.45,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (entry.hasAttachment)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.attach_file_rounded,
+                          size: 14,
+                          color: AppColors.primaryPurple,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            entry.attachmentName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
