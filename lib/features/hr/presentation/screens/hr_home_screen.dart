@@ -9,6 +9,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/ambient_background.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../core/widgets/slow_load_hint.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/models/hr_dashboard_models.dart';
 import '../providers/hr_dashboard_providers.dart';
@@ -133,6 +134,7 @@ class _OverviewLoading extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const SlowLoadHint(),
         const ShimmerBox(height: 120, borderRadius: 20),
         const SizedBox(height: 18),
         GridView.count(
@@ -361,7 +363,8 @@ class _CycleDependentSections extends ConsumerWidget {
       ),
       data: (cycleId) {
         if (cycleId == null) {
-          return const SizedBox.shrink(); // No active cycle -> hide these panels
+          return const SizedBox
+              .shrink(); // No active cycle -> hide these panels
         }
 
         return Column(
@@ -516,7 +519,8 @@ class _ActionItemsSection extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppColors.success.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+              border:
+                  Border.all(color: AppColors.success.withValues(alpha: 0.3)),
             ),
             child: const Row(
               children: [
@@ -646,7 +650,6 @@ class _ActionItemsSection extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 /// Maps a dashboard action-item `key` to the best-fit registered HR route.
@@ -819,7 +822,8 @@ class _RecentActivitySection extends ConsumerWidget {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: AppColors.primaryPurple.withValues(alpha: 0.1),
+                    backgroundColor:
+                        AppColors.primaryPurple.withValues(alpha: 0.1),
                     child: const Icon(Icons.history_rounded,
                         color: AppColors.primaryPurple, size: 20),
                   ),

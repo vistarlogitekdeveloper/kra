@@ -42,6 +42,10 @@ class AppStrings {
   static const String offlineLoginDisabled =
       'You\'re offline. Reconnect to sign in.';
 
+  // ───── Loading ─────
+  static const String slowLoadHint =
+      'Waking up the server… this can take up to a minute on the first load.';
+
   // ───── Errors (fallback / generic) ─────
   static const String errorGeneric = 'Something went wrong. Please try again.';
   static const String errorSessionEnded =

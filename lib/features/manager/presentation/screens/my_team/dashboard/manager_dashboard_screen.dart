@@ -7,6 +7,7 @@ import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/widgets/shimmer_box.dart';
 import '../../../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../../../core/widgets/slow_load_hint.dart';
 import '../../../../../employee/presentation/widgets/deadline_chip.dart';
 import '../../../../data/models/manager_dashboard.dart';
 import '../../../providers/manager_dashboard_providers.dart';
@@ -102,9 +103,8 @@ class _ActiveCycleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deadline = cycle.managerReviewDeadline;
-    final deadlineText = deadline == null
-        ? ''
-        : DateFormat('d MMM yyyy').format(deadline);
+    final deadlineText =
+        deadline == null ? '' : DateFormat('d MMM yyyy').format(deadline);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Container(
@@ -187,6 +187,7 @@ class _DashboardLoading extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: const [
+        SlowLoadHint(),
         ShimmerBox(height: 130, borderRadius: 20),
         SizedBox(height: 16),
         Row(

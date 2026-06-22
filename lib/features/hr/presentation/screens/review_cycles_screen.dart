@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
+import '../../../../core/widgets/slow_load_hint.dart';
 import '../providers/review_cycle_providers.dart';
 import '../widgets/confirm_action_dialog.dart';
 import '../widgets/empty_state.dart';
@@ -39,8 +40,8 @@ class ReviewCyclesScreen extends ConsumerWidget {
         child: cycles.when(
           loading: () => ListView(
             padding: const EdgeInsets.all(16),
-            physics: const NeverScrollableScrollPhysics(),
             children: const [
+              SlowLoadHint(),
               ShimmerBox(height: 160, borderRadius: 16),
               SizedBox(height: 14),
               ShimmerBox(height: 160, borderRadius: 16),
