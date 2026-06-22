@@ -6,26 +6,27 @@ import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/shimmer_box.dart';
-import '../../data/models/bonus_slab.dart';
-import '../providers/bonus_slab_providers.dart';
+import '../../data/models/performance_incentive.dart';
+import '../providers/performance_incentive_providers.dart';
 import '../widgets/_formatters.dart';
 import '../widgets/empty_state.dart';
 
-/// Per-cycle, per-grade bonus slab editor. Loads via the family
+/// Per-cycle, per-grade performance incentive editor. Loads via the family
 /// provider keyed on cycle id; new/edit happens in a bottom sheet so
 /// the user keeps the surrounding context.
-class BonusSlabsScreen extends ConsumerWidget {
+class PerformanceIncentivesScreen extends ConsumerWidget {
   final String cycleId;
-  const BonusSlabsScreen({super.key, required this.cycleId});
+  const PerformanceIncentivesScreen({super.key, required this.cycleId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final slabs = ref.watch(bonusSlabsForCycleProvider(cycleId));
+    final incentives =
+        ref.watch(performanceIncentivesForCycleProvider(cycleId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(AppStrings.bonusSlabsTitle),
+        title: const Text(AppStrings.performanceIncentivesTitle),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
@@ -40,10 +41,10 @@ class BonusSlabsScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: AppColors.primaryPurple,
         onRefresh: () async {
-          ref.invalidate(bonusSlabsForCycleProvider(cycleId));
-          await ref.read(bonusSlabsForCycleProvider(cycleId).future);
+          ref.invalidate(performanceIncentivesForCycleProvider(cycleId));
+          await ref.read(performanceIncentivesForCycleProvider(cycleId).future);
         },
-        child: slabs.when(
+        child: incentives.when(
           loading: () => ListView(
             padding: const EdgeInsets.all(16),
             physics: const NeverScrollableScrollPhysics(),
@@ -64,7 +65,7 @@ class BonusSlabsScreen extends ConsumerWidget {
                 message: e.toString(),
                 actionLabel: AppStrings.commonRetry,
                 onAction: () => ref
-                    .invalidate(bonusSlabsForCycleProvider(cycleId)),
+                    .invalidate(performanceIncentivesForCycleProvider(cycleId)),
               ),
             ],
           ),
@@ -76,9 +77,9 @@ class BonusSlabsScreen extends ConsumerWidget {
                   const SizedBox(height: 60),
                   EmptyState(
                     icon: Icons.payments_outlined,
-                    title: AppStrings.bonusSlabsEmptyTitle,
-                    message: AppStrings.bonusSlabsEmptyMessage,
-                    actionLabel: AppStrings.bonusSlabsEmptyCta,
+                    title: AppStrings.performanceIncentivesEmptyTitle,
+                    message: AppStrings.performanceIncentivesEmptyMessage,
+                    actionLabel: AppStrings.performanceIncentivesEmptyCta,
                     onAction: () => _openSheet(context, ref),
                   ),
                 ],
@@ -91,8 +92,8 @@ class BonusSlabsScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
                 final s = list[i];
-                return _SlabTile(
-                  slab: s,
+                return _IncentiveTile(
+                  incentive: s,
                   onTap: () => _openSheet(context, ref, existing: s),
                 );
               },
@@ -106,17 +107,16 @@ class BonusSlabsScreen extends ConsumerWidget {
   Future<void> _openSheet(
     BuildContext context,
     WidgetRef ref, {
-    BonusSlab? existing,
+    PerformanceIncentive? existing,
   }) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _BonusSlabSheet(
+      builder: (_) => _PerformanceIncentiveSheet(
         cycleId: cycleId,
         existing: existing,
       ),
@@ -124,10 +124,10 @@ class BonusSlabsScreen extends ConsumerWidget {
   }
 }
 
-class _SlabTile extends StatelessWidget {
-  final BonusSlab slab;
+class _IncentiveTile extends StatelessWidget {
+  final PerformanceIncentive incentive;
   final VoidCallback onTap;
-  const _SlabTile({required this.slab, required this.onTap});
+  const _IncentiveTile({required this.incentive, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +155,7 @@ class _SlabTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  slab.grade.isEmpty ? '?' : slab.grade,
+                  incentive.grade.isEmpty ? '?' : incentive.grade,
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -168,7 +168,7 @@ class _SlabTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Grade ${slab.grade}',
+                      'Grade ${incentive.grade}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -178,7 +178,7 @@ class _SlabTile extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          'Monthly ${HrFormatters.currencyInr(slab.monthlyEligibleAmount)}',
+                          'Monthly ${HrFormatters.currencyInr(incentive.monthlyEligibleAmount)}',
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
@@ -186,7 +186,7 @@ class _SlabTile extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Quarterly ${HrFormatters.currencyInr(slab.quarterlyEligibleAmount)}',
+                          'Quarterly ${HrFormatters.currencyInr(incentive.quarterlyEligibleAmount)}',
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
@@ -209,16 +209,18 @@ class _SlabTile extends StatelessWidget {
   }
 }
 
-class _BonusSlabSheet extends ConsumerStatefulWidget {
+class _PerformanceIncentiveSheet extends ConsumerStatefulWidget {
   final String cycleId;
-  final BonusSlab? existing;
-  const _BonusSlabSheet({required this.cycleId, this.existing});
+  final PerformanceIncentive? existing;
+  const _PerformanceIncentiveSheet({required this.cycleId, this.existing});
 
   @override
-  ConsumerState<_BonusSlabSheet> createState() => _BonusSlabSheetState();
+  ConsumerState<_PerformanceIncentiveSheet> createState() =>
+      _PerformanceIncentiveSheetState();
 }
 
-class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
+class _PerformanceIncentiveSheetState
+    extends ConsumerState<_PerformanceIncentiveSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _gradeController;
   late final TextEditingController _monthlyController;
@@ -253,9 +255,8 @@ class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
     if (!ok) return;
     setState(() => _isSubmitting = true);
     final monthly = double.tryParse(_monthlyController.text.trim()) ?? 0;
-    final quarterly =
-        double.tryParse(_quarterlyController.text.trim()) ?? 0;
-    final actions = ref.read(bonusSlabActionsProvider);
+    final quarterly = double.tryParse(_quarterlyController.text.trim()) ?? 0;
+    final actions = ref.read(performanceIncentiveActionsProvider);
     try {
       if (widget.existing == null) {
         await actions.create(
@@ -273,7 +274,7 @@ class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppStrings.bonusSlabsSaved)),
+        const SnackBar(content: Text(AppStrings.performanceIncentivesSaved)),
       );
       Navigator.of(context).pop();
     } on ApiError catch (e) {
@@ -313,8 +314,8 @@ class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
               const SizedBox(height: 16),
               Text(
                 isEdit
-                    ? AppStrings.bonusSlabsEditTitle
-                    : AppStrings.bonusSlabsAddTitle,
+                    ? AppStrings.performanceIncentivesEditTitle
+                    : AppStrings.performanceIncentivesAddTitle,
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -330,7 +331,7 @@ class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
                 const SizedBox(height: 12),
               ],
               _LabeledInput(
-                label: AppStrings.bonusSlabsGrade,
+                label: AppStrings.performanceIncentivesGrade,
                 controller: _gradeController,
                 validator: (v) => v == null || v.trim().isEmpty
                     ? AppStrings.validationRequired
@@ -338,7 +339,7 @@ class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
               ),
               const SizedBox(height: 14),
               _LabeledInput(
-                label: AppStrings.bonusSlabsMonthly,
+                label: AppStrings.performanceIncentivesMonthly,
                 controller: _monthlyController,
                 isCurrency: true,
                 validator: (v) {
@@ -352,7 +353,7 @@ class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
               ),
               const SizedBox(height: 14),
               _LabeledInput(
-                label: AppStrings.bonusSlabsQuarterly,
+                label: AppStrings.performanceIncentivesQuarterly,
                 controller: _quarterlyController,
                 isCurrency: true,
                 validator: (v) {
@@ -375,8 +376,7 @@ class _BonusSlabSheetState extends ConsumerState<_BonusSlabSheet> {
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2.4,
-                            valueColor:
-                                AlwaysStoppedAnimation(Colors.white),
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
                           ),
                         )
                       : const Icon(Icons.check_rounded),

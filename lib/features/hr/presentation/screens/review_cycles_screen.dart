@@ -90,8 +90,8 @@ class ReviewCyclesScreen extends ConsumerWidget {
                   cycle: cycle,
                   onActivate: () => _activate(context, ref, cycle.id),
                   onClose: () => _close(context, ref, cycle.id),
-                  onViewSlabs: () =>
-                      context.push(AppRoutes.hrCycleSlabs(cycle.id)),
+                  onViewIncentives: () =>
+                      context.push(AppRoutes.hrCyclePerformanceIncentives(cycle.id)),
                 );
               },
             );

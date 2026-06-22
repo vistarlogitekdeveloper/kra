@@ -8,7 +8,7 @@ import 'monthly_incentive.dart';
 ///
 /// Eligibility precedence (highest to lowest):
 ///   Review.monthlyIncentiveAmount (snapshot at review creation)
-///     → BonusSlab[cycleId, grade]
+///     → PerformanceIncentive[cycleId, grade]
 ///     → Employee.monthlyIncentiveAmount (org default)
 ///
 /// `payableIfFinalizedNow` is the projected payout if HR finalised

@@ -1,24 +1,25 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/api/api_constants.dart';
-import '../models/bonus_slab.dart';
+import '../models/performance_incentive.dart';
 import '../../../../core/api/envelope.dart';
-import 'bonus_slab_repository.dart';
+import 'performance_incentive_repository.dart';
 
-class ApiBonusSlabRepository implements BonusSlabRepository {
+class ApiPerformanceIncentiveRepository
+    implements PerformanceIncentiveRepository {
   final Dio _dio;
-  ApiBonusSlabRepository({required Dio dio}) : _dio = dio;
+  ApiPerformanceIncentiveRepository({required Dio dio}) : _dio = dio;
 
   @override
-  Future<List<BonusSlab>> listForCycle(String cycleId) async {
+  Future<List<PerformanceIncentive>> listForCycle(String cycleId) async {
     try {
       final response = await _dio.get(
-        ApiConstants.bonusSlabs,
+        ApiConstants.performanceIncentives,
         queryParameters: {'cycleId': cycleId},
       );
       return unwrapList(response)
           .whereType<Map<String, dynamic>>()
-          .map(BonusSlab.fromJson)
+          .map(PerformanceIncentive.fromJson)
           .toList();
     } catch (e, st) {
       rethrowAsApiError(e, st);
@@ -26,7 +27,7 @@ class ApiBonusSlabRepository implements BonusSlabRepository {
   }
 
   @override
-  Future<BonusSlab> create({
+  Future<PerformanceIncentive> create({
     required String cycleId,
     required String grade,
     required double monthlyEligibleAmount,
@@ -34,7 +35,7 @@ class ApiBonusSlabRepository implements BonusSlabRepository {
   }) async {
     try {
       final response = await _dio.post(
-        ApiConstants.bonusSlabs,
+        ApiConstants.performanceIncentives,
         data: {
           'cycleId': cycleId,
           'grade': grade,
@@ -42,20 +43,21 @@ class ApiBonusSlabRepository implements BonusSlabRepository {
           'quarterlyEligibleAmount': quarterlyEligibleAmount,
         },
       );
-      return BonusSlab.fromJson(unwrapObject(response));
+      return PerformanceIncentive.fromJson(unwrapObject(response));
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }
   }
 
   @override
-  Future<BonusSlab> update(String id, Map<String, dynamic> changes) async {
+  Future<PerformanceIncentive> update(
+      String id, Map<String, dynamic> changes) async {
     try {
       final response = await _dio.patch(
-        '${ApiConstants.bonusSlabs}/$id',
+        '${ApiConstants.performanceIncentives}/$id',
         data: changes,
       );
-      return BonusSlab.fromJson(unwrapObject(response));
+      return PerformanceIncentive.fromJson(unwrapObject(response));
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }

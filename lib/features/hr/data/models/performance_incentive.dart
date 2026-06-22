@@ -1,9 +1,9 @@
 import '../../../../core/api/json_parse.dart';
 
-/// Maps an employee grade to the maximum monthly + quarterly bonus
-/// amounts they are eligible for in a given review cycle. The actual
-/// payout is `eligibleAmount * finalScore`.
-class BonusSlab {
+/// Maps an employee grade to the maximum monthly + quarterly performance
+/// incentive amounts they are eligible for in a given review cycle. The
+/// actual payout is `eligibleAmount * finalScore`.
+class PerformanceIncentive {
   final String id;
   final String cycleId;
   final String grade;
@@ -12,7 +12,7 @@ class BonusSlab {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  const BonusSlab({
+  const PerformanceIncentive({
     required this.id,
     required this.cycleId,
     required this.grade,
@@ -22,8 +22,8 @@ class BonusSlab {
     this.updatedAt,
   });
 
-  factory BonusSlab.fromJson(Map<String, dynamic> json) {
-    return BonusSlab(
+  factory PerformanceIncentive.fromJson(Map<String, dynamic> json) {
+    return PerformanceIncentive(
       id: json['id'] as String,
       cycleId: (json['cycleId'] ?? '') as String,
       grade: (json['grade'] ?? '') as String,
@@ -46,7 +46,7 @@ class BonusSlab {
         'updatedAt': updatedAt?.toIso8601String(),
       };
 
-  BonusSlab copyWith({
+  PerformanceIncentive copyWith({
     String? id,
     String? cycleId,
     String? grade,
@@ -55,7 +55,7 @@ class BonusSlab {
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
-    return BonusSlab(
+    return PerformanceIncentive(
       id: id ?? this.id,
       cycleId: cycleId ?? this.cycleId,
       grade: grade ?? this.grade,
@@ -67,5 +67,4 @@ class BonusSlab {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-
 }

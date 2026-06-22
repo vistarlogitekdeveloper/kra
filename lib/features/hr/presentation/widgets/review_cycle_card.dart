@@ -8,13 +8,13 @@ import 'status_badge.dart';
 
 /// Compact card representing a [ReviewCycle] in the cycles list. Shows
 /// name, status, date range, and exposes action buttons for activating
-/// (DRAFT → ACTIVE) or closing (ACTIVE → CLOSED), plus a slabs link.
+/// (DRAFT → ACTIVE) or closing (ACTIVE → CLOSED), plus a performance-incentives link.
 class ReviewCycleCard extends StatelessWidget {
   final ReviewCycle cycle;
   final VoidCallback? onTap;
   final VoidCallback? onActivate;
   final VoidCallback? onClose;
-  final VoidCallback? onViewSlabs;
+  final VoidCallback? onViewIncentives;
   final VoidCallback? onEdit;
 
   const ReviewCycleCard({
@@ -23,7 +23,7 @@ class ReviewCycleCard extends StatelessWidget {
     this.onTap,
     this.onActivate,
     this.onClose,
-    this.onViewSlabs,
+    this.onViewIncentives,
     this.onEdit,
   });
 
@@ -109,12 +109,12 @@ class ReviewCycleCard extends StatelessWidget {
                       color: AppColors.primaryPurple,
                       onTap: onEdit!,
                     ),
-                  if (onViewSlabs != null)
+                  if (onViewIncentives != null)
                     _ActionChip(
                       icon: Icons.payments_outlined,
-                      label: AppStrings.reviewCyclesViewSlabs,
+                      label: AppStrings.reviewCyclesViewIncentives,
                       color: AppColors.accentOrange,
-                      onTap: onViewSlabs!,
+                      onTap: onViewIncentives!,
                     ),
                 ],
               ),

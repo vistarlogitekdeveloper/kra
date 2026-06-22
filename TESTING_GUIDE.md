@@ -78,7 +78,7 @@ Follow the quarter in calendar order — phases 2 and 3 repeat once per month be
 | Step | Role | What you do |
 |------|------|-------------|
 | 0 | — | Smoke-test login + app shell. |
-| 1 | HR Admin | Build everything: locations, templates, employees, cycle, slabs, assign, open. |
+| 1 | HR Admin | Build everything: locations, templates, employees, cycle, incentives, assign, open. |
 | 2 | Employee | Self-rate the active month. |
 | 3 | Manager | Rate the employee's submission; bulk-approve the team. |
 | ↻ | Repeat 2 & 3 | Once each for May and June. |
@@ -152,12 +152,12 @@ Signed in as HR Admin → land on `/hr/home`. Work top-down.
 | 1.21 | From detail, tap **Assign KRA**. | Navigates to `/hr/assign`. | ☐ |
 | 1.22 | From detail, tap **Edit Profile**. | Pre-filled form opens. | ☐ |
 
-### 4.5 Cycles & Bonus Slabs (`/hr/cycles`)
+### 4.5 Cycles & Performance Incentives (`/hr/cycles`)
 
 | # | Action | Expected | ✓ |
 |---|--------|----------|---|
 | 1.23 | Tap **+**. Fill name, start/end dates, self- and manager-rate deadlines. Save. | Cycle appears in the list with status. | ☐ |
-| 1.24 | Open **Bonus Slabs** (`/hr/cycles/:id/slabs`). Define bands (e.g. 90%+ = ₹50,000; 80–90% = ₹30,000; <70% = ₹0). | Slabs save and persist on refresh. | ☐ |
+| 1.24 | Open **Performance Incentives** (`/hr/cycles/:id/performance-incentives`). Define bands (e.g. 90%+ = ₹50,000; 80–90% = ₹30,000; <70% = ₹0). | Incentives save and persist on refresh. | ☐ |
 
 ### 4.6 Assign & open the cycle
 
@@ -180,7 +180,7 @@ Sign out, sign in as **EMPLOYEE** → `/employee/home`.
 |---|--------|----------|---|
 | 2.1 | Open Home. | Greeting + current cycle, deadline banner, current-month card, My KRAs summary, incentive snapshot, history strip — all rendered. | ☐ |
 | 2.2 | Note the deadline banner colour. | The banner is shown when the deadline is within 3 days or already overdue. (Colour ramp is orange → red.) | ☐ |
-| 2.3 | Check the incentive snapshot. | Shows the projected payout from the latest score and the cycle's bonus slab. | ☐ |
+| 2.3 | Check the incentive snapshot. | Shows the projected payout from the latest score and the cycle's performance incentives. | ☐ |
 | 2.4 | Tap **Self-Rate**. Switch months with the month picker. | The form switches months. Each KRA shows title, target, a 0–10 slider in 0.5 steps, and an optional comment field. | ☐ |
 | 2.5 | Score every KRA for the current month. | The weightage progress bar fills as you go and turns **green only at 100%** (not before). | ☐ |
 | 2.6 | Tap **Review & Submit**. Tap a row in the summary. | The review screen opens. **Tapping a row jumps back to the form** with that row visible. | ☐ |

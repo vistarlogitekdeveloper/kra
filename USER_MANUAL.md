@@ -14,7 +14,7 @@ The app runs on a quarterly **review cycle**. Inside a cycle there are three thi
 | -------------------- | -------------------- | ----------------------------------------------------------------------------- |
 | **Self-rate**        | Employee             | Scores themselves on each KRA for the month, with a one-line comment per KRA. |
 | **Manager rate**     | Reporting manager    | Reviews the employee's self-rating, sets the final score, adds comments.      |
-| **HR finalise**      | HR Admin             | Locks the cycle, runs payouts based on the bonus slab.                        |
+| **HR finalise**      | HR Admin             | Locks the cycle, runs payouts based on the performance incentives.                        |
 
 Everything else in the app — KRA Templates, Locations, Employees, Reports — exists to feed those three actions.
 
@@ -136,7 +136,7 @@ A cycle is the timebox the whole org rates against (e.g. *Q1 FY26-27, Apr–Jun*
 - **List tile** — cycle name, date range, status, # employees enrolled.
 - **+ button** → `/hr/cycles/new` → Cycle Form.
 - **Tap a row** → jump into cycle detail / actions.
-- **Bonus Slabs** → `/hr/cycles/:id/slabs` — define the score→payout bands (e.g. 90%+ = ₹50,000; 80–90% = ₹30,000; below 70% = ₹0). Used by HR finalise to compute payouts.
+- **Performance Incentives** → `/hr/cycles/:id/performance-incentives` — define the score→payout bands (e.g. 90%+ = ₹50,000; 80–90% = ₹30,000; below 70% = ₹0). Used by HR finalise to compute payouts.
 
 #### 4.4.1 Cycle Form
 
@@ -251,7 +251,7 @@ Four tabs. Self-rate is where the actual work happens; the rest are context.
 - **Deadline banner** — turns yellow/red as the self-rate deadline approaches.
 - **Current month card** — month name, status (Not Submitted / Submitted / Approved), CTA button.
 - **My KRAs summary card** — quick list of every KRA in the template with weightage.
-- **Incentive snapshot card** — projected payout based on the latest score and the cycle's bonus slab.
+- **Incentive snapshot card** — projected payout based on the latest score and the cycle's performance incentives.
 - **History strip** — last 3 cycles' scores as chips. Tap → History.
 
 ### 6.2 Self-Rate `/employee/self-rate`
@@ -345,13 +345,13 @@ Every state-changing action in HR Admin (create/edit/delete on employees, templa
 
 To tie it all together, here is what happens in calendar order in a typical Q1 cycle.
 
-1. **Late March** — HR Admin creates the Q1 FY26-27 cycle (`/hr/cycles/new`), defines bonus slabs (`/hr/cycles/:id/slabs`), runs **Bulk Setup** to auto-assign existing templates to all active employees, opens the cycle.
+1. **Late March** — HR Admin creates the Q1 FY26-27 cycle (`/hr/cycles/new`), defines performance incentives (`/hr/cycles/:id/performance-incentives`), runs **Bulk Setup** to auto-assign existing templates to all active employees, opens the cycle.
 2. **April 1** — Employees see the new cycle on `/employee/home`. The deadline banner counts down to the April self-rate close.
 3. **End of April** — Employees self-rate April (`/employee/self-rate`). The manager dashboard's Pending Actions list grows for each report submitted.
 4. **First week of May** — Managers rate April reviews (`/manager/team/reviews/:id/rate`). Reviews flip to "Manager Done" state. Employees see manager scores on `/employee/history/:reviewId`.
 5. **May, then June** — Same loop for May, then June.
 6. **End of June** — Cycle closes. HR runs the payout summary in Reports, exports it, finance disburses.
-7. **History** — Everyone's history strip now shows Q1 FY26-27 with its final score and earned bonus. The cycle is read-only forever.
+7. **History** — Everyone's history strip now shows Q1 FY26-27 with its final score and earned incentive. The cycle is read-only forever.
 
 ---
 

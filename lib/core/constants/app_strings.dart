@@ -215,7 +215,8 @@ class AppStrings {
   static const String kraAssignNoTemplate = 'No matching templates found.';
   static const String kraAssignNoCycle = 'No active review cycle yet.';
   static const String kraAssignSuccessOne = 'KRAs assigned to 1 employee.';
-  static const String kraAssignSuccessMany = 'KRAs assigned to {count} employees.';
+  static const String kraAssignSuccessMany =
+      'KRAs assigned to {count} employees.';
   static const String kraAssignSelectCycle = 'Cycle';
 
   // ───── Review cycles ─────
@@ -226,7 +227,8 @@ class AppStrings {
   static const String reviewCyclesEmptyCta = 'New Review Cycle';
   static const String reviewCyclesActivate = 'Activate';
   static const String reviewCyclesClose = 'Close cycle';
-  static const String reviewCyclesViewSlabs = 'View bonus slabs';
+  static const String reviewCyclesViewIncentives =
+      'View performance incentives';
   static const String reviewCyclesActivateConfirmTitle = 'Activate this cycle?';
   static const String reviewCyclesActivateConfirmMessage =
       'Employees will be able to start self-rating once this cycle is active.';
@@ -250,23 +252,29 @@ class AppStrings {
   static const String reviewCycleFormSelfRating = 'Self-rating deadline';
   static const String reviewCycleFormManagerReview = 'Manager review deadline';
   static const String reviewCycleFormOpsScoring = 'Ops scoring deadline';
-  static const String reviewCycleFormFinanceScoring = 'Finance scoring deadline';
+  static const String reviewCycleFormFinanceScoring =
+      'Finance scoring deadline';
   static const String reviewCycleFormDateOrder =
       'End date must be on or after start date.';
   static const String reviewCycleFormSaved = 'Review cycle saved.';
 
-  // ───── Bonus slabs ─────
-  static const String bonusSlabsTitle = 'Bonus Slabs';
-  static const String bonusSlabsEmptyTitle = 'No bonus slabs configured';
-  static const String bonusSlabsEmptyMessage =
-      'Add a slab per grade to enable payout calculation for this cycle.';
-  static const String bonusSlabsEmptyCta = 'Add slab';
-  static const String bonusSlabsAddTitle = 'Add bonus slab';
-  static const String bonusSlabsEditTitle = 'Edit bonus slab';
-  static const String bonusSlabsGrade = 'Grade';
-  static const String bonusSlabsMonthly = 'Monthly eligible amount';
-  static const String bonusSlabsQuarterly = 'Quarterly eligible amount';
-  static const String bonusSlabsSaved = 'Bonus slab saved.';
+  // ───── Performance incentives ─────
+  static const String performanceIncentivesTitle = 'Performance Incentives';
+  static const String performanceIncentivesEmptyTitle =
+      'No performance incentives configured';
+  static const String performanceIncentivesEmptyMessage =
+      'Add an incentive per grade to enable payout calculation for this cycle.';
+  static const String performanceIncentivesEmptyCta = 'Add incentive';
+  static const String performanceIncentivesAddTitle =
+      'Add performance incentive';
+  static const String performanceIncentivesEditTitle =
+      'Edit performance incentive';
+  static const String performanceIncentivesGrade = 'Grade';
+  static const String performanceIncentivesMonthly = 'Monthly eligible amount';
+  static const String performanceIncentivesQuarterly =
+      'Quarterly eligible amount';
+  static const String performanceIncentivesSaved =
+      'Performance incentive saved.';
 
   // ───── Reports placeholder ─────
   static const String hrReportsTitle = 'Reports';
@@ -329,8 +337,7 @@ class AppStrings {
   static const String auditLogFilterAction = 'Action';
   static const String auditLogFilterEntityType = 'Entity type';
   static const String auditLogFilterDateRange = 'Date range';
-  static const String auditLogExportComingSoon =
-      'Export is coming in Step 7.';
+  static const String auditLogExportComingSoon = 'Export is coming in Step 7.';
   static const String auditLogViewDiff = 'View diff';
 
   // ───── HR Admin role-guard ─────
@@ -399,12 +406,10 @@ class AppStrings {
   static const String homeIncentiveOf = 'of';
 
   // ───── Deadline banner ─────
-  static const String deadlineSelfRatingClosesIn =
-      'Self-rating closes in';
+  static const String deadlineSelfRatingClosesIn = 'Self-rating closes in';
   static const String deadlineDay = 'day';
   static const String deadlineDays = 'days';
-  static const String deadlineOverdue =
-      'Self-rating overdue — submit now';
+  static const String deadlineOverdue = 'Self-rating overdue — submit now';
 
   // ───── Self-Rate ─────
   static const String selfRateTitle = 'Rate yourself';
@@ -439,22 +444,17 @@ class AppStrings {
   static const String selfRateSubmitButton = 'Submit final';
   static const String selfRateSubmitting = 'Submitting…';
   static const String selfRateSuccessTitle = 'Submitted!';
-  static const String selfRateSuccessSubtitle =
-      'Your manager will review by';
+  static const String selfRateSuccessSubtitle = 'Your manager will review by';
   static const String selfRateSuccessTotalLabel = 'Total submitted';
   static const String selfRateViewSubmission = 'View submission';
   static const String selfRateBackToHome = 'Back to home';
   static const String selfRateGoToHistory = 'Go to History';
   static const String selfRateLockedTitle = 'Submission locked';
-  static const String selfRateLockedAwaitingManager =
-      'Awaiting manager review';
-  static const String selfRateLockedPeriodClosed =
-      'Self-rating period closed';
+  static const String selfRateLockedAwaitingManager = 'Awaiting manager review';
+  static const String selfRateLockedPeriodClosed = 'Self-rating period closed';
   static const String selfRateLockedSubmittedOn = 'You submitted on';
-  static const String selfRateLockedClosedOn =
-      'Self-rating period closed on';
-  static const String selfRateOfflineTooltip =
-      'Internet required to submit';
+  static const String selfRateLockedClosedOn = 'Self-rating period closed on';
+  static const String selfRateOfflineTooltip = 'Internet required to submit';
   static const String selfRateDescriptionToggleShow = 'Show description';
   static const String selfRateDescriptionToggleHide = 'Hide description';
   static const String selfRateTargetLabel = 'Target';
@@ -531,8 +531,7 @@ class AppStrings {
   static const String profileReportingTreeMyReports = 'My reports';
   static const String profileReportingTreeNoManager =
       'You don\'t have a manager assigned.';
-  static const String profileReportingTreeNoReports =
-      'No one reports to you.';
+  static const String profileReportingTreeNoReports = 'No one reports to you.';
 
   // ───── Empty / shared ─────
   static const String emptyDashboardTitle = 'Nothing to show yet';
@@ -559,14 +558,11 @@ class AppStrings {
   static const String managerDashboardStatPending = 'Pending my review';
   static const String managerDashboardStatCompleted = 'Completed this month';
   static const String managerDashboardStatOverdue = 'Overdue';
-  static const String managerDashboardPendingTitle =
-      'Awaiting your review';
-  static const String managerDashboardAllCaughtUp =
-      'All caught up! 🎉';
+  static const String managerDashboardPendingTitle = 'Awaiting your review';
+  static const String managerDashboardAllCaughtUp = 'All caught up! 🎉';
   static const String managerDashboardViewAll = 'View all';
   static const String managerDashboardSubmittedAgo = 'submitted';
-  static const String managerDashboardTrendTitle =
-      'Last cycle highlights';
+  static const String managerDashboardTrendTitle = 'Last cycle highlights';
   static const String managerDashboardTrendAverage = 'Average team score';
   static const String managerDashboardTrendHighest = 'Highest';
   static const String managerDashboardTrendLowest = 'Lowest';
@@ -578,8 +574,7 @@ class AppStrings {
       'You don\'t manage any team members';
   static const String managerDashboardNoReportsMessage =
       'You\'re set up as a manager but no direct reports are assigned to you yet. Switch to "My Review" to rate yourself, or contact HR.';
-  static const String managerDashboardNoReportsCta =
-      'Go to My Review';
+  static const String managerDashboardNoReportsCta = 'Go to My Review';
 
   // ───── Team list ─────
   static const String managerTeamTitle = 'My team';
@@ -639,8 +634,7 @@ class AppStrings {
   static const String managerReviewDetailIncentive = 'Incentive earned';
   static const String managerReviewDetailManagerComment =
       'Your overall comment';
-  static const String managerReviewDetailPreviousReviews =
-      'Previous reviews';
+  static const String managerReviewDetailPreviousReviews = 'Previous reviews';
   static const String managerReviewDetailWaitingForEmployee =
       'Employee hasn\'t submitted their self-rating yet. You\'ll be able to rate once they finish.';
   static const String managerReviewDetailWindowClosed =
@@ -665,8 +659,7 @@ class AppStrings {
       'Rate every applicable cell before submitting.';
   static const String managerRateAutoSavedLabel = 'Saved';
   static const String managerRateAutoSavingLabel = 'Saving…';
-  static const String managerRateAutoSaveFailed =
-      'Couldn\'t save — retrying';
+  static const String managerRateAutoSaveFailed = 'Couldn\'t save — retrying';
   static const String managerRateRetry = 'Retry';
   static const String managerRateReviewCta = 'Review';
   static const String managerRateReviewTitle = 'Review your ratings';
@@ -678,24 +671,20 @@ class AppStrings {
   static const String managerRateConfirmTitle = 'Submit this review?';
   static const String managerRateConfirmMessage =
       'Once submitted, you cannot change scores unless you reopen within the deadline.';
-  static const String managerRateOfflineTooltip =
-      'Internet required to submit';
+  static const String managerRateOfflineTooltip = 'Internet required to submit';
   static const String managerRateDeadlineWarning =
       'Manager review deadline approaching';
   static const String managerRateDeadlinePassed =
       'Manager review deadline has passed';
   static const String managerRateSuccessTitle = 'Review submitted ✓';
-  static const String managerRateSuccessSubtitle =
-      'Your rating is locked in.';
-  static const String managerRateSuccessViewSubmission =
-      'View submission';
+  static const String managerRateSuccessSubtitle = 'Your rating is locked in.';
+  static const String managerRateSuccessViewSubmission = 'View submission';
   static const String managerRateSuccessBackToTeam = 'Back to team';
   static const String managerRatePartialTitle = 'Saved — review not finalised';
   static const String managerRatePartialSubtitle =
       'Your scores are saved. The review can\'t move forward yet:';
   static const String managerRatePartialTryAgain = 'Try submit again';
-  static const String managerRatePartialBackToReview =
-      'Back to review';
+  static const String managerRatePartialBackToReview = 'Back to review';
 
   // ───── Submit response code → user message mapping ─────
   static const String managerRateErrorIncompleteAfterCopy =
@@ -718,8 +707,7 @@ class AppStrings {
   static const String bulkApproveResultTitle = 'Approval result';
   static const String bulkApproveResultApproved = 'Approved';
   static const String bulkApproveResultSkipped = 'Skipped';
-  static const String bulkApproveResultAllSuccess =
-      'All reviews approved.';
+  static const String bulkApproveResultAllSuccess = 'All reviews approved.';
   static const String bulkApproveResultSomeSkipped =
       '{approved} approved, {skipped} skipped';
   static const String bulkApproveDone = 'Done';
@@ -740,14 +728,12 @@ class AppStrings {
   static const String managerBulkApproveCommentHint =
       'Optional — leave blank to skip';
   static const String managerBulkApproveCta = 'Approve all';
-  static const String managerBulkApproveConfirmTitle =
-      'Approve these reviews?';
+  static const String managerBulkApproveConfirmTitle = 'Approve these reviews?';
   static const String managerBulkApproveConfirmMessage =
       'Reviews that can be finalised will transition to MANAGER_RATED_ALL. Others will be skipped with a reason — you can rate them individually afterwards.';
   static const String managerBulkApproveResultCleanTitle =
       'All reviews approved ✓';
-  static const String managerBulkApproveResultMixedTitle =
-      'Partial approve';
+  static const String managerBulkApproveResultMixedTitle = 'Partial approve';
   static const String managerBulkApproveResultAllSkippedTitle =
       'No reviews approved';
   static const String managerBulkApproveApprovedCount = 'APPROVED';
