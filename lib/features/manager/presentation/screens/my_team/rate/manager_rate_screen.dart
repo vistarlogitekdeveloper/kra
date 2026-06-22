@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
+import '../../../../../../core/utils/monthly_deadlines.dart';
+import '../../../../../../core/widgets/monthly_deadline_notice.dart';
 import '../../../../../../core/widgets/shimmer_box.dart';
 import '../../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../../hr/presentation/widgets/confirm_action_dialog.dart';
@@ -23,8 +25,7 @@ class ManagerRateScreen extends ConsumerStatefulWidget {
   const ManagerRateScreen({super.key, required this.reviewId});
 
   @override
-  ConsumerState<ManagerRateScreen> createState() =>
-      _ManagerRateScreenState();
+  ConsumerState<ManagerRateScreen> createState() => _ManagerRateScreenState();
 }
 
 class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
@@ -104,8 +105,8 @@ class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
                 primaryLabel: AppStrings.managerRateReviewCta,
                 isPrimaryEnabled: state.isComplete,
                 isSubmitting: state.isSubmitting,
-                onPrimary: () => context
-                    .go(AppRoutes.managerRateReview(widget.reviewId)),
+                onPrimary: () =>
+                    context.go(AppRoutes.managerRateReview(widget.reviewId)),
               ),
       ),
     );
@@ -162,7 +163,13 @@ class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
-      children: const [QuarterlyReviewMatrix()],
+      children: [
+        MonthlyDeadlineNotice(
+          title: AppStrings.deadlineManagerRatingTitle,
+          deadline: MonthlyDeadlines.managerRating(),
+        ),
+        const QuarterlyReviewMatrix(),
+      ],
     );
   }
 }

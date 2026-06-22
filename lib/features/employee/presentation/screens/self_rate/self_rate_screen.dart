@@ -6,6 +6,8 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/network/connectivity_service.dart';
 import '../../../../../core/router/app_router.dart';
+import '../../../../../core/utils/monthly_deadlines.dart';
+import '../../../../../core/widgets/monthly_deadline_notice.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../hr/presentation/widgets/confirm_action_dialog.dart';
 import '../../providers/employee_dashboard_providers.dart';
@@ -215,6 +217,10 @@ class _SelfRateScreenState extends ConsumerState<SelfRateScreen> {
 
     return Column(
       children: [
+        MonthlyDeadlineNotice(
+          title: AppStrings.deadlineSelfRatingTitle,
+          deadline: MonthlyDeadlines.selfRating(),
+        ),
         // Sticky top: progress bar + month picker
         WeightageProgressBar(
           weightedTotalPct: state.weightedTotalPct,
@@ -234,10 +240,8 @@ class _SelfRateScreenState extends ConsumerState<SelfRateScreen> {
         if (state.pendingDraft != null)
           _ResumeDraftPrompt(
             savedAt: state.pendingDraft!.savedAt,
-            onResume: () =>
-                ref.read(selfRateProvider.notifier).resumeDraft(),
-            onDiscard: () =>
-                ref.read(selfRateProvider.notifier).discardDraft(),
+            onResume: () => ref.read(selfRateProvider.notifier).resumeDraft(),
+            onDiscard: () => ref.read(selfRateProvider.notifier).discardDraft(),
           ),
         Expanded(
           child: ListView.builder(
@@ -270,8 +274,7 @@ class _SelfRateScreenState extends ConsumerState<SelfRateScreen> {
     if (!state.isComplete) {
       setState(() => _showMissingHighlights = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(AppStrings.selfRateErrorIncompleteScores)),
+        const SnackBar(content: Text(AppStrings.selfRateErrorIncompleteScores)),
       );
       return;
     }
@@ -302,8 +305,8 @@ class _ResumeDraftPrompt extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accentOrange.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: AppColors.accentOrange.withValues(alpha: 0.3)),
+        border:
+            Border.all(color: AppColors.accentOrange.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -350,8 +353,7 @@ class _ResumeDraftPrompt extends StatelessWidget {
             onPressed: onResume,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accentOrange,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),

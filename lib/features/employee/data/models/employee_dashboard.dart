@@ -1,4 +1,5 @@
 import '../../../../core/api/json_parse.dart';
+import '../../../../core/utils/monthly_deadlines.dart';
 import 'enums.dart';
 
 /// Aggregated payload for the Employee home screen. One round-trip
@@ -30,16 +31,14 @@ class EmployeeDashboard {
   /// home screen's empty-state vs. populated-state branch.
   bool get hasActiveCycle => cycle != null;
 
-  /// Days from today to [DashboardCycle.selfRatingDeadline]. Returns
-  /// `null` when no deadline is on the cycle (which would be unusual).
-  /// Negative values mean the deadline has passed.
+  /// Days from today to the self-rating deadline — the fixed
+  /// [MonthlyDeadlines.selfRatingDay] (7th) of the current calendar
+  /// month. Returns `null` when there is no active cycle (so the home
+  /// banner stays hidden between cycles). Negative values mean the
+  /// deadline has passed.
   int? get selfRatingDaysRemaining {
-    final deadline = cycle?.selfRatingDeadline;
-    if (deadline == null) return null;
-    final now = DateTime.now();
-    return DateTime(deadline.year, deadline.month, deadline.day)
-        .difference(DateTime(now.year, now.month, now.day))
-        .inDays;
+    if (cycle == null) return null;
+    return MonthlyDeadlines.daysRemaining(MonthlyDeadlines.selfRating());
   }
 
   /// Convenience for the deadline banner — "is the self-rating
@@ -60,12 +59,10 @@ class EmployeeDashboard {
               JsonParse.parseMap(json['currentMonth'])!),
       scorecard: JsonParse.parseMap(json['scorecard']) == null
           ? null
-          : DashboardScorecard.fromJson(
-              JsonParse.parseMap(json['scorecard'])!),
+          : DashboardScorecard.fromJson(JsonParse.parseMap(json['scorecard'])!),
       incentive: JsonParse.parseMap(json['incentive']) == null
           ? null
-          : DashboardIncentive.fromJson(
-              JsonParse.parseMap(json['incentive'])!),
+          : DashboardIncentive.fromJson(JsonParse.parseMap(json['incentive'])!),
     );
   }
 
@@ -114,8 +111,7 @@ class DashboardCycle {
     this.managerReviewDeadline,
   });
 
-  factory DashboardCycle.fromJson(Map<String, dynamic> json) =>
-      DashboardCycle(
+  factory DashboardCycle.fromJson(Map<String, dynamic> json) => DashboardCycle(
         id: JsonParse.parseString(json['id']) ?? '',
         name: JsonParse.parseString(json['name']) ?? '',
         fyLabel: JsonParse.parseString(json['fyLabel']),
@@ -315,8 +311,7 @@ class DashboardIncentive {
 
   factory DashboardIncentive.fromJson(Map<String, dynamic> json) =>
       DashboardIncentive(
-        monthlyEligible:
-            JsonParse.parseDouble(json['monthlyEligible']) ?? 0,
+        monthlyEligible: JsonParse.parseDouble(json['monthlyEligible']) ?? 0,
         quarterlyEligible:
             JsonParse.parseDouble(json['quarterlyEligible']) ?? 0,
         earnedSoFar: JsonParse.parseDouble(json['earnedSoFar']) ?? 0,

@@ -400,6 +400,10 @@ class AppStrings {
   static const String deadlineDays = 'days';
   static const String deadlineOverdue = 'Self-rating overdue — submit now';
 
+  // ───── Monthly deadline notices (self 7th / manager 10th) ─────
+  static const String deadlineSelfRatingTitle = 'Self-rating deadline';
+  static const String deadlineManagerRatingTitle = 'Manager rating deadline';
+
   // ───── Self-Rate ─────
   static const String selfRateTitle = 'Rate yourself';
   static const String selfRateLiveTotal = 'Current total';
