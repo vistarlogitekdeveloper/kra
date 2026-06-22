@@ -409,9 +409,17 @@ class AppStrings {
   static const String selfRateLiveTotal = 'Current total';
   static const String selfRateReviewCta = 'Review →';
   static const String selfRateMissingScore = 'Score required';
-  static const String selfRateOptionalComment = 'Optional comment';
-  static const String selfRateOptionalCommentHint =
-      'Add context for your manager (200 chars max)';
+  static const String selfRateReasonLabel = 'Reason for your rating';
+  static const String selfRateReasonHint =
+      'Explain why you gave this score (200 chars max)';
+
+  // ───── Self-rate attachment (proof) ─────
+  static const String selfRateAttachmentLabel = 'Proof / attachment';
+  static const String selfRateAttachmentAdd = 'Attach proof';
+  static const String selfRateAttachmentReplace = 'Replace';
+  static const String selfRateAttachmentRemoveTooltip = 'Remove attachment';
+  static const String selfRateAttachmentPendingNote =
+      'Saved with your draft. Upload to the server is coming soon.';
   static const String selfRateOverallCommentLabel =
       'Overall comment for the month';
   static const String selfRateScoreOutOfRange =

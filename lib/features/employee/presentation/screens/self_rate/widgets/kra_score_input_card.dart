@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../../core/constants/app_colors.dart';
@@ -24,12 +25,19 @@ class KraScoreInputCard extends StatefulWidget {
   final ValueChanged<String> onRemarkChanged;
   final ValueChanged<bool> onToggleNotApplicable;
 
+  /// Called when the user picks a proof file — carries the display
+  /// [name] and the on-device [path].
+  final void Function(String name, String path) onAttach;
+  final VoidCallback onRemoveAttachment;
+
   const KraScoreInputCard({
     super.key,
     required this.entry,
     required this.onScoreChanged,
     required this.onRemarkChanged,
     required this.onToggleNotApplicable,
+    required this.onAttach,
+    required this.onRemoveAttachment,
     this.isHighlightedAsMissing = false,
   });
 
@@ -119,8 +127,8 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
           if (e.description != null && e.description!.isNotEmpty) ...[
             const SizedBox(height: 10),
             InkWell(
-              onTap: () => setState(
-                  () => _descriptionExpanded = !_descriptionExpanded),
+              onTap: () =>
+                  setState(() => _descriptionExpanded = !_descriptionExpanded),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -183,7 +191,7 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
             onToggleNotApplicable: widget.onToggleNotApplicable,
           ),
 
-          // ── Optional remark ──
+          // ── Reason for the rating ──
           const SizedBox(height: 12),
           TextField(
             controller: _remarkController,
@@ -193,12 +201,12 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
             maxLines: 3,
             onChanged: widget.onRemarkChanged,
             decoration: InputDecoration(
-              labelText: AppStrings.selfRateOptionalComment,
+              labelText: AppStrings.selfRateReasonLabel,
               labelStyle: const TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),
-              hintText: AppStrings.selfRateOptionalCommentHint,
+              hintText: AppStrings.selfRateReasonHint,
               hintStyle: const TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textMuted,
@@ -226,8 +234,8 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
                   width: 1.4,
                 ),
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
             style: const TextStyle(
               fontSize: 13.5,
@@ -235,8 +243,137 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
               height: 1.4,
             ),
           ),
+
+          // ── Proof / attachment ──
+          const SizedBox(height: 12),
+          _AttachmentField(
+            entry: e,
+            onPick: e.isNotApplicable ? null : _pickAttachment,
+            onRemove: widget.onRemoveAttachment,
+          ),
         ],
       ),
+    );
+  }
+
+  Future<void> _pickAttachment() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    final path = file.path;
+    if (path == null) return;
+    widget.onAttach(file.name, path);
+  }
+}
+
+/// Shows either an "Attach proof" button or the attached-file chip with
+/// a remove control and a "not uploaded yet" note. [onPick] is null when
+/// the cell is N/A (attachment disabled).
+class _AttachmentField extends StatelessWidget {
+  final KraScoreEntry entry;
+  final VoidCallback? onPick;
+  final VoidCallback onRemove;
+
+  const _AttachmentField({
+    required this.entry,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!entry.hasAttachment) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: onPick,
+          icon: const Icon(Icons.attach_file_rounded, size: 18),
+          label: const Text(AppStrings.selfRateAttachmentAdd),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primaryPurple,
+            side: const BorderSide(color: AppColors.divider),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+          decoration: BoxDecoration(
+            color: AppColors.primaryPurple.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.primaryPurple.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.insert_drive_file_outlined,
+                size: 18,
+                color: AppColors.primaryPurple,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  entry.attachmentName!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (onPick != null)
+                TextButton(
+                  onPressed: onPick,
+                  child: const Text(AppStrings.selfRateAttachmentReplace),
+                ),
+              IconButton(
+                onPressed: onRemove,
+                tooltip: AppStrings.selfRateAttachmentRemoveTooltip,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Row(
+          children: [
+            Icon(
+              Icons.info_outline_rounded,
+              size: 13,
+              color: AppColors.textMuted,
+            ),
+            SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                AppStrings.selfRateAttachmentPendingNote,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: AppColors.textMuted,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

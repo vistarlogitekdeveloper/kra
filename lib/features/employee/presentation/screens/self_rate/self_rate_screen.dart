@@ -262,6 +262,12 @@ class _SelfRateScreenState extends ConsumerState<SelfRateScreen> {
                 onToggleNotApplicable: (v) => ref
                     .read(selfRateProvider.notifier)
                     .toggleNotApplicable(entry.monthlyScoreId, v),
+                onAttach: (name, path) => ref
+                    .read(selfRateProvider.notifier)
+                    .setAttachment(entry.monthlyScoreId, name, path),
+                onRemoveAttachment: () => ref
+                    .read(selfRateProvider.notifier)
+                    .clearAttachment(entry.monthlyScoreId),
               );
             },
           ),
