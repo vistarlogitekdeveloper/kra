@@ -31,9 +31,6 @@ class ApiConstants {
   static const String kraAssignments = '/kra-assignments';
   static const String kraAssignmentsBulk = '/kra-assignments/bulk';
   static const String reviewCycles = '/review-cycles';
-  // Backend endpoint is still `/bonus-slabs` (wire contract); the Dart
-  // symbol uses the product name "performance incentives".
-  static const String performanceIncentives = '/bonus-slabs';
   static const String hrDashboard = '/hr/dashboard';
 
   // Employee module endpoints — every authenticated user, regardless of

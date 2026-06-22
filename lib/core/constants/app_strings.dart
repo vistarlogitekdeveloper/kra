@@ -227,8 +227,6 @@ class AppStrings {
   static const String reviewCyclesEmptyCta = 'New Review Cycle';
   static const String reviewCyclesActivate = 'Activate';
   static const String reviewCyclesClose = 'Close cycle';
-  static const String reviewCyclesViewIncentives =
-      'View performance incentives';
   static const String reviewCyclesActivateConfirmTitle = 'Activate this cycle?';
   static const String reviewCyclesActivateConfirmMessage =
       'Employees will be able to start self-rating once this cycle is active.';
@@ -258,23 +256,14 @@ class AppStrings {
       'End date must be on or after start date.';
   static const String reviewCycleFormSaved = 'Review cycle saved.';
 
-  // ───── Performance incentives ─────
-  static const String performanceIncentivesTitle = 'Performance Incentives';
-  static const String performanceIncentivesEmptyTitle =
-      'No performance incentives configured';
-  static const String performanceIncentivesEmptyMessage =
-      'Add an incentive per grade to enable payout calculation for this cycle.';
-  static const String performanceIncentivesEmptyCta = 'Add incentive';
-  static const String performanceIncentivesAddTitle =
-      'Add performance incentive';
-  static const String performanceIncentivesEditTitle =
-      'Edit performance incentive';
-  static const String performanceIncentivesGrade = 'Grade';
-  static const String performanceIncentivesMonthly = 'Monthly eligible amount';
-  static const String performanceIncentivesQuarterly =
-      'Quarterly eligible amount';
-  static const String performanceIncentivesSaved =
-      'Performance incentive saved.';
+  // ───── Performance incentives (per employee) ─────
+  static const String employeeFormIncentiveSection = 'Performance incentive';
+  static const String employeeFormMonthlyIncentive = 'Monthly incentive amount';
+  static const String employeeFormMonthlyIncentiveHint =
+      'e.g. 5000 — leave blank to use the org default';
+  static const String employeeDetailIncentiveTitle = 'Performance incentive';
+  static const String employeeDetailMonthlyIncentive = 'Monthly incentive';
+  static const String employeeDetailIncentiveNotSet = 'Not set (org default)';
 
   // ───── Reports placeholder ─────
   static const String hrReportsTitle = 'Reports';

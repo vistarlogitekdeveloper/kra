@@ -35,8 +35,7 @@ class ReviewCyclesScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         color: AppColors.primaryPurple,
-        onRefresh: () =>
-            ref.read(reviewCyclesProvider.notifier).refresh(),
+        onRefresh: () => ref.read(reviewCyclesProvider.notifier).refresh(),
         child: cycles.when(
           loading: () => ListView(
             padding: const EdgeInsets.all(16),
@@ -90,8 +89,6 @@ class ReviewCyclesScreen extends ConsumerWidget {
                   cycle: cycle,
                   onActivate: () => _activate(context, ref, cycle.id),
                   onClose: () => _close(context, ref, cycle.id),
-                  onViewIncentives: () =>
-                      context.push(AppRoutes.hrCyclePerformanceIncentives(cycle.id)),
                 );
               },
             );
@@ -115,9 +112,8 @@ class ReviewCyclesScreen extends ConsumerWidget {
       accentColor: AppColors.success,
     );
     if (ok != true || !context.mounted) return;
-    final success = await ref
-        .read(reviewCyclesProvider.notifier)
-        .activateOptimistic(id);
+    final success =
+        await ref.read(reviewCyclesProvider.notifier).activateOptimistic(id);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -126,8 +122,7 @@ class ReviewCyclesScreen extends ConsumerWidget {
               ? AppStrings.reviewCyclesActivateSuccess
               : AppStrings.reviewCyclesActivateFailed,
         ),
-        backgroundColor:
-            success ? AppColors.textPrimary : AppColors.error,
+        backgroundColor: success ? AppColors.textPrimary : AppColors.error,
       ),
     );
   }
@@ -154,8 +149,7 @@ class ReviewCyclesScreen extends ConsumerWidget {
               ? AppStrings.reviewCyclesCloseSuccess
               : AppStrings.reviewCyclesCloseFailed,
         ),
-        backgroundColor:
-            success ? AppColors.textPrimary : AppColors.error,
+        backgroundColor: success ? AppColors.textPrimary : AppColors.error,
       ),
     );
   }

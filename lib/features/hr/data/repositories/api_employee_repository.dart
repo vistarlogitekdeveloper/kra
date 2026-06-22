@@ -55,6 +55,7 @@ class ApiEmployeeRepository implements EmployeeRepository {
     String? projectLocationId,
     String? managerId,
     String? grade,
+    double? monthlyIncentiveAmount,
     DateTime? joinedDate,
   }) async {
     try {
@@ -69,6 +70,8 @@ class ApiEmployeeRepository implements EmployeeRepository {
           if (projectLocationId != null) 'projectLocationId': projectLocationId,
           if (managerId != null) 'managerId': managerId,
           if (grade != null) 'grade': grade,
+          if (monthlyIncentiveAmount != null)
+            'monthlyIncentiveAmount': monthlyIncentiveAmount,
           if (joinedDate != null) 'joinedDate': joinedDate.toIso8601String(),
         },
       );

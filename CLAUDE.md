@@ -16,7 +16,7 @@ lib/
 ├── core/                 (api, theme, router, storage, widgets, constants)
 └── features/
     ├── auth/             (login + token lifecycle)
-    ├── hr/               (HR Admin: employees, templates, cycles, performance incentives, locations, reports, audit log)
+    ├── hr/               (HR Admin: employees, templates, cycles, locations, reports, audit log)
     ├── manager/          (My Team: dashboard, team, history, rate matrix, bulk approve)
     └── employee/         (home, self-rate, history, profile)
 ```

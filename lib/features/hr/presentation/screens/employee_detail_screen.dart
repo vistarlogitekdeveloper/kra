@@ -64,8 +64,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-          data: (employee) =>
-              _DetailContent(employee: employee, ref: ref),
+          data: (employee) => _DetailContent(employee: employee, ref: ref),
         ),
       ),
     );
@@ -126,9 +125,23 @@ class _DetailContent extends StatelessWidget {
               value: employee.isActive
                   ? AppStrings.employeesActive
                   : AppStrings.employeesInactive,
-              valueColor: employee.isActive
-                  ? AppColors.success
-                  : AppColors.textMuted,
+              valueColor:
+                  employee.isActive ? AppColors.success : AppColors.textMuted,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _DetailCard(
+          title: AppStrings.employeeDetailIncentiveTitle,
+          rows: [
+            _DetailRow(
+              label: AppStrings.employeeDetailMonthlyIncentive,
+              value: employee.monthlyIncentiveAmount == null
+                  ? AppStrings.employeeDetailIncentiveNotSet
+                  : HrFormatters.currencyInr(employee.monthlyIncentiveAmount!),
+              valueColor: employee.monthlyIncentiveAmount == null
+                  ? AppColors.textMuted
+                  : null,
             ),
           ],
         ),
@@ -140,8 +153,7 @@ class _DetailContent extends StatelessWidget {
                 onPressed: () => context.push(
                   '${AppRoutes.hrAssign}?employeeId=${employee.id}',
                 ),
-                icon: const Icon(Icons.assignment_turned_in_outlined,
-                    size: 18),
+                icon: const Icon(Icons.assignment_turned_in_outlined, size: 18),
                 label: const Text(
                   AppStrings.employeeDetailAssignKra,
                   style: TextStyle(fontWeight: FontWeight.w800),
@@ -183,8 +195,7 @@ class _DetailContent extends StatelessWidget {
         if (employee.isActive)
           OutlinedButton.icon(
             onPressed: () => _confirmDeactivate(context),
-            icon: const Icon(Icons.person_off_outlined,
-                color: AppColors.error),
+            icon: const Icon(Icons.person_off_outlined, color: AppColors.error),
             label: const Text(
               AppStrings.employeesActionDeactivate,
               style: TextStyle(
@@ -402,8 +413,7 @@ class _AssignmentRow extends StatelessWidget {
           ),
           if (assignment.isLocked)
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: AppColors.textMuted.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),

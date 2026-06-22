@@ -18,7 +18,6 @@ import '../../features/employee/presentation/screens/self_rate/self_rate_review_
 import '../../features/employee/presentation/screens/self_rate/self_rate_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_success_screen.dart';
 import '../../features/hr/presentation/screens/audit_log_screen.dart';
-import '../../features/hr/presentation/screens/performance_incentives_screen.dart';
 import '../../features/hr/presentation/screens/bulk_setup_screen.dart';
 import '../../features/hr/presentation/screens/employee_detail_screen.dart';
 import '../../features/hr/presentation/screens/employee_form_screen.dart';
@@ -94,8 +93,6 @@ class AppRoutes {
   static String hrEmployeeDetail(String id) => '/hr/employees/$id';
   static String hrEmployeeEdit(String id) => '/hr/employees/$id/edit';
   static String hrTemplateEdit(String id) => '/hr/kra-templates/$id';
-  static String hrCyclePerformanceIncentives(String id) =>
-      '/hr/cycles/$id/performance-incentives';
 
   // ── Manager module nested routes ──
   // Two modes share the /manager root: My Team (default) and
@@ -554,12 +551,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.hrCycleNew,
         builder: (_, __) => const ReviewCycleFormScreen(),
-      ),
-      GoRoute(
-        path: '/hr/cycles/:id/performance-incentives',
-        builder: (_, state) => PerformanceIncentivesScreen(
-          cycleId: state.pathParameters['id']!,
-        ),
       ),
       GoRoute(
         path: AppRoutes.hrAuditLog,
