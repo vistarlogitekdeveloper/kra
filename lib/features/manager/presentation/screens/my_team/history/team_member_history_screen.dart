@@ -35,13 +35,14 @@ class _TeamMemberHistoryScreenState
 
   @override
   void dispose() {
+    // Capture the notifier synchronously — `ref` is unusable once
+    // super.dispose() runs, so reading it inside the deferred microtask
+    // would throw and the filter would never reset. The filter provider
+    // is not autoDispose, so the captured notifier stays alive.
+    final filter = ref.read(teamHistoryFilterProvider.notifier);
     // Defer the reset to the next microtask so we don't mutate a
     // provider during widget disposal.
-    Future.microtask(() {
-      if (!mounted) {
-        ref.read(teamHistoryFilterProvider.notifier).setEmployee(null);
-      }
-    });
+    Future.microtask(() => filter.setEmployee(null));
     super.dispose();
   }
 

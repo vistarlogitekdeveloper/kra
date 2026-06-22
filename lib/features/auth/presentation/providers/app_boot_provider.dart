@@ -42,7 +42,13 @@ final appBootProvider = FutureProvider<void>((ref) async {
   // the cached user remains in place and we'll re-try on next launch.
   // ignore: unawaited_futures
   ref.read(authRepositoryProvider).refreshCurrentUser().then((fresh) {
-    if (fresh != null) {
+    // Guard against a logout that happened while /auth/me was in flight
+    // (Render cold-start makes this a 30–60s window). Without this check,
+    // a late success would call hydrate() and snap the just-logged-out
+    // user back into the app, then bounce them out again once the cleared
+    // token starts forcing 401s.
+    if (fresh != null &&
+        ref.read(authStateProvider) is AuthAuthenticated) {
       ref.read(authStateProvider.notifier).hydrate(fresh);
     }
   });

@@ -266,11 +266,13 @@ class _MonthBlock extends StatelessWidget {
     final cellWidget =
         (isFeed || monthClosed || cell.isNotApplicable)
             ? ReadonlyScoreCell(
+                key: ValueKey('ro_${cell.monthlyScoreId}'),
                 cell: cell,
                 maxScore: row.maxScore,
                 isFeedRow: isFeed,
               )
             : ScoreCell(
+                key: ValueKey(cell.monthlyScoreId),
                 cell: cell,
                 maxScore: row.maxScore,
                 onScoreChanged: (v) =>

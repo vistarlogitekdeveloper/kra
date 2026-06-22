@@ -94,6 +94,11 @@ class _ScoreCellState extends State<ScoreCell> {
     final parsed = double.tryParse(raw.trim());
     if (parsed == null) {
       setState(() => _error = AppStrings.managerRateOutOfRange);
+      // Clear the parent's stored value too — otherwise a previously
+      // valid score stays in notifier state and gets auto-saved/submitted
+      // while the cell visibly shows an error (e.g. after typing "8.."),
+      // matching the empty/out-of-range branches which also clear it.
+      widget.onScoreChanged(null);
       return;
     }
     if (parsed < 0 || parsed > widget.maxScore) {

@@ -26,9 +26,13 @@ class KraTemplateItem {
     required this.sortOrder,
   });
 
-  /// Convenience getter — returns weightage as 0–100 regardless of how
-  /// the server stored it.
-  double get weightagePercent => weightage <= 1.0 ? weightage * 100 : weightage;
+  /// Convenience getter — [weightage] is already canonically a 0–100
+  /// percentage (normalised at [fromJson] from the wire's 0–1 decimal, and
+  /// entered directly as a percentage on the form), so this is the identity.
+  /// Do NOT re-apply a `<= 1.0` fraction heuristic here: that would turn a
+  /// legitimate sub-1% value (e.g. 0.5%) into 50%, and a user-typed "1" into
+  /// 100%, corrupting the form total and the persisted payload.
+  double get weightagePercent => weightage;
 
   factory KraTemplateItem.empty({int sortOrder = 0}) => KraTemplateItem(
         name: '',

@@ -147,15 +147,19 @@ class _SelfRateScreenState extends ConsumerState<SelfRateScreen> {
   }
 
   PreferredSizeWidget _buildAppBar(SelfRateState state) {
-    final monthLabel = state.entries.isNotEmpty
-        ? state.entries.first.monthLabel
-        : (state.review?.reviewCycle?.months
-                .firstWhere(
-                  (m) => m.id == state.activeMonthId,
-                  orElse: () => state.review!.reviewCycle!.months.first,
-                )
-                .monthLabel ??
-            '');
+    final months = state.review?.reviewCycle?.months;
+    String monthLabel = '';
+    if (state.entries.isNotEmpty) {
+      monthLabel = state.entries.first.monthLabel;
+    } else if (months != null && months.isNotEmpty) {
+      // Don't use firstWhere(orElse: () => months.first) — when no month
+      // matches activeMonthId the orElse is fine, but an empty `months`
+      // list would make `months.first` throw StateError and crash the
+      // whole screen (build calls this unconditionally) instead of letting
+      // the body render its empty state.
+      final match = months.where((m) => m.id == state.activeMonthId);
+      monthLabel = (match.isNotEmpty ? match.first : months.first).monthLabel;
+    }
     final title = monthLabel.isEmpty
         ? AppStrings.selfRateTitle
         : '${AppStrings.selfRateTitle} — $monthLabel';
