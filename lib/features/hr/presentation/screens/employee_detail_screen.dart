@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
@@ -133,6 +135,10 @@ class _DetailContent extends StatelessWidget {
         const SizedBox(height: 14),
         _DetailCard(
           title: AppStrings.employeeDetailIncentiveTitle,
+          actionLabel: employee.monthlyIncentiveAmount == null
+              ? AppStrings.employeeIncentiveSetCta
+              : AppStrings.employeeIncentiveEditCta,
+          onAction: () => _AssignIncentiveSheet.show(context, ref, employee),
           rows: [
             _DetailRow(
               label: AppStrings.employeeDetailMonthlyIncentive,
@@ -529,7 +535,18 @@ class _ProfileHeader extends StatelessWidget {
 class _DetailCard extends StatelessWidget {
   final String title;
   final List<_DetailRow> rows;
-  const _DetailCard({required this.title, required this.rows});
+
+  /// Optional header action (e.g. "Set" / "Edit"). Renders a text button
+  /// on the right of the card title when both are provided.
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _DetailCard({
+    required this.title,
+    required this.rows,
+    this.actionLabel,
+    this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -543,14 +560,44 @@ class _DetailCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textSecondary,
-              letterSpacing: 0.6,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textSecondary,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+              if (actionLabel != null && onAction != null)
+                GestureDetector(
+                  onTap: onAction,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.edit_rounded,
+                        size: 14,
+                        color: AppColors.primaryPurple,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        actionLabel!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryPurple,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           for (final row in rows) row,
@@ -617,6 +664,210 @@ class _DetailSkeleton extends StatelessWidget {
         SizedBox(height: 14),
         ShimmerBox(height: 280, borderRadius: 16),
       ],
+    );
+  }
+}
+
+/// Quick "assign performance incentive" bottom sheet, opened from the
+/// employee detail screen. PATCHes the employee's monthly incentive
+/// without going through the full edit form. An empty field clears the
+/// override (the employee falls back to the org default).
+class _AssignIncentiveSheet extends ConsumerStatefulWidget {
+  final Employee employee;
+  const _AssignIncentiveSheet({required this.employee});
+
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref,
+    Employee employee,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _AssignIncentiveSheet(employee: employee),
+    );
+  }
+
+  @override
+  ConsumerState<_AssignIncentiveSheet> createState() =>
+      _AssignIncentiveSheetState();
+}
+
+class _AssignIncentiveSheetState extends ConsumerState<_AssignIncentiveSheet> {
+  late final TextEditingController _controller;
+  bool _isSubmitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final current = widget.employee.monthlyIncentiveAmount;
+    _controller = TextEditingController(
+      text: current == null ? '' : current.toStringAsFixed(0),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final text = _controller.text.trim();
+    final amount = text.isEmpty ? null : double.tryParse(text);
+    if (text.isNotEmpty && (amount == null || amount < 0)) {
+      setState(() => _error = AppStrings.validationNumberRequired);
+      return;
+    }
+    setState(() {
+      _isSubmitting = true;
+      _error = null;
+    });
+    try {
+      final updated = await ref.read(employeeRepositoryProvider).update(
+        widget.employee.id,
+        {'monthlyIncentiveAmount': amount},
+      );
+      ref.read(employeeListProvider.notifier).replaceUpdated(updated);
+      ref.invalidate(employeeDetailProvider(updated.id));
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.employeeIncentiveSaved)),
+      );
+    } on ApiError catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = AppStrings.errorGeneric);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              AppStrings.employeeIncentiveSheetTitle,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.employee.fullName,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 18),
+            if (_error != null) ...[
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const Text(
+              AppStrings.employeeFormMonthlyIncentive,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'^\d{0,9}(\.\d{0,2})?'),
+                ),
+              ],
+              onSubmitted: (_) => _isSubmitting ? null : _save(),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.currency_rupee_rounded, size: 18),
+                hintText: AppStrings.employeeFormMonthlyIncentiveHint,
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                if (widget.employee.monthlyIncentiveAmount != null)
+                  TextButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () {
+                            _controller.clear();
+                            _save();
+                          },
+                    child: const Text(
+                      AppStrings.employeeIncentiveClear,
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                  ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _isSubmitting ? null : _save,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded),
+                  label: const Text(
+                    AppStrings.commonSave,
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

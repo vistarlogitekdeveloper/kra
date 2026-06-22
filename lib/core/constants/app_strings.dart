@@ -269,6 +269,14 @@ class AppStrings {
   static const String employeeDetailMonthlyIncentive = 'Monthly incentive';
   static const String employeeDetailIncentiveNotSet = 'Not set (org default)';
 
+  // Assign-from-detail quick action
+  static const String employeeIncentiveSetCta = 'Set';
+  static const String employeeIncentiveEditCta = 'Edit';
+  static const String employeeIncentiveSheetTitle =
+      'Assign performance incentive';
+  static const String employeeIncentiveClear = 'Clear override';
+  static const String employeeIncentiveSaved = 'Performance incentive updated.';
+
   // ───── Reports placeholder ─────
   static const String hrReportsTitle = 'Reports';
   static const String hrReportsComingSoonTitle = 'Reports — coming soon';
