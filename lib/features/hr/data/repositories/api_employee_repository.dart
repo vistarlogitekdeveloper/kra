@@ -57,6 +57,8 @@ class ApiEmployeeRepository implements EmployeeRepository {
     String? grade,
     double? monthlyIncentiveAmount,
     DateTime? joinedDate,
+    String? password,
+    bool? forcePasswordReset,
   }) async {
     try {
       final response = await _dio.post(
@@ -73,6 +75,12 @@ class ApiEmployeeRepository implements EmployeeRepository {
           if (monthlyIncentiveAmount != null)
             'monthlyIncentiveAmount': monthlyIncentiveAmount,
           if (joinedDate != null) 'joinedDate': joinedDate.toIso8601String(),
+          // Login credentials — optional on the wire. Backend defaults
+          // authMethod to PASSWORD when omitted; sending a value here
+          // makes the new account log-in-able with that password.
+          if (password != null && password.isNotEmpty) 'password': password,
+          if (forcePasswordReset != null)
+            'forcePasswordReset': forcePasswordReset,
         },
       );
       return Employee.fromJson(unwrapObject(response));
