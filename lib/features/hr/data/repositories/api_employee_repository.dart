@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/api/api_constants.dart';
-import '../models/bulk_operation_result.dart';
 import '../models/employee.dart';
 import '../../../../core/api/envelope.dart';
 import 'employee_repository.dart';
@@ -103,70 +102,4 @@ class ApiEmployeeRepository implements EmployeeRepository {
       rethrowAsApiError(e, st);
     }
   }
-
-  @override
-  Future<BulkOperationResult> deactivateAll() async {
-    final rows = await _fetchAllActive();
-    return _runBulk<Employee>(
-      rows,
-      label: (e) => e.fullName,
-      action: (e) => deactivate(e.id),
-    );
-  }
-
-  @override
-  Future<BulkOperationResult> clearAllIncentiveAmounts() async {
-    final rows = await _fetchAllActive();
-    return _runBulk<Employee>(
-      rows,
-      label: (e) => e.fullName,
-      action: (e) => update(e.id, {'monthlyIncentiveAmount': 0}),
-    );
-  }
-
-  /// Walks the paginated list endpoint until it exhausts. We can't trust
-  /// a single high `pageSize` to return everything — the backend caps it
-  /// (we hit that limit on the audit log probe earlier) — so loop in
-  /// chunks of 50.
-  Future<List<Employee>> _fetchAllActive() async {
-    final out = <Employee>[];
-    var page = 1;
-    while (true) {
-      final pageData = await list(page: page, pageSize: 50, isActive: true);
-      out.addAll(pageData.employees);
-      final fetched = page * 50;
-      if (fetched >= pageData.total || pageData.employees.isEmpty) break;
-      page += 1;
-    }
-    return out;
-  }
-}
-
-/// Sequential bulk runner used by the admin-tools surfaces. Sequential
-/// (not Future.wait) because Render's free tier throttles hard on bursts;
-/// a parade of parallel DELETEs would return a mix of 200/429 and the
-/// caller would see flaky failures unrelated to the data. Each item
-/// failure is swallowed, recorded in [failures], and the loop continues.
-Future<BulkOperationResult> _runBulk<T>(
-  List<T> items, {
-  required String Function(T item) label,
-  required Future<void> Function(T item) action,
-}) async {
-  int ok = 0;
-  int bad = 0;
-  final failures = <String>[];
-  for (final item in items) {
-    try {
-      await action(item);
-      ok += 1;
-    } catch (_) {
-      bad += 1;
-      if (failures.length < 5) failures.add(label(item));
-    }
-  }
-  return BulkOperationResult(
-    successCount: ok,
-    failureCount: bad,
-    failures: failures,
-  );
 }

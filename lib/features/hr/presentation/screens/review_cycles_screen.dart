@@ -90,6 +90,7 @@ class ReviewCyclesScreen extends ConsumerWidget {
                   cycle: cycle,
                   onActivate: () => _activate(context, ref, cycle.id),
                   onClose: () => _close(context, ref, cycle.id),
+                  onDelete: () => _delete(context, ref, cycle.id, cycle.name),
                 );
               },
             );
@@ -123,6 +124,35 @@ class ReviewCyclesScreen extends ConsumerWidget {
               ? AppStrings.reviewCyclesActivateSuccess
               : AppStrings.reviewCyclesActivateFailed,
         ),
+        backgroundColor: success ? AppColors.textPrimary : AppColors.error,
+      ),
+    );
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    String name,
+  ) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: 'Delete review cycle?',
+      message: 'Permanently removes "$name" and every assignment + review '
+          'tied to it. This cannot be undone.',
+      confirmLabel: 'Delete cycle',
+      icon: Icons.delete_outline_rounded,
+      accentColor: AppColors.error,
+    );
+    if (ok != true || !context.mounted) return;
+    final success =
+        await ref.read(reviewCyclesProvider.notifier).deleteOptimistic(id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Cycle deleted.'
+            : 'Could not delete cycle. It may have active reviews.'),
         backgroundColor: success ? AppColors.textPrimary : AppColors.error,
       ),
     );

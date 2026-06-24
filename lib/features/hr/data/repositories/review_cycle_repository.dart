@@ -1,4 +1,3 @@
-import '../models/bulk_operation_result.dart';
 import '../models/review_cycle.dart';
 
 abstract class ReviewCycleRepository {
@@ -23,13 +22,8 @@ abstract class ReviewCycleRepository {
   /// to open a fresh cycle to make further changes.
   Future<ReviewCycle> close(String id);
 
-  /// Hard-delete a single cycle via `DELETE /review-cycles/:id`. Used
-  /// by the admin-tools "delete all cycles" surface and reachable
-  /// individually from the cycle detail screen once that ships.
+  /// Hard-delete a single cycle via `DELETE /review-cycles/:id`. The
+  /// backend cascades to any KRA assignments + reviews tied to the
+  /// cycle, so this is irreversible — gate behind a confirm dialog.
   Future<void> delete(String id);
-
-  /// Admin-only: fan out [delete] over every cycle the server lists.
-  /// Sequential, see [ApiEmployeeRepository.deactivateAll] for the
-  /// rate-limit reasoning. Returns per-row counts.
-  Future<BulkOperationResult> deleteAll();
 }

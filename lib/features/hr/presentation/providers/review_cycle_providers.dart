@@ -100,6 +100,33 @@ class ReviewCycleListController extends StateNotifier<AsyncValue<List<ReviewCycl
     }
   }
 
+  /// Optimistic delete. Removes the cycle from the local list
+  /// immediately; on server failure the row is reinserted at its prior
+  /// index. The backend cascades to assignments + reviews, so the UI
+  /// should gate behind a confirm dialog.
+  Future<bool> deleteOptimistic(String id) async {
+    final current = state.value;
+    if (current == null) return false;
+    final idx = current.indexWhere((c) => c.id == id);
+    if (idx == -1) return false;
+    final original = current[idx];
+    final next = [...current]..removeAt(idx);
+    state = AsyncValue.data(next);
+
+    try {
+      await _repository.delete(id);
+      return true;
+    } catch (_) {
+      final revert = [...?state.value];
+      // Re-insert at the original slot if it still fits; otherwise
+      // append so we don't lose the row entirely on a race.
+      final insertAt = idx.clamp(0, revert.length);
+      revert.insert(insertAt, original);
+      state = AsyncValue.data(revert);
+      return false;
+    }
+  }
+
   /// Optimistic close. Same shape as [activateOptimistic].
   Future<bool> closeOptimistic(String id) async {
     final current = state.value;

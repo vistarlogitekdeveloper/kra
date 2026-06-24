@@ -1,4 +1,3 @@
-import '../models/bulk_operation_result.dart';
 import '../models/employee.dart';
 
 /// Contract for employee CRUD. UI binds to this, not the Dio impl —
@@ -35,16 +34,4 @@ abstract class EmployeeRepository {
 
   /// Soft delete — flips `isActive` to false on the server.
   Future<void> deactivate(String id);
-
-  /// Admin-only: fan out `deactivate` over every currently-active
-  /// employee. The backend has no bulk endpoint, so we orchestrate
-  /// client-side and report success / failure counts.
-  Future<BulkOperationResult> deactivateAll();
-
-  /// Admin-only: zero out the per-employee `monthlyIncentiveAmount`
-  /// field on every active employee. This is what the admin-tools
-  /// surface calls "delete all performance incentives" — the backend
-  /// has no `DELETE /bonus-slabs` route, so clearing the per-employee
-  /// amount is the only deletion it actually supports.
-  Future<BulkOperationResult> clearAllIncentiveAmounts();
 }
