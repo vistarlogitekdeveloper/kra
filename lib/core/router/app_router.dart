@@ -18,6 +18,7 @@ import '../../features/employee/presentation/screens/self_rate/self_rate_review_
 import '../../features/employee/presentation/screens/self_rate/self_rate_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_success_screen.dart';
 import '../../features/hr/presentation/screens/audit_log_screen.dart';
+import '../../features/hr/presentation/screens/admin_tools_screen.dart';
 import '../../features/hr/presentation/screens/bulk_setup_screen.dart';
 import '../../features/hr/presentation/screens/employee_detail_screen.dart';
 import '../../features/hr/presentation/screens/employee_form_screen.dart';
@@ -87,6 +88,7 @@ class AppRoutes {
   static const String hrLocations = '/hr/locations';
   static const String hrBulkSetup = '/hr/bulk-setup';
   static const String hrAuditLog = '/hr/reports/audit-log';
+  static const String hrAdminTools = '/hr/admin-tools';
 
   // Helpers for parameterised routes — keep the slash arithmetic in one
   // place so the wiring on either side stays in sync.
@@ -216,6 +218,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         // get bounced to their own dashboard if they deep-link in.
         if (goingToHrArea && !_canAccessHr(authState.user.role)) {
           return AppRoutes.dashboardForRole(authState.user.role);
+        }
+        // Tighter guard for /hr/admin-tools — HR_ADMIN and ADMIN only.
+        // Plain HR can see the rest of the HR module but is NOT allowed
+        // to bulk-wipe employees / cycles / incentives.
+        if (loc == AppRoutes.hrAdminTools &&
+            !canAccessAdminTools(authState.user.role)) {
+          return AppRoutes.hrHome;
         }
         // Bare /hr → /hr/home for HR/HR_ADMIN/ADMIN.
         if (state.matchedLocation == AppRoutes.hrDashboard &&
@@ -521,6 +530,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.hrBulkSetup,
         builder: (_, __) => const BulkSetupScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrAdminTools,
+        builder: (_, __) => const AdminToolsScreen(),
       ),
       GoRoute(
         path: AppRoutes.hrEmployeeNew,

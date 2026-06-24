@@ -11,6 +11,7 @@ import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../core/widgets/slow_load_hint.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import 'admin_tools_screen.dart' show canAccessAdminTools;
 import '../../data/models/hr_dashboard_models.dart';
 import '../providers/hr_dashboard_providers.dart';
 import '../widgets/_formatters.dart';
@@ -882,47 +883,70 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _QuickActionsGrid extends StatelessWidget {
+class _QuickActionsGrid extends ConsumerWidget {
   const _QuickActionsGrid();
 
   @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 3.4,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final user =
+        authState is AuthAuthenticated ? authState.user : null;
+    final showAdminTile =
+        user != null && canAccessAdminTools(user.role);
+
+    return Column(
       children: [
-        QuickActionButton(
-          icon: Icons.person_add_alt_1_rounded,
-          label: AppStrings.hrHomeQuickAddEmployee,
-          iconBg: AppColors.primaryPurple.withValues(alpha: 0.10),
-          iconFg: AppColors.primaryPurple,
-          onTap: () => context.push(AppRoutes.hrEmployeeNew),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 3.4,
+          children: [
+            QuickActionButton(
+              icon: Icons.person_add_alt_1_rounded,
+              label: AppStrings.hrHomeQuickAddEmployee,
+              iconBg: AppColors.primaryPurple.withValues(alpha: 0.10),
+              iconFg: AppColors.primaryPurple,
+              onTap: () => context.push(AppRoutes.hrEmployeeNew),
+            ),
+            QuickActionButton(
+              icon: Icons.description_rounded,
+              label: AppStrings.hrHomeQuickCreateTemplate,
+              iconBg: AppColors.accentOrange.withValues(alpha: 0.12),
+              iconFg: AppColors.accentOrange,
+              onTap: () => context.push(AppRoutes.hrTemplateNew),
+            ),
+            QuickActionButton(
+              icon: Icons.assignment_turned_in_rounded,
+              label: AppStrings.hrHomeQuickAssignKra,
+              iconBg: AppColors.accentYellow.withValues(alpha: 0.20),
+              iconFg: AppColors.accentYellow,
+              onTap: () => context.push(AppRoutes.hrAssign),
+            ),
+            QuickActionButton(
+              icon: Icons.event_available_rounded,
+              label: AppStrings.hrHomeQuickNewCycle,
+              iconBg: AppColors.success.withValues(alpha: 0.12),
+              iconFg: AppColors.success,
+              onTap: () => context.push(AppRoutes.hrCycleNew),
+            ),
+          ],
         ),
-        QuickActionButton(
-          icon: Icons.description_rounded,
-          label: AppStrings.hrHomeQuickCreateTemplate,
-          iconBg: AppColors.accentOrange.withValues(alpha: 0.12),
-          iconFg: AppColors.accentOrange,
-          onTap: () => context.push(AppRoutes.hrTemplateNew),
-        ),
-        QuickActionButton(
-          icon: Icons.assignment_turned_in_rounded,
-          label: AppStrings.hrHomeQuickAssignKra,
-          iconBg: AppColors.accentYellow.withValues(alpha: 0.20),
-          iconFg: AppColors.accentYellow,
-          onTap: () => context.push(AppRoutes.hrAssign),
-        ),
-        QuickActionButton(
-          icon: Icons.event_available_rounded,
-          label: AppStrings.hrHomeQuickNewCycle,
-          iconBg: AppColors.success.withValues(alpha: 0.12),
-          iconFg: AppColors.success,
-          onTap: () => context.push(AppRoutes.hrCycleNew),
-        ),
+        if (showAdminTile) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 64,
+            child: QuickActionButton(
+              icon: Icons.admin_panel_settings_rounded,
+              label: 'Admin tools (Danger Zone)',
+              iconBg: AppColors.error.withValues(alpha: 0.14),
+              iconFg: AppColors.error,
+              onTap: () => context.push(AppRoutes.hrAdminTools),
+            ),
+          ),
+        ],
       ],
     );
   }

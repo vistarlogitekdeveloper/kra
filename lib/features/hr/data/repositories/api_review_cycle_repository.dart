@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/api/api_constants.dart';
+import '../models/bulk_operation_result.dart';
 import '../models/review_cycle.dart';
 import '../../../../core/api/envelope.dart';
 import 'review_cycle_repository.dart';
@@ -133,5 +134,36 @@ class ApiReviewCycleRepository implements ReviewCycleRepository {
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete('${ApiConstants.reviewCycles}/$id');
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
+  Future<BulkOperationResult> deleteAll() async {
+    final cycles = await list();
+    int ok = 0;
+    int bad = 0;
+    final failures = <String>[];
+    for (final c in cycles) {
+      try {
+        await delete(c.id);
+        ok += 1;
+      } catch (_) {
+        bad += 1;
+        if (failures.length < 5) failures.add(c.name);
+      }
+    }
+    return BulkOperationResult(
+      successCount: ok,
+      failureCount: bad,
+      failures: failures,
+    );
   }
 }
