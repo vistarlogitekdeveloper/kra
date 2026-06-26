@@ -330,3 +330,18 @@ final allEmployeesProvider =
   final page = await repo.list(page: 1, pageSize: 500, isActive: true);
   return page.employees;
 });
+
+/// Active employees whose role is MANAGER — feeds the "Reporting manager"
+/// dropdown on the employee create/edit form. Filtered server-side so we
+/// don't ship 500 rows to the client just to drop them on the floor.
+final allManagersProvider =
+    FutureProvider.autoDispose<List<Employee>>((ref) async {
+  final repo = ref.watch(employeeRepositoryProvider);
+  final page = await repo.list(
+    page: 1,
+    pageSize: 200,
+    role: 'MANAGER',
+    isActive: true,
+  );
+  return page.employees;
+});

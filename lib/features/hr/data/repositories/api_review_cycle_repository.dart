@@ -134,4 +134,13 @@ class ApiReviewCycleRepository implements ReviewCycleRepository {
       rethrowAsApiError(e, st);
     }
   }
+
+  @override
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete('${ApiConstants.reviewCycles}/$id');
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
 }

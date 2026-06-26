@@ -73,9 +73,13 @@ class ApiConstants {
   };
 
   // ───── Timeouts ─────
-  static const Duration connectTimeout = Duration(seconds: 15);
-  static const Duration receiveTimeout = Duration(seconds: 20);
-  static const Duration sendTimeout = Duration(seconds: 15);
+  // The backend is on Render's free tier, which sleeps after ~15 min of
+  // inactivity and takes 30–60s to wake. Timeouts MUST exceed that or the
+  // first request after idle dies before the server is up — which shows as
+  // every page stuck on its loading shimmer. Keep connect/receive ≥ 60s.
+  static const Duration connectTimeout = Duration(seconds: 60);
+  static const Duration receiveTimeout = Duration(seconds: 60);
+  static const Duration sendTimeout = Duration(seconds: 30);
 
   // ───── Response envelope keys ─────
   static const String envelopeSuccess = 'success';

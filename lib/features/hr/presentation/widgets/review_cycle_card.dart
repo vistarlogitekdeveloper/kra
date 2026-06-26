@@ -15,6 +15,7 @@ class ReviewCycleCard extends StatelessWidget {
   final VoidCallback? onActivate;
   final VoidCallback? onClose;
   final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const ReviewCycleCard({
     super.key,
@@ -23,6 +24,7 @@ class ReviewCycleCard extends StatelessWidget {
     this.onActivate,
     this.onClose,
     this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -108,6 +110,13 @@ class ReviewCycleCard extends StatelessWidget {
                       label: AppStrings.commonEdit,
                       color: AppColors.primaryPurple,
                       onTap: onEdit!,
+                    ),
+                  if (onDelete != null)
+                    _ActionChip(
+                      icon: Icons.delete_outline_rounded,
+                      label: 'Delete',
+                      color: AppColors.error,
+                      onTap: onDelete!,
                     ),
                 ],
               ),

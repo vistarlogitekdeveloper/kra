@@ -37,10 +37,16 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   final _departmentController = TextEditingController();
   final _gradeController = TextEditingController();
   final _monthlyIncentiveController = TextEditingController();
+  // Create-mode only. Edits don't change the password here — that's a
+  // separate "reset password" flow if it ships later.
+  final _passwordController = TextEditingController();
 
   String _role = 'EMPLOYEE';
   String? _projectLocationId;
+  String? _managerId;
   DateTime? _joinedDate;
+  bool _forcePasswordReset = true;
+  bool _obscurePassword = true;
   String? _serverError;
   bool _isSubmitting = false;
   bool _isDirty = false;
@@ -71,6 +77,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       _departmentController,
       _gradeController,
       _monthlyIncentiveController,
+      _passwordController,
     ]) {
       c.addListener(() => setState(() => _isDirty = true));
     }
@@ -84,6 +91,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _departmentController.dispose();
     _gradeController.dispose();
     _monthlyIncentiveController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -100,6 +108,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     setState(() {
       _role = e.role;
       _projectLocationId = e.projectLocationId;
+      _managerId = e.managerId;
       _joinedDate = e.joinedDate;
       _hydrated = true;
       _isDirty = false;
@@ -152,6 +161,13 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     final monthlyIncentive =
         incentiveText.isEmpty ? null : double.tryParse(incentiveText);
     try {
+      // ManagerId is only meaningful when the role is EMPLOYEE — other
+      // roles report through the org chart differently or sit at the top.
+      // Send `null` from non-EMPLOYEE submissions so an admin changing
+      // someone's role to MANAGER also clears their stale reporting line.
+      final managerIdForPayload =
+          _role == 'EMPLOYEE' ? _managerId : null;
+      final passwordText = _passwordController.text;
       if (widget.isEdit) {
         final updated = await repo.update(widget.employeeId!, {
           'employeeCode': _codeController.text.trim(),
@@ -162,6 +178,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               ? null
               : _departmentController.text.trim(),
           'projectLocationId': _projectLocationId,
+          'managerId': managerIdForPayload,
           'grade': _gradeController.text.trim().isEmpty
               ? null
               : _gradeController.text.trim(),
@@ -185,11 +202,15 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               ? null
               : _departmentController.text.trim(),
           projectLocationId: _projectLocationId,
+          managerId: managerIdForPayload,
           grade: _gradeController.text.trim().isEmpty
               ? null
               : _gradeController.text.trim(),
           monthlyIncentiveAmount: monthlyIncentive,
           joinedDate: _joinedDate,
+          password: passwordText.isEmpty ? null : passwordText,
+          forcePasswordReset:
+              passwordText.isEmpty ? null : _forcePasswordReset,
         );
         ref.read(employeeListProvider.notifier).prependCreated(created);
         if (!mounted) return;
@@ -340,9 +361,25 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             roles: _roles,
             onChanged: (v) => setState(() {
               _role = v;
+              // A non-EMPLOYEE role doesn't have a reporting manager
+              // here, so clear any stale selection so the payload
+              // doesn't carry it back to the server.
+              if (v != 'EMPLOYEE') _managerId = null;
               _isDirty = true;
             }),
           ),
+          // Manager picker only appears for normal employees — managers
+          // and HR roles don't report through this surface.
+          if (_role == 'EMPLOYEE') ...[
+            const SizedBox(height: 14),
+            _ManagerDropdown(
+              value: _managerId,
+              onChanged: (id) => setState(() {
+                _managerId = id;
+                _isDirty = true;
+              }),
+            ),
+          ],
           const SizedBox(height: 14),
           BrandedTextField(
             controller: _departmentController,
@@ -389,6 +426,71 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               return _fieldErrors['monthlyIncentiveAmount'];
             },
           ),
+          // Credentials are only collected on create. Editing an
+          // employee's password lives behind a separate "reset password"
+          // surface if/when it ships.
+          if (!widget.isEdit) ...[
+            const SizedBox(height: 20),
+            const _SectionHeader(title: 'Login credentials'),
+            const SizedBox(height: 6),
+            const Text(
+              'Optional. Leave blank to create the account without a '
+              'password — the employee won\'t be able to log in until '
+              'HR sets one later.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            BrandedTextField(
+              controller: _passwordController,
+              label: 'Initial password',
+              hint: 'At least 8 characters',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: _obscurePassword,
+              autofillHints: const [AutofillHints.newPassword],
+              suffixIcon: IconButton(
+                onPressed: () => setState(
+                    () => _obscurePassword = !_obscurePassword),
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 20,
+                ),
+              ),
+              validator: (v) {
+                final t = v ?? '';
+                if (t.isEmpty) return null; // optional
+                if (t.length < 8) {
+                  return AppStrings.validationPasswordTooShort;
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              value: _forcePasswordReset,
+              onChanged: _passwordController.text.isEmpty
+                  ? null
+                  : (v) => setState(
+                      () => _forcePasswordReset = v ?? false),
+              title: const Text(
+                'Require employee to change this password on first sign-in',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              activeColor: AppColors.primaryPurple,
+            ),
+          ],
           const SizedBox(height: 28),
           BrandedPrimaryButton(
             label: AppStrings.commonSave,
@@ -489,6 +591,87 @@ class _RoleDropdown extends StatelessWidget {
               },
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "Reporting manager" picker — mirrors the [_LocationDropdown] pattern.
+/// Only rendered when the employee's role is EMPLOYEE (managers don't
+/// report through this surface). If the saved manager isn't in the
+/// active list (e.g. they left the org and were deactivated) we surface
+/// it as an orphan item so the dropdown can render without asserting.
+class _ManagerDropdown extends ConsumerWidget {
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  const _ManagerDropdown({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final managersAsync = ref.watch(allManagersProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Reporting manager',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        managersAsync.when(
+          loading: () => const _LocationDropdownShell(
+            child: ShimmerBox(height: 16, borderRadius: 6),
+          ),
+          error: (_, __) => const _LocationDropdownShell(
+            child: Text(
+              'Failed to load managers',
+              style: TextStyle(fontSize: 14, color: AppColors.error),
+            ),
+          ),
+          data: (managers) {
+            final hasOrphan =
+                value != null && !managers.any((m) => m.id == value);
+            return InputDecorator(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.supervisor_account_outlined, size: 20),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: value,
+                  isExpanded: true,
+                  hint: const Text(
+                    'Select manager',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('— None —'),
+                    ),
+                    if (hasOrphan)
+                      DropdownMenuItem<String?>(
+                        value: value,
+                        child: const Text('(current — inactive)'),
+                      ),
+                    for (final m in managers)
+                      DropdownMenuItem<String?>(
+                        value: m.id,
+                        child: Text(
+                          '${m.fullName} · ${m.employeeCode}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: onChanged,
+                ),
+              ),
+            );
+          },
         ),
       ],
     );

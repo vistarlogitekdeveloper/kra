@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_strings.dart';
 import 'shimmer_skeletons.dart';
+import 'slow_load_hint.dart';
 
 /// Infinite-scroll list that adheres to the CLAUDE.md convention:
 ///
@@ -117,7 +118,8 @@ class _PagedListViewState<T> extends State<PagedListView<T>> {
     if (!_controller.hasClients) return;
     if (widget.isLoadingMore || !widget.hasMore) return;
     final position = _controller.position;
-    if (position.pixels >= position.maxScrollExtent - widget.loadMoreThreshold) {
+    if (position.pixels >=
+        position.maxScrollExtent - widget.loadMoreThreshold) {
       widget.onLoadMore();
     }
   }
@@ -133,14 +135,19 @@ class _PagedListViewState<T> extends State<PagedListView<T>> {
 
   Widget _buildBody() {
     if (widget.isInitialLoading) {
+      // index 0 is the slow-load hint (renders nothing until ~7s); the
+      // rest are skeleton rows.
       return ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: widget.padding,
-        itemCount: widget.skeletonItemCount,
-        itemBuilder: (_, __) => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 6),
-          child: ListItemSkeleton(),
-        ),
+        itemCount: widget.skeletonItemCount + 1,
+        itemBuilder: (_, i) {
+          if (i == 0) return const SlowLoadHint();
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            child: ListItemSkeleton(),
+          );
+        },
       );
     }
     if (widget.initialError != null && widget.items.isEmpty) {

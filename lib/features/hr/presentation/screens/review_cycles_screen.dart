@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
+import '../../../../core/widgets/slow_load_hint.dart';
 import '../providers/review_cycle_providers.dart';
 import '../widgets/confirm_action_dialog.dart';
 import '../widgets/empty_state.dart';
@@ -39,8 +40,8 @@ class ReviewCyclesScreen extends ConsumerWidget {
         child: cycles.when(
           loading: () => ListView(
             padding: const EdgeInsets.all(16),
-            physics: const NeverScrollableScrollPhysics(),
             children: const [
+              SlowLoadHint(),
               ShimmerBox(height: 160, borderRadius: 16),
               SizedBox(height: 14),
               ShimmerBox(height: 160, borderRadius: 16),
@@ -89,6 +90,7 @@ class ReviewCyclesScreen extends ConsumerWidget {
                   cycle: cycle,
                   onActivate: () => _activate(context, ref, cycle.id),
                   onClose: () => _close(context, ref, cycle.id),
+                  onDelete: () => _delete(context, ref, cycle.id, cycle.name),
                 );
               },
             );
@@ -122,6 +124,35 @@ class ReviewCyclesScreen extends ConsumerWidget {
               ? AppStrings.reviewCyclesActivateSuccess
               : AppStrings.reviewCyclesActivateFailed,
         ),
+        backgroundColor: success ? AppColors.textPrimary : AppColors.error,
+      ),
+    );
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    String name,
+  ) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: 'Delete review cycle?',
+      message: 'Permanently removes "$name" and every assignment + review '
+          'tied to it. This cannot be undone.',
+      confirmLabel: 'Delete cycle',
+      icon: Icons.delete_outline_rounded,
+      accentColor: AppColors.error,
+    );
+    if (ok != true || !context.mounted) return;
+    final success =
+        await ref.read(reviewCyclesProvider.notifier).deleteOptimistic(id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Cycle deleted.'
+            : 'Could not delete cycle. It may have active reviews.'),
         backgroundColor: success ? AppColors.textPrimary : AppColors.error,
       ),
     );

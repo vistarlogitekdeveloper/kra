@@ -26,6 +26,8 @@ abstract class EmployeeRepository {
     String? grade,
     double? monthlyIncentiveAmount,
     DateTime? joinedDate,
+    String? password,
+    bool? forcePasswordReset,
   });
 
   /// Patches a subset of fields. Pass only the fields that changed —

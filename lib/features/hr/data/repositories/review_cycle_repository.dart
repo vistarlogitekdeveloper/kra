@@ -21,4 +21,9 @@ abstract class ReviewCycleRepository {
   /// Moves an ACTIVE cycle to CLOSED. Irreversible client-side; HR has
   /// to open a fresh cycle to make further changes.
   Future<ReviewCycle> close(String id);
+
+  /// Hard-delete a single cycle via `DELETE /review-cycles/:id`. The
+  /// backend cascades to any KRA assignments + reviews tied to the
+  /// cycle, so this is irreversible — gate behind a confirm dialog.
+  Future<void> delete(String id);
 }

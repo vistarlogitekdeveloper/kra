@@ -42,6 +42,10 @@ class AppStrings {
   static const String offlineLoginDisabled =
       'You\'re offline. Reconnect to sign in.';
 
+  // ───── Loading ─────
+  static const String slowLoadHint =
+      'Waking up the server… this can take up to a minute on the first load.';
+
   // ───── Errors (fallback / generic) ─────
   static const String errorGeneric = 'Something went wrong. Please try again.';
   static const String errorSessionEnded =
@@ -264,6 +268,14 @@ class AppStrings {
   static const String employeeDetailIncentiveTitle = 'Performance incentive';
   static const String employeeDetailMonthlyIncentive = 'Monthly incentive';
   static const String employeeDetailIncentiveNotSet = 'Not set (org default)';
+
+  // Assign-from-detail quick action
+  static const String employeeIncentiveSetCta = 'Set';
+  static const String employeeIncentiveEditCta = 'Edit';
+  static const String employeeIncentiveSheetTitle =
+      'Assign performance incentive';
+  static const String employeeIncentiveClear = 'Clear override';
+  static const String employeeIncentiveSaved = 'Performance incentive updated.';
 
   // ───── Reports placeholder ─────
   static const String hrReportsTitle = 'Reports';
