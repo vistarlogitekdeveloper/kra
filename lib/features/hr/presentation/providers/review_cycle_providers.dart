@@ -12,7 +12,8 @@ final reviewCycleRepositoryProvider = Provider<ReviewCycleRepository>((ref) {
 /// Mutable, optimistic list state. Lifecycle hooks like activate/close
 /// flip status locally before the network call resolves so the UI feels
 /// snappy; on failure we revert + surface a snackbar at the call site.
-class ReviewCycleListController extends StateNotifier<AsyncValue<List<ReviewCycle>>> {
+class ReviewCycleListController
+    extends StateNotifier<AsyncValue<List<ReviewCycle>>> {
   final ReviewCycleRepository _repository;
 
   ReviewCycleListController(this._repository)
@@ -127,6 +128,32 @@ class ReviewCycleListController extends StateNotifier<AsyncValue<List<ReviewCycl
     }
   }
 
+  /// Deletes every cycle regardless of status — the admin "delete all"
+  /// action. Each successful delete is removed from the list as it lands;
+  /// rows the backend refuses are left in place. Returns counts so the
+  /// caller can report partial failures.
+  Future<({int deleted, int failed})> deleteAll() async {
+    final current = state.value;
+    if (current == null || current.isEmpty) {
+      return (deleted: 0, failed: 0);
+    }
+    var deleted = 0;
+    var failed = 0;
+    // Snapshot ids up front — state is mutated as we go.
+    for (final id in current.map((c) => c.id).toList()) {
+      try {
+        await _repository.delete(id);
+        deleted++;
+        state = AsyncValue.data(
+          [...?state.value]..removeWhere((c) => c.id == id),
+        );
+      } catch (_) {
+        failed++;
+      }
+    }
+    return (deleted: deleted, failed: failed);
+  }
+
   /// Optimistic close. Same shape as [activateOptimistic].
   Future<bool> closeOptimistic(String id) async {
     final current = state.value;
@@ -160,8 +187,8 @@ class ReviewCycleListController extends StateNotifier<AsyncValue<List<ReviewCycl
   }
 }
 
-final reviewCyclesProvider = StateNotifierProvider<
-    ReviewCycleListController, AsyncValue<List<ReviewCycle>>>((ref) {
+final reviewCyclesProvider = StateNotifierProvider<ReviewCycleListController,
+    AsyncValue<List<ReviewCycle>>>((ref) {
   return ReviewCycleListController(ref.watch(reviewCycleRepositoryProvider));
 });
 
