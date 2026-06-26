@@ -231,6 +231,14 @@ class AppStrings {
   static const String reviewCyclesEmptyCta = 'New Review Cycle';
   static const String reviewCyclesActivate = 'Activate';
   static const String reviewCyclesClose = 'Close cycle';
+  // Admin-only bulk delete (deletes every cycle, including active ones).
+  static const String reviewCyclesDeleteAllTooltip = 'Delete all cycles';
+  static const String reviewCyclesDeleteAllTitle = 'Delete ALL review cycles?';
+  static const String reviewCyclesDeleteAllMessage =
+      'Permanently removes every review cycle — including any that are '
+      'active — along with all assignments and reviews tied to them. This '
+      'cannot be undone.';
+  static const String reviewCyclesDeleteAllConfirm = 'Delete all';
   static const String reviewCyclesActivateConfirmTitle = 'Activate this cycle?';
   static const String reviewCyclesActivateConfirmMessage =
       'Employees will be able to start self-rating once this cycle is active.';

@@ -7,6 +7,8 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/slow_load_hint.dart';
+import '../../../auth/data/models/user.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../providers/review_cycle_providers.dart';
 import '../widgets/confirm_action_dialog.dart';
 import '../widgets/empty_state.dart';
@@ -19,6 +21,16 @@ class ReviewCyclesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cycles = ref.watch(reviewCyclesProvider);
 
+    // "Delete all" is a destructive admin power — limit it to the elevated
+    // roles (ADMIN / HR_ADMIN).
+    final authState = ref.watch(authStateProvider);
+    final role = authState is AuthAuthenticated ? authState.user.role : null;
+    final canWipe = role == UserRole.admin || role == UserRole.hrAdmin;
+    final hasCycles = cycles.maybeWhen(
+      data: (list) => list.isNotEmpty,
+      orElse: () => false,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -26,6 +38,15 @@ class ReviewCyclesScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
+        actions: [
+          if (canWipe && hasCycles)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_outlined),
+              color: AppColors.error,
+              tooltip: AppStrings.reviewCyclesDeleteAllTooltip,
+              onPressed: () => _deleteAll(context, ref),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primaryPurple,
@@ -125,6 +146,32 @@ class ReviewCyclesScreen extends ConsumerWidget {
               : AppStrings.reviewCyclesActivateFailed,
         ),
         backgroundColor: success ? AppColors.textPrimary : AppColors.error,
+      ),
+    );
+  }
+
+  Future<void> _deleteAll(BuildContext context, WidgetRef ref) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.reviewCyclesDeleteAllTitle,
+      message: AppStrings.reviewCyclesDeleteAllMessage,
+      confirmLabel: AppStrings.reviewCyclesDeleteAllConfirm,
+      icon: Icons.delete_sweep_outlined,
+      accentColor: AppColors.error,
+    );
+    if (ok != true || !context.mounted) return;
+    final result = await ref.read(reviewCyclesProvider.notifier).deleteAll();
+    if (!context.mounted) return;
+    final message = result.failed == 0
+        ? 'Deleted ${result.deleted} '
+            'cycle${result.deleted == 1 ? '' : 's'}.'
+        : 'Deleted ${result.deleted}, but ${result.failed} could not be '
+            'removed (the server refused — they may be locked).';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            result.failed == 0 ? AppColors.textPrimary : AppColors.error,
       ),
     );
   }
