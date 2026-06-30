@@ -6,9 +6,17 @@ import '../../data/models/monthly_review_summary.dart';
 import '../../data/repositories/mock_monthly_review_repository.dart';
 import '../../data/repositories/monthly_review_repository.dart';
 
-/// Single swap point for the data layer. Returns the in-memory mock today;
-/// replace the body with `ApiMonthlyReviewRepository(...)` once the monthly
-/// backend ships — no other file changes.
+/// Single swap point for the data layer.
+///
+/// Returns the in-memory mock today. To go live once the monthly backend
+/// ships, swap the body to (and add the imports for `dio_client.dart` +
+/// `api_monthly_review_repository.dart`):
+///
+///     return ApiMonthlyReviewRepository(dio: ref.read(dioProvider));
+///
+/// `ApiMonthlyReviewRepository` is already implemented against the proposed
+/// contract on `ApiConstants.monthlyReviews` — confirm its paths/JSON
+/// against the real backend first. No other file changes needed.
 final monthlyReviewRepositoryProvider =
     Provider<MonthlyReviewRepository>((ref) {
   return MockMonthlyReviewRepository();

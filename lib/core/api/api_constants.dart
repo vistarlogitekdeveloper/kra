@@ -52,6 +52,17 @@ class ApiConstants {
   // Body must include `side: 'MANAGER'`.
   static const String reviewsScores = '/reviews';
 
+  // ───── Monthly reviews (new 5-stage pipeline) ─────
+  // PROPOSED contract — confirm/adjust against the real monthly backend.
+  // Sub-paths are constructed by ApiMonthlyReviewRepository:
+  //   GET  $monthlyReviews/periods            → ["2026-06", ...]
+  //   GET  $monthlyReviews?period=YYYY-MM      → [MonthlyReview...] (scoped
+  //                                              server-side from the token)
+  //   GET  $monthlyReviews/:id                 → MonthlyReview
+  //   POST $monthlyReviews/:id/stages/:stage   → submit/advance a stage
+  //   POST $monthlyReviews/:id/payout          → mark incentive paid
+  static const String monthlyReviews = '/reviews/monthly';
+
   // ───── Endpoints that should NOT have a Bearer token attached ─────
   // Marked via options.extra['skipAuth'] = true at the call site.
   // /auth/me explicitly is NOT in this list — it requires a valid
