@@ -84,7 +84,7 @@ class AppStrings {
   static const String hrShellHome = 'Home';
   static const String hrShellEmployees = 'Employees';
   static const String hrShellTemplates = 'Templates';
-  static const String hrShellCycles = 'Cycles';
+  static const String hrShellReviews = 'Reviews';
   static const String hrShellReports = 'Reports';
 
   // ───── HR home ─────
@@ -102,7 +102,7 @@ class AppStrings {
   static const String hrHomeQuickAddEmployee = 'Add Employee';
   static const String hrHomeQuickCreateTemplate = 'Create Template';
   static const String hrHomeQuickAssignKra = 'Assign KRAs';
-  static const String hrHomeQuickNewCycle = 'New Review Cycle';
+  static const String hrHomeQuickReviews = 'Monthly Reviews';
   static const String hrHomeNoActivity = 'No recent activity yet.';
   static const String hrHomeDaysRemaining = 'days remaining';
   static const String hrHomeDayRemaining = 'day remaining';

@@ -31,7 +31,6 @@ import '../../features/hr/presentation/screens/kra_assign_screen.dart';
 import '../../features/hr/presentation/screens/kra_template_form_screen.dart';
 import '../../features/hr/presentation/screens/kra_templates_screen.dart';
 import '../../features/hr/presentation/screens/locations_screen.dart';
-import '../../features/hr/presentation/screens/review_cycle_form_screen.dart';
 import '../../features/manager/presentation/screens/manager_shell_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_confirm_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_result_screen.dart';
@@ -48,7 +47,6 @@ import '../../features/manager/presentation/screens/my_team/review/review_detail
     as manager_review;
 import '../../features/manager/presentation/screens/my_team/team/team_list_screen.dart';
 import '../../features/manager/presentation/screens/my_team/team/team_member_profile_screen.dart';
-import '../../features/hr/presentation/screens/review_cycles_screen.dart';
 
 /// Centralised route paths — never use raw strings at call sites.
 class AppRoutes {
@@ -88,8 +86,9 @@ class AppRoutes {
   static const String hrTemplates = '/hr/kra-templates';
   static const String hrTemplateNew = '/hr/kra-templates/new';
   static const String hrAssign = '/hr/assign';
-  static const String hrCycles = '/hr/cycles';
-  static const String hrCycleNew = '/hr/cycles/new';
+  // Replaced the old review-cycles surface with the monthly reviews
+  // dashboard (the HR "Reviews" tab).
+  static const String hrReviews = '/hr/reviews';
   static const String hrReports = '/hr/reports';
   static const String hrLocations = '/hr/locations';
   static const String hrBulkSetup = '/hr/bulk-setup';
@@ -513,8 +512,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.hrCycles,
-                builder: (_, __) => const ReviewCyclesScreen(),
+                path: AppRoutes.hrReviews,
+                builder: (_, __) => const MonthlyReviewDashboardScreen(),
               ),
             ],
           ),
@@ -570,10 +569,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => KraTemplateFormScreen(
           templateId: state.pathParameters['id'],
         ),
-      ),
-      GoRoute(
-        path: AppRoutes.hrCycleNew,
-        builder: (_, __) => const ReviewCycleFormScreen(),
       ),
       GoRoute(
         path: AppRoutes.hrAuditLog,
