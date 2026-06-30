@@ -5,13 +5,16 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../data/models/bulk_assign_result.dart';
 import '../../data/models/employee.dart';
 import '../../data/models/kra_template.dart';
+import '../../data/models/review_cycle.dart';
 import '../providers/employee_providers.dart';
 import '../providers/kra_assignment_providers.dart';
 import '../providers/kra_template_providers.dart';
+import '../providers/review_cycle_providers.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/kra_template_card.dart';
 import '../widgets/weightage_indicator.dart';
@@ -19,10 +22,7 @@ import '../widgets/weightage_indicator.dart';
 /// 3-step KRA assignment wizard:
 ///   1. Pick employees (multi-select with search)
 ///   2. Pick template (filtered list)
-///   3. Review & confirm
-///
-/// Assignment is per-employee (monthly reviews are generated from the
-/// assigned template each month) — there is no review-cycle to pick.
+///   3. Review & confirm (cycle picker + summary)
 ///
 /// State is held in [_AssignWizardState] so step transitions don't
 /// re-fetch data. Bulk-assign happens on the final step's confirm tap.
@@ -54,6 +54,7 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
 
   String _employeeSearch = '';
   KraTemplate? _selectedTemplate;
+  ReviewCycle? _selectedCycle;
   bool _isSubmitting = false;
   bool _isLoadingTemplate = false;
   String? _serverError;
@@ -117,6 +118,8 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
           key: const ValueKey('step3'),
           selectedEmployeeCount: _selectedEmployeeIds.length,
           selectedTemplate: _selectedTemplate!,
+          selectedCycle: _selectedCycle,
+          onCycleSelected: (c) => setState(() => _selectedCycle = c),
           serverError: _serverError,
         );
       default:
@@ -138,7 +141,7 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
             _selectedTemplate!.hasWeightageData &&
             _selectedTemplate!.hasValidWeightage;
       case 2:
-        return !_isSubmitting;
+        return _selectedCycle != null && !_isSubmitting;
       default:
         return false;
     }
@@ -234,7 +237,8 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.4,
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation(Colors.white),
                         ),
                       )
                     : Icon(
@@ -243,7 +247,9 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
                             : Icons.arrow_forward_rounded,
                       ),
                 label: Text(
-                  isLast ? AppStrings.commonConfirm : AppStrings.commonNext,
+                  isLast
+                      ? AppStrings.commonConfirm
+                      : AppStrings.commonNext,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 style: FilledButton.styleFrom(
@@ -267,14 +273,16 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
       _serverError = null;
     });
     try {
-      final result = await ref.read(kraAssignmentActionsProvider).bulkAssign(
-            employeeIds: _selectedEmployeeIds.toList(),
-            templateId: _selectedTemplate!.id,
-          );
+      final result =
+          await ref.read(kraAssignmentActionsProvider).bulkAssign(
+                employeeIds: _selectedEmployeeIds.toList(),
+                cycleId: _selectedCycle!.id,
+                templateId: _selectedTemplate!.id,
+              );
       if (!mounted) return;
-      // Backend is idempotent: employees who already have this template
-      // come back under `skippedEmployeeIds`. Surface that honestly
-      // instead of pretending we created N rows.
+      // Backend is idempotent: employees who already have an assignment
+      // for this cycle come back under `skippedEmployeeIds`. Surface that
+      // honestly instead of pretending we created N rows.
       final msg = _formatBulkResultMessage(result);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg)),
@@ -294,8 +302,8 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
     final skipped = result.skippedCount;
     if (created == 0 && skipped > 0) {
       return skipped == 1
-          ? 'This employee already has this template.'
-          : 'All $skipped employees already had this template.';
+          ? 'This employee already has this template for the selected cycle.'
+          : 'All $skipped employees already had this template for the selected cycle.';
     }
     if (skipped == 0) {
       return created == 1
@@ -366,8 +374,9 @@ class _StepDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        completed || active ? AppColors.primaryPurple : AppColors.textMuted;
+    final color = completed || active
+        ? AppColors.primaryPurple
+        : AppColors.textMuted;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -383,7 +392,8 @@ class _StepDot extends StatelessWidget {
             border: Border.all(color: color, width: 1.5),
           ),
           child: completed
-              ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+              ? const Icon(Icons.check_rounded,
+                  color: Colors.white, size: 16)
               : Text(
                   '$index',
                   style: TextStyle(
@@ -477,7 +487,9 @@ class _Step1Employees extends ConsumerWidget {
                           e.employeeCode
                               .toLowerCase()
                               .contains(search.toLowerCase()) ||
-                          e.email.toLowerCase().contains(search.toLowerCase()))
+                          e.email
+                              .toLowerCase()
+                              .contains(search.toLowerCase()))
                       .toList();
               if (filtered.isEmpty) {
                 return const EmptyState(
@@ -544,7 +556,8 @@ class _EmployeeSelectTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: const BoxDecoration(
             border: Border(
               bottom: BorderSide(color: AppColors.divider),
@@ -646,7 +659,8 @@ class _Step2Template extends ConsumerWidget {
                     template: tpl,
                     selected: isSelected,
                     isLoading: isSelected && isLoading,
-                    onTap: () => onSelect(isSelected ? null : tpl),
+                    onTap: () =>
+                        onSelect(isSelected ? null : tpl),
                   );
                 },
               );
@@ -708,20 +722,25 @@ class _TemplateOptionTile extends StatelessWidget {
 
 // ───── Step 3: review & confirm ─────
 
-class _Step3Review extends StatelessWidget {
+class _Step3Review extends ConsumerWidget {
   final int selectedEmployeeCount;
   final KraTemplate selectedTemplate;
+  final ReviewCycle? selectedCycle;
+  final ValueChanged<ReviewCycle?> onCycleSelected;
   final String? serverError;
 
   const _Step3Review({
     super.key,
     required this.selectedEmployeeCount,
     required this.selectedTemplate,
+    required this.selectedCycle,
+    required this.onCycleSelected,
     required this.serverError,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cycles = ref.watch(reviewCyclesProvider);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -770,6 +789,58 @@ class _Step3Review extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         WeightageIndicator(total: selectedTemplate.totalWeightage),
+        const SizedBox(height: 16),
+        const Text(
+          AppStrings.kraAssignSelectCycle,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+            letterSpacing: 0.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        cycles.when(
+          loading: () => const SizedBox(
+            height: 56,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: ShimmerBox(height: 24, borderRadius: 8),
+            ),
+          ),
+          error: (e, _) => Text(
+            e.toString(),
+            style: const TextStyle(color: AppColors.error),
+          ),
+          data: (list) {
+            final eligible = list
+                .where(
+                  (c) =>
+                      c.status == ReviewCycleStatus.active ||
+                      c.status == ReviewCycleStatus.draft,
+                )
+                .toList();
+            if (eligible.isEmpty) {
+              return const EmptyState(
+                icon: Icons.event_busy_rounded,
+                title: AppStrings.kraAssignNoCycle,
+                message: AppStrings.reviewCyclesEmptyMessage,
+                compact: true,
+              );
+            }
+            return Column(
+              children: eligible
+                  .map((c) => _CycleOptionTile(
+                        cycle: c,
+                        selected: selectedCycle?.id == c.id,
+                        onTap: () => onCycleSelected(
+                          selectedCycle?.id == c.id ? null : c,
+                        ),
+                      ))
+                  .toList(),
+            );
+          },
+        ),
       ],
     );
   }
@@ -830,6 +901,106 @@ class _SummaryRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CycleOptionTile extends StatelessWidget {
+  final ReviewCycle cycle;
+  final bool selected;
+  final VoidCallback onTap;
+  const _CycleOptionTile({
+    required this.cycle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primaryPurple.withValues(alpha: 0.06)
+                : AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primaryPurple
+                  : AppColors.divider,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Custom radio indicator — Material's Radio<T> requires a
+              // RadioGroup ancestor on Flutter 3.32+, but a hand-rolled
+              // dot is simpler and works on every supported SDK.
+              _RadioDot(selected: selected),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cycle.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cycle.status.displayName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RadioDot extends StatelessWidget {
+  final bool selected;
+  const _RadioDot({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? AppColors.primaryPurple : AppColors.textMuted,
+          width: 2,
+        ),
+      ),
+      child: selected
+          ? Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primaryPurple,
+              ),
+            )
+          : null,
     );
   }
 }

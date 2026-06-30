@@ -5,8 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/data/models/user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
-import '../../features/reviews/presentation/screens/monthly_review_detail_screen.dart';
 import '../widgets/route_error_screen.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
 import '../../features/employee/presentation/screens/history/my_reviews_history_screen.dart';
@@ -17,6 +15,7 @@ import '../../features/employee/presentation/screens/profile/my_profile_screen.d
 import '../../features/employee/presentation/screens/profile/my_reporting_tree_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_locked_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_review_screen.dart';
+import '../../features/employee/presentation/screens/self_rate/self_rate_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_success_screen.dart';
 import '../../features/hr/presentation/screens/audit_log_screen.dart';
 import '../../features/hr/presentation/screens/bulk_setup_screen.dart';
@@ -30,9 +29,11 @@ import '../../features/hr/presentation/screens/kra_assign_screen.dart';
 import '../../features/hr/presentation/screens/kra_template_form_screen.dart';
 import '../../features/hr/presentation/screens/kra_templates_screen.dart';
 import '../../features/hr/presentation/screens/locations_screen.dart';
+import '../../features/hr/presentation/screens/review_cycle_form_screen.dart';
 import '../../features/manager/presentation/screens/manager_shell_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_confirm_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_result_screen.dart';
+import '../../features/manager/presentation/screens/my_team/dashboard/manager_dashboard_screen.dart';
 import '../../features/manager/presentation/screens/my_team/history/team_history_screen.dart';
 import '../../features/manager/presentation/screens/my_team/history/team_member_history_screen.dart';
 import '../../features/manager/presentation/screens/my_team/my_team_shell.dart';
@@ -45,6 +46,7 @@ import '../../features/manager/presentation/screens/my_team/review/review_detail
     as manager_review;
 import '../../features/manager/presentation/screens/my_team/team/team_list_screen.dart';
 import '../../features/manager/presentation/screens/my_team/team/team_member_profile_screen.dart';
+import '../../features/hr/presentation/screens/review_cycles_screen.dart';
 
 /// Centralised route paths — never use raw strings at call sites.
 class AppRoutes {
@@ -54,11 +56,6 @@ class AppRoutes {
   static const String employeeDashboard = '/employee';
   static const String managerDashboard = '/manager';
   static const String hrDashboard = '/hr';
-
-  // ── Monthly reviews (new pipeline) — role-adaptive, top-level so any
-  // login can reach it. Phase 3 wires these into the role shells.
-  static const String monthlyReviews = '/reviews/monthly';
-  static String monthlyReviewDetail(String id) => '/reviews/monthly/$id';
 
   // ── Employee module nested routes ──
   // Every authenticated user (except ADMIN) lands inside /employee/* —
@@ -84,9 +81,8 @@ class AppRoutes {
   static const String hrTemplates = '/hr/kra-templates';
   static const String hrTemplateNew = '/hr/kra-templates/new';
   static const String hrAssign = '/hr/assign';
-  // Replaced the old review-cycles surface with the monthly reviews
-  // dashboard (the HR "Reviews" tab).
-  static const String hrReviews = '/hr/reviews';
+  static const String hrCycles = '/hr/cycles';
+  static const String hrCycleNew = '/hr/cycles/new';
   static const String hrReports = '/hr/reports';
   static const String hrLocations = '/hr/locations';
   static const String hrBulkSetup = '/hr/bulk-setup';
@@ -261,22 +257,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const LoginScreen(),
       ),
 
-      // ───── Monthly reviews (new pipeline) ─────
-      // Top-level, role-adaptive, full-screen. Reachable by any signed-in
-      // user; Phase 3 wires these into the per-role shells.
-      GoRoute(
-        path: AppRoutes.monthlyReviews,
-        builder: (_, __) => const MonthlyReviewDashboardScreen(),
-        routes: [
-          GoRoute(
-            path: ':id',
-            builder: (_, state) => MonthlyReviewDetailScreen(
-              reviewId: state.pathParameters['id']!,
-            ),
-          ),
-        ],
-      ),
-
       // ───── Employee module ─────
       // StatefulShellRoute keeps each tab's nav stack alive across
       // tab switches — important for the self-rate flow where the
@@ -300,16 +280,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // ── Tab 2: Reviews (monthly pipeline) ──
-          // Re-rooted from the old cycle-era self-rate form to the monthly
-          // review dashboard; the employee opens their month and self-rates
-          // from there. The legacy self-rate sub-screens remain nested for
-          // any deep links but are no longer the tab's surface.
+          // ── Tab 2: Self-Rate (form + 3 sub-screens) ──
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: AppRoutes.employeeSelfRate,
-                builder: (_, __) => const MonthlyReviewDashboardScreen(),
+                builder: (_, __) => const SelfRateScreen(),
                 routes: [
                   GoRoute(
                     path: 'review',
@@ -384,9 +360,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: AppRoutes.managerTeamDashboard,
-                    // Re-rooted to the monthly review dashboard — the
-                    // manager's team reviews per month.
-                    builder: (_, __) => const MonthlyReviewDashboardScreen(),
+                    builder: (_, __) => const ManagerDashboardScreen(),
                   ),
                 ],
               ),
@@ -516,8 +490,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.hrReviews,
-                builder: (_, __) => const MonthlyReviewDashboardScreen(),
+                path: AppRoutes.hrCycles,
+                builder: (_, __) => const ReviewCyclesScreen(),
               ),
             ],
           ),
@@ -573,6 +547,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => KraTemplateFormScreen(
           templateId: state.pathParameters['id'],
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.hrCycleNew,
+        builder: (_, __) => const ReviewCycleFormScreen(),
       ),
       GoRoute(
         path: AppRoutes.hrAuditLog,

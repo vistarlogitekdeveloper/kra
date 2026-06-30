@@ -9,7 +9,6 @@ import '../../../../../../core/widgets/shimmer_box.dart';
 import '../../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../../../core/widgets/slow_load_hint.dart';
 import '../../../../../employee/presentation/widgets/deadline_chip.dart';
-import '../../../../../reviews/presentation/widgets/monthly_reviews_entry_banner.dart';
 import '../../../../data/models/manager_dashboard.dart';
 import '../../../providers/manager_dashboard_providers.dart';
 import 'widgets/manager_greeting_card.dart';
@@ -82,7 +81,6 @@ class _DashboardBody extends StatelessWidget {
       padding: const EdgeInsets.only(top: 4, bottom: 28),
       children: [
         ManagerGreetingCard(manager: dashboard.manager),
-        const MonthlyReviewsEntryBanner(),
         ManagerStatsGrid(stats: dashboard.stats),
         if (dashboard.activeCycle != null)
           _ActiveCycleCard(cycle: dashboard.activeCycle!),
