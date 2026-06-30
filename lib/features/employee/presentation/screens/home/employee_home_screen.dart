@@ -7,6 +7,7 @@ import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../reviews/presentation/widgets/monthly_reviews_entry_banner.dart';
 import '../../../data/models/employee_dashboard.dart';
 import '../../providers/employee_dashboard_providers.dart';
 import '../../providers/my_profile_providers.dart';
@@ -82,6 +83,7 @@ class EmployeeHomeScreen extends ConsumerWidget {
                 employeeCode: employeeCode,
                 roleLabel: roleLabel,
               ),
+              const MonthlyReviewsEntryBanner(),
               const _DeadlineBannerSection(),
               const _CurrentMonthSection(),
               const _MyKrasSection(),

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/data/models/user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
+import '../../features/reviews/presentation/screens/monthly_review_detail_screen.dart';
 import '../widgets/route_error_screen.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
 import '../../features/employee/presentation/screens/history/my_reviews_history_screen.dart';
@@ -56,6 +58,11 @@ class AppRoutes {
   static const String employeeDashboard = '/employee';
   static const String managerDashboard = '/manager';
   static const String hrDashboard = '/hr';
+
+  // ── Monthly reviews (new pipeline) — role-adaptive, top-level so any
+  // login can reach it. Phase 3 wires these into the role shells.
+  static const String monthlyReviews = '/reviews/monthly';
+  static String monthlyReviewDetail(String id) => '/reviews/monthly/$id';
 
   // ── Employee module nested routes ──
   // Every authenticated user (except ADMIN) lands inside /employee/* —
@@ -255,6 +262,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.login,
         builder: (_, __) => const LoginScreen(),
+      ),
+
+      // ───── Monthly reviews (new pipeline) ─────
+      // Top-level, role-adaptive, full-screen. Reachable by any signed-in
+      // user; Phase 3 wires these into the per-role shells.
+      GoRoute(
+        path: AppRoutes.monthlyReviews,
+        builder: (_, __) => const MonthlyReviewDashboardScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, state) => MonthlyReviewDetailScreen(
+              reviewId: state.pathParameters['id']!,
+            ),
+          ),
+        ],
       ),
 
       // ───── Employee module ─────

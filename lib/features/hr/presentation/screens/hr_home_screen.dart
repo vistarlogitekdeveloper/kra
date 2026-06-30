@@ -11,6 +11,7 @@ import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../core/widgets/slow_load_hint.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../reviews/presentation/widgets/monthly_reviews_entry_banner.dart';
 import '../../data/models/hr_dashboard_models.dart';
 import '../providers/hr_dashboard_providers.dart';
 import '../widgets/_formatters.dart';
@@ -74,6 +75,7 @@ class HrHomeScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             children: const [
               _OverviewSection(),
+              MonthlyReviewsEntryBanner(),
               SizedBox(height: 24),
               _SectionHeader(title: AppStrings.hrHomeQuickActions),
               SizedBox(height: 10),

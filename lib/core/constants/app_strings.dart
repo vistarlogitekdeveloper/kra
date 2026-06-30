@@ -424,6 +424,32 @@ class AppStrings {
   static const String deadlineSelfRatingTitle = 'Self-rating deadline';
   static const String deadlineManagerRatingTitle = 'Manager rating deadline';
 
+  // ───── Monthly reviews (new pipeline) ─────
+  static const String monthlyReviewsTitleSelf = 'My Monthly Reviews';
+  static const String monthlyReviewsTitleTeam = 'Team Monthly Reviews';
+  static const String monthlyReviewsTitleAll = 'Monthly Reviews';
+  static const String monthlyReviewsNavPreview = 'Monthly Reviews (preview)';
+  static const String monthlyReviewsEmpty = 'No reviews for this month.';
+  static const String monthlyReviewsNeedsYou = 'Needs you';
+  static const String monthlyReviewsWaitingOn = 'Waiting on';
+  static const String monthlyReviewStageDone = 'Done';
+  static const String monthlyReviewSubmit = 'Submit rating';
+  static const String monthlyReviewApprove = 'Approve';
+  static const String monthlyReviewReturn = 'Return for rework';
+  static const String monthlyReviewMarkPaid = 'Mark incentive paid';
+  static const String monthlyReviewCommentLabel = 'Comment (optional)';
+  static const String monthlyReviewScoreHint = 'Score';
+  static const String monthlyReviewRemarkHint = 'Remark (optional)';
+  static const String monthlyReviewSubmitted = 'Rating submitted.';
+  static const String monthlyReviewApproved = 'Approved — sent to payout.';
+  static const String monthlyReviewReturned =
+      'Returned to the reporting manager.';
+  static const String monthlyReviewPaid = 'Incentive marked as paid.';
+  static const String monthlyReviewActionFailed =
+      'Could not complete the action. Please try again.';
+  static const String monthlyReviewProjectedPayout = 'Projected payout';
+  static const String monthlyReviewEligible = 'Eligible amount';
+
   // ───── Self-Rate ─────
   static const String selfRateTitle = 'Rate yourself';
   static const String selfRateLiveTotal = 'Current total';
