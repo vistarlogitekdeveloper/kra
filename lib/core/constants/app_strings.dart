@@ -373,6 +373,7 @@ class AppStrings {
   // ───── Employee shell / bottom nav ─────
   static const String employeeShellHome = 'Home';
   static const String employeeShellSelfRate = 'Self-Rate';
+  static const String employeeShellReviews = 'Reviews';
   static const String employeeShellHistory = 'History';
   static const String employeeShellProfile = 'Profile';
 
@@ -595,6 +596,7 @@ class AppStrings {
 
   // ───── Bottom nav — My Team ─────
   static const String managerTeamNavDashboard = 'Dashboard';
+  static const String managerTeamNavReviews = 'Reviews';
   static const String managerTeamNavTeam = 'Team';
   static const String managerTeamNavHistory = 'History';
   static const String managerTeamNavProfile = 'Profile';

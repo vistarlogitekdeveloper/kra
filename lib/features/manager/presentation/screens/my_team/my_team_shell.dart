@@ -15,8 +15,8 @@ class MyTeamShell extends ConsumerWidget {
 
   static const _tabs = [
     _Tab(
-      label: AppStrings.managerTeamNavDashboard,
-      icon: Icons.dashboard_rounded,
+      label: AppStrings.managerTeamNavReviews,
+      icon: Icons.event_available_rounded,
     ),
     _Tab(
       label: AppStrings.managerTeamNavTeam,
@@ -113,8 +113,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        isActive ? AppColors.primaryPurple : AppColors.textSecondary;
+    final color = isActive ? AppColors.primaryPurple : AppColors.textSecondary;
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -128,8 +127,8 @@ class _NavItem extends StatelessWidget {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                   decoration: BoxDecoration(
                     color: isActive
                         ? AppColors.primaryPurple.withValues(alpha: 0.12)

@@ -17,7 +17,6 @@ import '../../features/employee/presentation/screens/profile/my_profile_screen.d
 import '../../features/employee/presentation/screens/profile/my_reporting_tree_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_locked_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_review_screen.dart';
-import '../../features/employee/presentation/screens/self_rate/self_rate_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_success_screen.dart';
 import '../../features/hr/presentation/screens/audit_log_screen.dart';
 import '../../features/hr/presentation/screens/bulk_setup_screen.dart';
@@ -34,7 +33,6 @@ import '../../features/hr/presentation/screens/locations_screen.dart';
 import '../../features/manager/presentation/screens/manager_shell_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_confirm_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_result_screen.dart';
-import '../../features/manager/presentation/screens/my_team/dashboard/manager_dashboard_screen.dart';
 import '../../features/manager/presentation/screens/my_team/history/team_history_screen.dart';
 import '../../features/manager/presentation/screens/my_team/history/team_member_history_screen.dart';
 import '../../features/manager/presentation/screens/my_team/my_team_shell.dart';
@@ -302,12 +300,16 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // ── Tab 2: Self-Rate (form + 3 sub-screens) ──
+          // ── Tab 2: Reviews (monthly pipeline) ──
+          // Re-rooted from the old cycle-era self-rate form to the monthly
+          // review dashboard; the employee opens their month and self-rates
+          // from there. The legacy self-rate sub-screens remain nested for
+          // any deep links but are no longer the tab's surface.
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: AppRoutes.employeeSelfRate,
-                builder: (_, __) => const SelfRateScreen(),
+                builder: (_, __) => const MonthlyReviewDashboardScreen(),
                 routes: [
                   GoRoute(
                     path: 'review',
@@ -382,7 +384,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: AppRoutes.managerTeamDashboard,
-                    builder: (_, __) => const ManagerDashboardScreen(),
+                    // Re-rooted to the monthly review dashboard — the
+                    // manager's team reviews per month.
+                    builder: (_, __) => const MonthlyReviewDashboardScreen(),
                   ),
                 ],
               ),
