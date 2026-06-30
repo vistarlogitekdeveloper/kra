@@ -26,6 +26,13 @@ class MonthlyDeadlines {
   static DateTime managerRating([DateTime? reference]) =>
       _forMonth(managerRatingDay, reference);
 
+  /// The deadline on the given [day] of the month containing [reference]
+  /// (defaults to today). Generic building block — callers that key off a
+  /// review stage (e.g. `ReviewStage.deadlineDay`) pass the stage's day
+  /// here so `core/` stays independent of the feature layer.
+  static DateTime forDay(int day, [DateTime? reference]) =>
+      _forMonth(day, reference);
+
   static DateTime _forMonth(int day, DateTime? reference) {
     final r = reference ?? DateTime.now();
     return DateTime(r.year, r.month, day);
