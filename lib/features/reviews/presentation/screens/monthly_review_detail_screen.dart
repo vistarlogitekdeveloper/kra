@@ -6,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/monthly_deadlines.dart';
 import '../../../../core/widgets/monthly_deadline_notice.dart';
-import '../../../auth/data/models/user.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
@@ -64,19 +63,11 @@ class _MonthlyReviewDetailScreenState
     );
   }
 
-  bool _canAct(MonthlyReview review, ReviewScope scope) {
-    if (!review.isActionableBy(scope.role)) return false;
-    switch (review.currentStage) {
-      case ReviewStage.selfRating:
-        return scope.userId == review.employeeId;
-      case ReviewStage.reportingManagerRating:
-        return scope.userId == review.managerId ||
-            scope.role == UserRole.admin ||
-            scope.role == UserRole.hrAdmin;
-      default:
-        return true;
-    }
-  }
+  // Mock phase: gate purely on role — the list is already scoped to what
+  // this user can see (own review / team / org), and the real backend will
+  // enforce per-record ownership (own review, own direct report) in Phase 4.
+  bool _canAct(MonthlyReview review, ReviewScope scope) =>
+      review.isActionableBy(scope.role);
 
   @override
   Widget build(BuildContext context) {

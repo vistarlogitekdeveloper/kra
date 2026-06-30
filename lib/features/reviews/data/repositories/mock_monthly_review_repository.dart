@@ -184,15 +184,22 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
     return visible.map(MonthlyReviewSummary.fromReview).toList();
   }
 
+  // Demo personas: a real login's user id won't match the seeded ids, so
+  // the mock maps any employee login to the demo employee and any manager
+  // login to the demo manager. The REAL backend (Phase 4) enforces actual
+  // ownership server-side.
+  static const String _demoEmployeeId = 'emp1';
+  static const String _demoManagerId = 'm1';
+
   bool _visibleTo(MonthlyReview r, ReviewScope scope) {
     switch (scope.role) {
       case UserRole.employee:
       case UserRole.ops:
-        return r.employeeId == scope.userId;
+        return r.employeeId == _demoEmployeeId;
       case UserRole.manager:
       case UserRole.bdManager:
       case UserRole.warehouseMgr:
-        return r.managerId == scope.userId;
+        return r.managerId == _demoManagerId;
       case UserRole.hr:
       case UserRole.finance:
       case UserRole.hrAdmin:
