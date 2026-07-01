@@ -1,9 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../data/models/kra_template.dart';
 import '../../data/repositories/api_kra_template_repository.dart';
 import '../../data/repositories/kra_template_repository.dart';
+
+/// Outcome of a bulk "delete all templates" run. Some templates may be
+/// undeletable (the backend RESTRICTs deleting a template whose KRA items
+/// are still referenced by existing review rows) — those land in [failed].
+class BulkTemplateDeleteResult {
+  final int deleted;
+  final List<({String name, String reason})> failed;
+  const BulkTemplateDeleteResult({required this.deleted, required this.failed});
+
+  int get total => deleted + failed.length;
+  bool get allDeleted => failed.isEmpty;
+}
 
 final kraTemplateRepositoryProvider = Provider<KraTemplateRepository>((ref) {
   return ApiKraTemplateRepository(dio: ref.read(dioProvider));
@@ -105,6 +118,47 @@ class KraTemplateActions {
   Future<void> delete(String id) async {
     await _repo.delete(id);
     ref.invalidate(kraTemplatesProvider);
+  }
+
+  /// Deletes **every** KRA template — including the system-default ones
+  /// ("irrespective of the default KRA"). Attempts each independently so a
+  /// single undeletable template doesn't abort the rest; the outcome
+  /// reports how many went and which were skipped and why.
+  ///
+  /// The backend enforces a `RESTRICT` foreign key from `review_rows` to
+  /// `kra_template_items`, so a template whose KRAs are already used by an
+  /// existing review can't be removed until those reviews are gone. That's
+  /// a database-level rule we can't override from the client — such
+  /// templates are surfaced in [BulkTemplateDeleteResult.failed].
+  Future<BulkTemplateDeleteResult> deleteAll() async {
+    // isActive: null → every template, active or not, all roles.
+    final templates = await _repo.list(isActive: null);
+    var deleted = 0;
+    final failed = <({String name, String reason})>[];
+    for (final t in templates) {
+      try {
+        await _repo.delete(t.id);
+        deleted++;
+      } on ApiError catch (e) {
+        failed.add((name: t.name, reason: _deleteFailureReason(e)));
+      } catch (_) {
+        failed.add((name: t.name, reason: 'Unexpected error'));
+      }
+    }
+    ref.invalidate(kraTemplatesProvider);
+    return BulkTemplateDeleteResult(deleted: deleted, failed: failed);
+  }
+
+  String _deleteFailureReason(ApiError e) {
+    final msg = e.message.toLowerCase();
+    if (msg.contains('review_rows') ||
+        msg.contains('foreign key') ||
+        msg.contains('constraint') ||
+        (e.statusCode == 500 && msg.contains('delete'))) {
+      return 'In use by existing reviews';
+    }
+    if (msg.contains('default')) return 'Protected default template';
+    return e.message;
   }
 
   Future<KraTemplate> clone(String id) async {

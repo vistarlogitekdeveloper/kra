@@ -177,6 +177,16 @@ class AppStrings {
   static const String kraTemplatesDeleteConfirmTitle = 'Delete template?';
   static const String kraTemplatesDeleteConfirmMessage =
       'This will not affect existing assignments, but the template can no longer be used for new ones.';
+  static const String kraTemplatesDeleteAllMenu = 'Delete all templates';
+  static const String kraTemplatesDeleteAllConfirmTitle =
+      'Delete all KRA templates?';
+  static const String kraTemplatesDeleteAllConfirmMessage =
+      'Permanently deletes every KRA template, including the default ones. '
+      'Templates already used by existing reviews are protected by the '
+      'backend and will be skipped.';
+  static const String kraTemplatesDeleteAllCta = 'Delete all';
+  static const String kraTemplatesDeleteAllResultTitle = 'Delete all templates';
+  static const String kraTemplatesDeleteAllNone = 'No templates to delete.';
 
   // ───── KRA template form ─────
   static const String kraItemDeleteConfirmTitle = 'Remove this KRA?';
