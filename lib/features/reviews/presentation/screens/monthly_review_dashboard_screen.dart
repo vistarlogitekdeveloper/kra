@@ -11,12 +11,13 @@ import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
 import '../../data/models/review_stage.dart';
+import '../../data/models/stage_status.dart';
 import '../providers/monthly_review_providers.dart';
 import '../widgets/monthly_review_widgets.dart';
 
-/// Role-adaptive monthly review dashboard. The list is already scoped by
-/// the provider (employee → own, manager → team, HR/finance/admin → all);
-/// this screen just renders it with a month selector and routes into each
+/// Role-adaptive monthly review dashboard. The list is scoped by the
+/// provider (employee → own, manager → team, HR/finance/admin → all);
+/// this screen renders it with a month selector and routes into each
 /// review's stage screen.
 class MonthlyReviewDashboardScreen extends ConsumerWidget {
   const MonthlyReviewDashboardScreen({super.key});
@@ -38,7 +39,8 @@ class MonthlyReviewDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(currentReviewScopeProvider)?.role;
-    final periodsAsync = ref.watch(availablePeriodsProvider);
+    final periods = ref.watch(availablePeriodsProvider);
+    final selected = ref.watch(selectedPeriodProvider) ?? periods.first;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -48,34 +50,17 @@ class MonthlyReviewDashboardScreen extends ConsumerWidget {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
       ),
-      body: periodsAsync.when(
-        loading: () => const _DashboardSkeleton(),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(e.toString(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.error)),
+      body: Column(
+        children: [
+          PeriodSelector(
+            periods: periods,
+            selected: selected,
+            onSelect: (p) =>
+                ref.read(selectedPeriodProvider.notifier).state = p,
           ),
-        ),
-        data: (periods) {
-          if (periods.isEmpty) {
-            return const Center(child: Text(AppStrings.monthlyReviewsEmpty));
-          }
-          final selected = ref.watch(selectedPeriodProvider) ?? periods.first;
-          return Column(
-            children: [
-              PeriodSelector(
-                periods: periods,
-                selected: selected,
-                onSelect: (p) =>
-                    ref.read(selectedPeriodProvider.notifier).state = p,
-              ),
-              const Divider(height: 1, color: AppColors.divider),
-              Expanded(child: _ReviewList(period: selected, role: role)),
-            ],
-          );
-        },
+          const Divider(height: 1, color: AppColors.divider),
+          Expanded(child: _ReviewList(period: selected, role: role)),
+        ],
       ),
     );
   }
@@ -91,10 +76,8 @@ class _ReviewList extends ConsumerWidget {
     final listAsync = ref.watch(monthlyReviewListProvider(period));
     return RefreshIndicator(
       color: AppColors.primaryPurple,
-      onRefresh: () async {
-        ref.invalidate(availablePeriodsProvider);
-        ref.invalidate(monthlyReviewListProvider(period));
-      },
+      onRefresh: () async =>
+          ref.invalidate(monthlyReviewListProvider(period)),
       child: listAsync.when(
         loading: () => const _DashboardSkeleton(),
         error: (e, _) => ListView(
@@ -136,15 +119,14 @@ class _ReviewTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final needsYou = role != null && summary.needsActionFrom(role!);
+    final needsYou = role != null && summary.needsActionBy(role!);
     final completed = summary.currentStage.isTerminal;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () =>
-            context.push(AppRoutes.monthlyReviewDetail(summary.reviewId)),
+        onTap: () => context.push(AppRoutes.monthlyReviewDetail(summary.id)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           decoration: BoxDecoration(
@@ -173,16 +155,12 @@ class _ReviewTile extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        if (completed)
-                          const StagePill(
-                            stage: ReviewStage.completed,
-                            status: StageStatus.done,
-                          )
-                        else
-                          StagePill(
-                            stage: summary.currentStage,
-                            status: StageStatus.pending,
-                          ),
+                        StagePill(
+                          stage: summary.currentStage,
+                          status: completed
+                              ? StageStatus.submitted
+                              : summary.currentStageStatus,
+                        ),
                         if (needsYou) ...[
                           const SizedBox(width: 8),
                           Container(

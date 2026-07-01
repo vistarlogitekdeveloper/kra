@@ -3,19 +3,19 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/review_stage.dart';
+import '../../data/models/stage_status.dart';
 
 /// Brand colour for a stage given its status within a review.
 Color stageColor(StageStatus status) {
   switch (status) {
-    case StageStatus.done:
+    case StageStatus.submitted:
       return AppColors.success;
-    case StageStatus.pending:
     case StageStatus.inProgress:
       return AppColors.accentOrange;
+    case StageStatus.pending:
+      return AppColors.textMuted;
     case StageStatus.skipped:
       return AppColors.error;
-    case StageStatus.notStarted:
-      return AppColors.textMuted;
   }
 }
 
@@ -100,7 +100,7 @@ class PeriodSelector extends StatelessWidget {
   }
 }
 
-/// Five-dot pipeline progress strip for a review's stages.
+/// Five-segment pipeline progress strip for a review's stages.
 class StageTimeline extends StatelessWidget {
   final MonthlyReview review;
   const StageTimeline({super.key, required this.review});
@@ -116,14 +116,14 @@ class StageTimeline extends StatelessWidget {
     ];
     return Row(
       children: [
-        for (final s in stages) ...[
+        for (final s in stages)
           Expanded(
             child: Column(
               children: [
                 _dot(s),
                 const SizedBox(height: 4),
                 Text(
-                  '${s.pipelineIndex + 1}',
+                  '${s.pipelineIndex}',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -133,7 +133,6 @@ class StageTimeline extends StatelessWidget {
               ],
             ),
           ),
-        ],
       ],
     );
   }

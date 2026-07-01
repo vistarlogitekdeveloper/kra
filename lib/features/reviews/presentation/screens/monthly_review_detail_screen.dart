@@ -10,7 +10,7 @@ import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/review_stage.dart';
-import '../../data/repositories/monthly_review_repository.dart';
+import '../../data/models/row_score.dart';
 import '../providers/monthly_review_providers.dart';
 import '../widgets/monthly_review_widgets.dart';
 
@@ -51,7 +51,9 @@ class _MonthlyReviewDetailScreenState
     return _scoreCtrls.putIfAbsent(row.id, () {
       final existing = row.scoreFor(stage);
       return TextEditingController(
-        text: existing == null ? '' : EmployeeFormatters.score(existing.value),
+        text: existing?.value == null
+            ? ''
+            : EmployeeFormatters.score(existing!.value!),
       );
     });
   }
@@ -112,10 +114,8 @@ class _MonthlyReviewDetailScreenState
         if (!stage.isTerminal && stage.deadlineDay != null)
           MonthlyDeadlineNotice(
             title: stage.label,
-            deadline: MonthlyDeadlines.forDay(
-              stage.deadlineDay!,
-              review.period.dateOn(1),
-            ),
+            deadline:
+                MonthlyDeadlines.forStage(stage, review.period.dateOn(1))!,
           ),
         const SizedBox(height: 12),
         // KRA rows
@@ -181,8 +181,7 @@ class _MonthlyReviewDetailScreenState
                   child: OutlinedButton.icon(
                     onPressed: _submitting
                         ? null
-                        : () => _decide(
-                            review, scope!, StageDecision.returnForRework),
+                        : () => _decide(review, scope!, approved: false),
                     icon:
                         const Icon(Icons.undo_rounded, color: AppColors.error),
                     label: const Text(
@@ -196,7 +195,7 @@ class _MonthlyReviewDetailScreenState
                   child: FilledButton.icon(
                     onPressed: _submitting
                         ? null
-                        : () => _decide(review, scope!, StageDecision.approve),
+                        : () => _decide(review, scope!, approved: true),
                     icon: const Icon(Icons.check_rounded),
                     label: const Text(AppStrings.monthlyReviewApprove),
                     style: FilledButton.styleFrom(
@@ -268,10 +267,11 @@ class _MonthlyReviewDetailScreenState
     }
     await _run(
       () => ref.read(monthlyReviewRepositoryProvider).submitStage(
-            reviewId: review.id,
-            stage: stage,
-            actor: scope,
+            review.id,
+            stage,
             rowScores: scores,
+            actorId: scope.userId,
+            actorName: scope.userName,
           ),
       AppStrings.monthlyReviewSubmitted,
     );
@@ -279,20 +279,21 @@ class _MonthlyReviewDetailScreenState
 
   Future<void> _decide(
     MonthlyReview review,
-    ReviewScope scope,
-    StageDecision decision,
-  ) async {
+    ReviewScope scope, {
+    required bool approved,
+  }) async {
     await _run(
       () => ref.read(monthlyReviewRepositoryProvider).submitStage(
-            reviewId: review.id,
-            stage: ReviewStage.managementReview,
-            actor: scope,
-            decision: decision,
+            review.id,
+            ReviewStage.managementReview,
+            approved: approved,
             comment: _commentCtrl.text.trim().isEmpty
                 ? null
                 : _commentCtrl.text.trim(),
+            actorId: scope.userId,
+            actorName: scope.userName,
           ),
-      decision == StageDecision.approve
+      approved
           ? AppStrings.monthlyReviewApproved
           : AppStrings.monthlyReviewReturned,
     );
@@ -300,9 +301,11 @@ class _MonthlyReviewDetailScreenState
 
   Future<void> _markPaid(MonthlyReview review, ReviewScope scope) async {
     await _run(
-      () => ref
-          .read(monthlyReviewRepositoryProvider)
-          .markPaid(reviewId: review.id, actor: scope),
+      () => ref.read(monthlyReviewRepositoryProvider).markPaid(
+            review.id,
+            actorId: scope.userId,
+            actorName: scope.userName,
+          ),
       AppStrings.monthlyReviewPaid,
     );
   }
@@ -435,10 +438,10 @@ class _RowCard extends StatelessWidget {
                 ReviewStage.accountHrRating,
                 ReviewStage.reportingManagerRating,
               ])
-                if (row.scoreFor(s) != null)
+                if (row.scoreFor(s)?.value != null)
                   _ScoreChip(
                     label: s.label,
-                    value: '${EmployeeFormatters.score(row.scoreFor(s)!.value)}'
+                    value: '${EmployeeFormatters.score(row.scoreFor(s)!.value!)}'
                         '/${EmployeeFormatters.score(row.maxScore)}',
                   ),
             ],

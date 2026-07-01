@@ -1,8 +1,11 @@
 import '../../../auth/data/models/user.dart';
+import '../models/incentive_snapshot.dart';
 import '../models/monthly_kra_row.dart';
 import '../models/monthly_review.dart';
 import '../models/monthly_review_summary.dart';
 import '../models/review_stage.dart';
+import '../models/row_score.dart';
+import '../models/stage_record.dart';
 import 'monthly_review_repository.dart';
 
 /// In-memory [MonthlyReviewRepository] used until the monthly backend
@@ -13,6 +16,13 @@ import 'monthly_review_repository.dart';
 class MockMonthlyReviewRepository implements MonthlyReviewRepository {
   final Map<String, MonthlyReview> _byId = {};
   final DateTime _now;
+
+  /// Seeded demo manager id — the presentation layer maps any real
+  /// manager login onto this so the demo team is visible.
+  static const String demoManagerId = 'm1';
+
+  /// Seeded demo employee id — any real employee login maps here.
+  static const String demoEmployeeId = 'emp1';
 
   MockMonthlyReviewRepository({DateTime? now}) : _now = now ?? DateTime.now() {
     _seed();
@@ -29,14 +39,14 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
   }
 
   void _seed() {
-    const manager = (id: 'm1', name: 'Manish Rao');
+    const manager = (id: demoManagerId, name: 'Manish Rao');
     final team = <({String id, String name, String code, String grade})>[
       (id: 'emp1', name: 'Asha Iyer', code: 'VIS-1001', grade: 'E1'),
       (id: 'emp2', name: 'Ravi Kumar', code: 'VIS-1002', grade: 'E1'),
       (id: 'emp3', name: 'Neha Shah', code: 'VIS-1003', grade: 'M1'),
     ];
 
-    // Current month — reviews sitting at different stages so each role has
+    // Current month — reviews at different stages so each role has
     // something to act on.
     final currentStages = [
       ReviewStage.selfRating, // emp1 — employee self-rates
@@ -46,13 +56,12 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
 
     for (var i = 0; i < team.length; i++) {
       final e = team[i];
-      final stage = currentStages[i];
       _add(_buildReview(
         id: '${_currentPeriod.key}-${e.id}',
         period: _currentPeriod,
         employee: e,
         manager: manager,
-        currentStage: stage,
+        currentStage: currentStages[i],
       ));
       // Previous month — everything finished.
       _add(_buildReview(
@@ -67,9 +76,9 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
 
   void _add(MonthlyReview r) => _byId[r.id] = r;
 
-  /// Builds a review whose stages BEFORE [currentStage] are marked done
-  /// (with seeded scores for rating stages), so the pipeline looks
-  /// realistic.
+  /// Builds a review whose stages BEFORE [currentStage] are recorded as
+  /// submitted (with seeded scores for rating stages) so the pipeline
+  /// looks realistic.
   MonthlyReview _buildReview({
     required String id,
     required ReviewPeriod period,
@@ -77,42 +86,31 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
     required ({String id, String name}) manager,
     required ReviewStage currentStage,
   }) {
-    final rows = _seedRows();
+    var rows = _seedRows();
     final records = <ReviewStage, StageRecord>{};
 
-    // For every stage strictly before currentStage: mark done and, for
-    // rating stages, fill in seeded scores.
     for (final stage in ReviewStage.values) {
       if (stage.isTerminal) continue;
       final done = stage.pipelineIndex < currentStage.pipelineIndex;
-      if (done) {
-        records[stage] = StageRecord(
-          status: StageStatus.done,
-          actorId: stage == ReviewStage.selfRating ? employee.id : 'system',
-          actorName: stage.label,
-          actedAt: period.dateOn(stage.deadlineDay ?? 1),
-        );
-        if (stage.isRatingStage) {
-          for (var r = 0; r < rows.length; r++) {
-            // Slightly different score per stage so the matrix isn't flat.
-            final base = 7.0 + ((r + stage.pipelineIndex) % 3);
-            rows[r] = rows[r].withStageScore(
+      if (!done) continue;
+      records[stage] = StageRecord(
+        actorId: stage == ReviewStage.selfRating ? employee.id : manager.id,
+        actorName: stage == ReviewStage.selfRating ? employee.name : 'System',
+        submittedAt: period.dateOn(stage.deadlineDay ?? 1),
+      );
+      if (stage.isRatingStage) {
+        rows = [
+          for (var r = 0; r < rows.length; r++)
+            rows[r].withStageScore(
               stage,
-              RowScore(value: base, remark: null),
-            );
-          }
-        }
-      } else if (stage == currentStage) {
-        records[stage] = const StageRecord(status: StageStatus.pending);
+              // A little variation per stage/row so the matrix isn't flat.
+              RowScore(value: 7.0 + ((r + stage.pipelineIndex) % 3)),
+            ),
+        ];
       }
     }
 
-    final payout = currentStage == ReviewStage.completed
-        ? PayoutStatus.paid
-        : currentStage == ReviewStage.incentivePayout
-            ? PayoutStatus.ready
-            : PayoutStatus.notReady;
-
+    final isPaid = currentStage == ReviewStage.completed;
     return MonthlyReview(
       id: id,
       employeeId: employee.id,
@@ -125,14 +123,16 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
       currentStage: currentStage,
       stageRecords: records,
       rows: rows,
-      eligibleAmount: 5000,
-      payoutStatus: payout,
-      paidAt: currentStage == ReviewStage.completed ? period.dateOn(20) : null,
+      incentive: IncentiveSnapshot(
+        eligibleAmount: 5000,
+        payoutStatus: isPaid ? PayoutStatus.paid : PayoutStatus.pending,
+        paidAt: isPaid ? period.dateOn(20) : null,
+      ),
     );
   }
 
-  List<MonthlyKraRow> _seedRows() => [
-        const MonthlyKraRow(
+  List<MonthlyKraRow> _seedRows() => const [
+        MonthlyKraRow(
           id: 'k1',
           name: 'Revenue target',
           category: 'Sales',
@@ -142,7 +142,7 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
           target: '₹5L',
           trackingMethod: 'CRM',
         ),
-        const MonthlyKraRow(
+        MonthlyKraRow(
           id: 'k2',
           name: 'Customer satisfaction',
           category: 'Quality',
@@ -150,7 +150,7 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
           maxScore: 10,
           displayOrder: 1,
         ),
-        const MonthlyKraRow(
+        MonthlyKraRow(
           id: 'k3',
           name: 'Process adherence',
           category: 'Ops',
@@ -163,70 +163,45 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
   // ── Reads ─────────────────────────────────────────────────────────────
 
   @override
-  Future<List<ReviewPeriod>> availablePeriods() async {
-    final seen = <String, ReviewPeriod>{};
-    for (final r in _byId.values) {
-      seen[r.period.key] = r.period;
-    }
-    final list = seen.values.toList()
-      ..sort((a, b) => b.key.compareTo(a.key)); // newest first
-    return list;
-  }
-
-  @override
-  Future<List<MonthlyReviewSummary>> listForMonth({
-    required ReviewPeriod period,
-    required ReviewScope scope,
+  Future<List<MonthlyReviewSummary>> listMonthlyReviews({
+    required int year,
+    required int month,
+    UserRole? scopeRole,
+    String? scopeEmployeeId,
+    String? scopeManagerId,
+    ReviewStage? currentStage,
   }) async {
-    final inMonth = _byId.values.where((r) => r.period == period).toList();
-    final visible = inMonth.where((r) => _visibleTo(r, scope)).toList()
+    final visible = _byId.values.where((r) {
+      if (r.period.year != year || r.period.month != month) return false;
+      if (scopeEmployeeId != null && r.employeeId != scopeEmployeeId) {
+        return false;
+      }
+      if (scopeManagerId != null && r.managerId != scopeManagerId) return false;
+      if (currentStage != null && r.currentStage != currentStage) return false;
+      return true;
+    }).toList()
       ..sort((a, b) => a.employeeName.compareTo(b.employeeName));
     return visible.map(MonthlyReviewSummary.fromReview).toList();
   }
 
-  // Demo personas: a real login's user id won't match the seeded ids, so
-  // the mock maps any employee login to the demo employee and any manager
-  // login to the demo manager. The REAL backend (Phase 4) enforces actual
-  // ownership server-side.
-  static const String _demoEmployeeId = 'emp1';
-  static const String _demoManagerId = 'm1';
-
-  bool _visibleTo(MonthlyReview r, ReviewScope scope) {
-    switch (scope.role) {
-      case UserRole.employee:
-      case UserRole.ops:
-        return r.employeeId == _demoEmployeeId;
-      case UserRole.manager:
-      case UserRole.bdManager:
-      case UserRole.warehouseMgr:
-        return r.managerId == _demoManagerId;
-      case UserRole.hr:
-      case UserRole.finance:
-      case UserRole.hrAdmin:
-      case UserRole.admin:
-        return true; // org-wide
-    }
-  }
-
   @override
-  Future<MonthlyReview> getReview(String reviewId) async {
-    final r = _byId[reviewId];
-    if (r == null) {
-      throw StateError('Review $reviewId not found');
-    }
+  Future<MonthlyReview> getReview(String id) async {
+    final r = _byId[id];
+    if (r == null) throw StateError('Review $id not found');
     return r;
   }
 
   // ── Writes (state machine) ────────────────────────────────────────────
 
   @override
-  Future<MonthlyReview> submitStage({
-    required String reviewId,
-    required ReviewStage stage,
-    required ReviewScope actor,
+  Future<MonthlyReview> submitStage(
+    String reviewId,
+    ReviewStage stage, {
     Map<String, RowScore>? rowScores,
-    StageDecision? decision,
+    bool? approved,
     String? comment,
+    required String actorId,
+    required String actorName,
   }) async {
     final review = await getReview(reviewId);
     if (review.currentStage != stage) {
@@ -241,51 +216,47 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
       rows = [
         for (final row in rows)
           rowScores.containsKey(row.id)
-              ? row.withStageScore(stage, rowScores[row.id])
+              ? row.withStageScore(stage, rowScores[row.id]!)
               : row,
       ];
     }
 
-    // Management review can send the review back a step instead of advancing.
-    final returning = stage == ReviewStage.managementReview &&
-        decision == StageDecision.returnForRework;
-
     final records = Map<ReviewStage, StageRecord>.from(review.stageRecords);
-    records[stage] = StageRecord(
-      status: returning ? StageStatus.skipped : StageStatus.done,
-      actorId: actor.userId,
-      actorName: actor.role.displayName,
-      actedAt: _now,
-      comment: comment,
-    );
 
-    final nextStage =
-        returning ? ReviewStage.reportingManagerRating : stage.next;
+    // Management review can send the review back a step instead of
+    // advancing — clear the reporting-manager record so it re-opens.
+    final returning = stage == ReviewStage.managementReview && approved == false;
     if (returning) {
-      records[ReviewStage.reportingManagerRating] =
-          const StageRecord(status: StageStatus.pending);
-    } else {
-      records[nextStage] = StageRecord(
-        status: nextStage.isTerminal ? StageStatus.done : StageStatus.pending,
+      records.remove(ReviewStage.reportingManagerRating);
+      final updated = review.copyWith(
+        rows: rows,
+        currentStage: ReviewStage.reportingManagerRating,
+        stageRecords: records,
       );
+      _byId[reviewId] = updated;
+      return updated;
     }
 
+    records[stage] = StageRecord(
+      actorId: actorId,
+      actorName: actorName,
+      submittedAt: _now,
+      comment: comment,
+    );
     final updated = review.copyWith(
       rows: rows,
-      currentStage: nextStage,
+      currentStage: stage.next,
       stageRecords: records,
-      payoutStatus: nextStage == ReviewStage.incentivePayout
-          ? PayoutStatus.ready
-          : review.payoutStatus,
     );
     _byId[reviewId] = updated;
     return updated;
   }
 
   @override
-  Future<MonthlyReview> markPaid({
-    required String reviewId,
-    required ReviewScope actor,
+  Future<MonthlyReview> markPaid(
+    String reviewId, {
+    required String actorId,
+    required String actorName,
   }) async {
     final review = await getReview(reviewId);
     if (review.currentStage != ReviewStage.incentivePayout) {
@@ -293,16 +264,17 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
     }
     final records = Map<ReviewStage, StageRecord>.from(review.stageRecords);
     records[ReviewStage.incentivePayout] = StageRecord(
-      status: StageStatus.done,
-      actorId: actor.userId,
-      actorName: actor.role.displayName,
-      actedAt: _now,
+      actorId: actorId,
+      actorName: actorName,
+      submittedAt: _now,
     );
     final updated = review.copyWith(
       currentStage: ReviewStage.completed,
       stageRecords: records,
-      payoutStatus: PayoutStatus.paid,
-      paidAt: _now,
+      incentive: review.incentive.copyWith(
+        payoutStatus: PayoutStatus.paid,
+        paidAt: _now,
+      ),
     );
     _byId[reviewId] = updated;
     return updated;

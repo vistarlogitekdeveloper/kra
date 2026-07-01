@@ -1,62 +1,56 @@
 import '../../../auth/data/models/user.dart';
-import '../models/monthly_kra_row.dart';
 import '../models/monthly_review.dart';
 import '../models/monthly_review_summary.dart';
 import '../models/review_stage.dart';
+import '../models/row_score.dart';
 
-/// Who is asking — drives which reviews the repository returns:
-///   - employee → only their own review
-///   - manager  → their direct reports
-///   - HR / finance / admin / management → the whole (scoped) org
-class ReviewScope {
-  final String userId;
-  final UserRole role;
-
-  const ReviewScope({required this.userId, required this.role});
-}
-
-/// Management Review outcome.
-enum StageDecision { approve, returnForRework }
-
-/// Contract for the monthly-review domain. The UI binds to this; a mock
-/// implementation backs it today and an API implementation will replace it
-/// once the new monthly backend ships (swap the provider binding only).
+/// Contract the presentation layer binds to. The only implementation
+/// today is [MockMonthlyReviewRepository] (in-memory seed data), used
+/// until a monthly-review backend ships; a future `ApiMonthlyReview
+/// Repository` would implement the same surface against `/reviews/monthly`.
 abstract class MonthlyReviewRepository {
-  /// Calendar months that have reviews, newest first — feeds the month
-  /// selector on every dashboard.
-  Future<List<ReviewPeriod>> availablePeriods();
-
-  /// Review summaries for [period], scoped to who is asking.
-  Future<List<MonthlyReviewSummary>> listForMonth({
-    required ReviewPeriod period,
-    required ReviewScope scope,
-  });
-
-  /// Full review (with KRA rows + per-stage scores) for the detail/rating
-  /// screens.
-  Future<MonthlyReview> getReview(String reviewId);
-
-  /// Submit/advance the current stage:
-  ///   - rating stages (self / accountHr / reportingManager) pass [rowScores]
-  ///     keyed by `MonthlyKraRow.id`
-  ///   - [ReviewStage.managementReview] passes a [decision] (+ optional
-  ///     [comment]); `approve` advances, `returnForRework` sends it back
+  /// Lists review summaries for a specific ([year], [month]).
   ///
-  /// Advances `currentStage` and stamps the stage record. Returns the
-  /// updated review.
-  Future<MonthlyReview> submitStage({
-    required String reviewId,
-    required ReviewStage stage,
-    required ReviewScope actor,
-    Map<String, RowScore>? rowScores,
-    StageDecision? decision,
-    String? comment,
+  /// Scope filters narrow to what a dashboard needs:
+  ///   * [scopeEmployeeId] — one employee (their own home)
+  ///   * [scopeManagerId] — a manager's direct reports
+  ///   * [scopeRole] — informational (whose lens we filter through)
+  ///   * [currentStage] — only reviews sitting on a specific stage
+  ///     (e.g. the payout screen wants only [ReviewStage.incentivePayout])
+  Future<List<MonthlyReviewSummary>> listMonthlyReviews({
+    required int year,
+    required int month,
+    UserRole? scopeRole,
+    String? scopeEmployeeId,
+    String? scopeManagerId,
+    ReviewStage? currentStage,
   });
 
-  /// Marks the incentive paid (the [ReviewStage.incentivePayout] action),
-  /// moving the review to `completed`.
-  Future<MonthlyReview> markPaid({
-    required String reviewId,
-    required ReviewScope actor,
+  /// Full [MonthlyReview] for [id] — rows and stage records populated.
+  Future<MonthlyReview> getReview(String id);
+
+  /// Submits [stage] on [reviewId]. Payload varies by stage:
+  ///   * Rating stages — [rowScores] maps row id → the actor's score.
+  ///   * Management review — [approved] `true` advances, `false` returns
+  ///     the review to the reporting manager; [comment] explains a return.
+  ///   * Incentive payout — use [markPaid] instead.
+  ///
+  /// Rejects the submit if [stage] != the review's `currentStage`.
+  Future<MonthlyReview> submitStage(
+    String reviewId,
+    ReviewStage stage, {
+    Map<String, RowScore>? rowScores,
+    bool? approved,
+    String? comment,
+    required String actorId,
+    required String actorName,
+  });
+
+  /// Marks payout on [reviewId] paid and advances to
+  /// [ReviewStage.completed].
+  Future<MonthlyReview> markPaid(
+    String reviewId, {
+    required String actorId,
+    required String actorName,
   });
 }
