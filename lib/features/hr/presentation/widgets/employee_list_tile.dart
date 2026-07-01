@@ -215,7 +215,7 @@ class _OverflowMenu extends StatelessWidget {
             value: 'deactivate',
             child: Row(
               children: [
-                Icon(Icons.person_off_outlined,
+                Icon(Icons.delete_outline_rounded,
                     size: 18, color: AppColors.error),
                 SizedBox(width: 10),
                 Text(

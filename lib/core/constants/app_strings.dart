@@ -130,13 +130,19 @@ class AppStrings {
   static const String hrHeatmapViewEmployees = 'View employees here';
   static const String employeesInactive = 'Inactive';
   static const String employeesActionEdit = 'Edit';
-  static const String employeesActionDeactivate = 'Deactivate';
-  static const String employeesDeactivateConfirmTitle = 'Deactivate employee?';
+  // Delete = the backend's soft-delete (DELETE /employees/:id). The
+  // employee is removed from the active roster immediately; the record is
+  // retained server-side (shows under the "Inactive" filter) so it can be
+  // restored. Surfaced to users as "Delete" — the internal identifiers
+  // still say "deactivate".
+  static const String employeesActionDeactivate = 'Delete';
+  static const String employeesDeactivateConfirmTitle = 'Delete employee?';
   static const String employeesDeactivateConfirmMessage =
-      'They will lose access immediately. You can reactivate from the master record later.';
-  static const String employeesDeactivateSuccess = 'Employee deactivated.';
+      'They are removed from the active roster immediately. The record is '
+      'retained on the server and can be restored if this was a mistake.';
+  static const String employeesDeactivateSuccess = 'Employee deleted.';
   static const String employeesDeactivateFailed =
-      'Could not deactivate. Please try again.';
+      'Could not delete. Please try again.';
   static const String employeesLoadMoreFailed =
       'Could not load more employees. Tap to retry.';
 

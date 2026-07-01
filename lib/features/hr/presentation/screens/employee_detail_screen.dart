@@ -201,7 +201,8 @@ class _DetailContent extends StatelessWidget {
         if (employee.isActive)
           OutlinedButton.icon(
             onPressed: () => _confirmDeactivate(context),
-            icon: const Icon(Icons.person_off_outlined, color: AppColors.error),
+            icon: const Icon(Icons.delete_outline_rounded,
+                color: AppColors.error),
             label: const Text(
               AppStrings.employeesActionDeactivate,
               style: TextStyle(
