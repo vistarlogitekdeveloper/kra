@@ -33,9 +33,9 @@ class EmployeeShellScreen extends ConsumerWidget {
       activeIcon: Icons.home_rounded,
     ),
     _EmployeeTab(
-      label: AppStrings.employeeShellSelfRate,
-      icon: Icons.rate_review_outlined,
-      activeIcon: Icons.rate_review_rounded,
+      label: AppStrings.employeeShellReviews,
+      icon: Icons.event_available_outlined,
+      activeIcon: Icons.event_available_rounded,
     ),
     _EmployeeTab(
       label: AppStrings.employeeShellHistory,
@@ -141,8 +141,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        isActive ? AppColors.primaryPurple : AppColors.textSecondary;
+    final color = isActive ? AppColors.primaryPurple : AppColors.textSecondary;
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -156,8 +155,8 @@ class _NavItem extends StatelessWidget {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                   decoration: BoxDecoration(
                     color: isActive
                         ? AppColors.primaryPurple.withValues(alpha: 0.12)
@@ -175,8 +174,7 @@ class _NavItem extends StatelessWidget {
                   tab.label,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight:
-                        isActive ? FontWeight.w800 : FontWeight.w600,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                     color: color,
                     letterSpacing: 0.2,
                   ),

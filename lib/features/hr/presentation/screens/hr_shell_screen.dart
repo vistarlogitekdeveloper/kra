@@ -36,7 +36,7 @@ class HrShellScreen extends ConsumerWidget {
       icon: Icons.description_rounded,
     ),
     _HrTab(
-      label: AppStrings.hrShellCycles,
+      label: AppStrings.hrShellReviews,
       icon: Icons.event_available_rounded,
     ),
     _HrTab(
@@ -57,8 +57,7 @@ class HrShellScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
-    final user =
-        authState is AuthAuthenticated ? authState.user : null;
+    final user = authState is AuthAuthenticated ? authState.user : null;
 
     return ConnectivityWrapper(
       child: Scaffold(
@@ -148,8 +147,8 @@ class _HrDrawer extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.20),
                       borderRadius: BorderRadius.circular(999),
@@ -201,8 +200,7 @@ class _HrDrawer extends StatelessWidget {
                   // actually reach it. The router enforces access
                   // again, but a hidden link is cleaner than a
                   // bounce-back for users who never see it.
-                  if (user != null &&
-                      AppRoutes.canAccessManager(user.role))
+                  if (user != null && AppRoutes.canAccessManager(user.role))
                     _DrawerItem(
                       icon: Icons.swap_horiz_rounded,
                       label: AppStrings.hrDrawerSwitchToManager,
@@ -308,8 +306,7 @@ class _DrawerItem extends StatelessWidget {
       onTap: onTap,
       horizontalTitleGap: 8,
       minLeadingWidth: 24,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }

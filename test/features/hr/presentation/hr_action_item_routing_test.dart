@@ -10,12 +10,12 @@ import 'package:vistar_app/features/hr/presentation/screens/hr_home_screen.dart'
 /// regress.
 void main() {
   group('routeForActionKey — live backend keys', () {
-    test('hr_feed_missing → cycles (current backend key)', () {
-      expect(routeForActionKey('hr_feed_missing'), AppRoutes.hrCycles);
+    test('hr_feed_missing → reviews (current backend key)', () {
+      expect(routeForActionKey('hr_feed_missing'), AppRoutes.hrReviews);
     });
 
-    test('draft_stuck → cycles (current backend key)', () {
-      expect(routeForActionKey('draft_stuck'), AppRoutes.hrCycles);
+    test('draft_stuck → reviews (current backend key)', () {
+      expect(routeForActionKey('draft_stuck'), AppRoutes.hrReviews);
     });
 
     test('normalises case — UPPER and lower forms map identically', () {
@@ -30,9 +30,8 @@ void main() {
     });
   });
 
-  group('routeForActionKey — known sibling keys route to a real screen',
-      () {
-    final cycleScoped = [
+  group('routeForActionKey — known sibling keys route to a real screen', () {
+    final reviewScoped = [
       'PENDING_REVIEWS',
       'OVERDUE_REVIEWS',
       'UNFINALIZED_REVIEWS',
@@ -42,9 +41,9 @@ void main() {
       'FINALIZATION_OVERDUE',
       'MISSING_BONUS_SLABS',
     ];
-    for (final key in cycleScoped) {
-      test('$key → cycles', () {
-        expect(routeForActionKey(key), AppRoutes.hrCycles);
+    for (final key in reviewScoped) {
+      test('$key → reviews', () {
+        expect(routeForActionKey(key), AppRoutes.hrReviews);
       });
     }
 
@@ -57,13 +56,11 @@ void main() {
     });
 
     test('MISSING_KRA_TEMPLATES → templates', () {
-      expect(routeForActionKey('MISSING_KRA_TEMPLATES'),
-          AppRoutes.hrTemplates);
+      expect(routeForActionKey('MISSING_KRA_TEMPLATES'), AppRoutes.hrTemplates);
     });
 
     test('AUDIT_REVIEW_REQUIRED → audit log', () {
-      expect(routeForActionKey('AUDIT_REVIEW_REQUIRED'),
-          AppRoutes.hrAuditLog);
+      expect(routeForActionKey('AUDIT_REVIEW_REQUIRED'), AppRoutes.hrAuditLog);
     });
   });
 

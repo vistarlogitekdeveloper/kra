@@ -21,31 +21,24 @@ class ManagerDashboard {
     this.lastCycleTrend,
   });
 
-  factory ManagerDashboard.fromJson(Map<String, dynamic> json) {
-    // The live backend surfaces the last-completed-cycle trend under
-    // `teamPerformance.lastCompletedMonth`; an earlier contract used a
-    // flat `lastCycleTrend`. Read the flat key first, then fall back to
-    // the nested live shape. Either way the card stays hidden until the
-    // backend actually populates it (both are null on an open cycle).
-    final trendMap = JsonParse.parseMap(json['lastCycleTrend']) ??
-        JsonParse.parseMap(
-          JsonParse.parseMap(json['teamPerformance'])?['lastCompletedMonth'],
-        );
-    return ManagerDashboard(
-      manager: ManagerCardUser.fromJson(
-          JsonParse.parseMap(json['manager']) ?? const {}),
-      activeCycle: JsonParse.parseMap(json['activeCycle']) == null
-          ? null
-          : ManagerActiveCycle.fromJson(
-              JsonParse.parseMap(json['activeCycle'])!),
-      stats: ManagerStats.fromJson(
-          JsonParse.parseMap(json['stats']) ?? const {}),
-      pendingActions: JsonParse.parseMapList(json['pendingActions'])
-          .map(PendingAction.fromJson)
-          .toList(),
-      lastCycleTrend: trendMap == null ? null : TeamTrend.fromJson(trendMap),
-    );
-  }
+  factory ManagerDashboard.fromJson(Map<String, dynamic> json) =>
+      ManagerDashboard(
+        manager: ManagerCardUser.fromJson(
+            JsonParse.parseMap(json['manager']) ?? const {}),
+        activeCycle: JsonParse.parseMap(json['activeCycle']) == null
+            ? null
+            : ManagerActiveCycle.fromJson(
+                JsonParse.parseMap(json['activeCycle'])!),
+        stats: ManagerStats.fromJson(
+            JsonParse.parseMap(json['stats']) ?? const {}),
+        pendingActions: JsonParse.parseMapList(json['pendingActions'])
+            .map(PendingAction.fromJson)
+            .toList(),
+        lastCycleTrend: JsonParse.parseMap(json['lastCycleTrend']) == null
+            ? null
+            : TeamTrend.fromJson(
+                JsonParse.parseMap(json['lastCycleTrend'])!),
+      );
 
   Map<String, dynamic> toJson() => {
         'manager': manager.toJson(),
@@ -167,18 +160,9 @@ class TeamTrend {
   });
 
   factory TeamTrend.fromJson(Map<String, dynamic> json) => TeamTrend(
-        // Live "last completed month" uses month-based keys
-        // (monthId / monthLabel / finalTotal); the earlier cycle-trend
-        // contract used cycleId / cycleName / averageScore. Read both.
-        cycleId: JsonParse.parseString(json['cycleId']) ??
-            JsonParse.parseString(json['monthId']) ??
-            '',
-        cycleName: JsonParse.parseString(json['cycleName']) ??
-            JsonParse.parseString(json['monthLabel']) ??
-            '',
-        averageScore: JsonParse.parseDouble(json['averageScore']) ??
-            JsonParse.parseDouble(json['finalTotal']) ??
-            0,
+        cycleId: JsonParse.parseString(json['cycleId']) ?? '',
+        cycleName: JsonParse.parseString(json['cycleName']) ?? '',
+        averageScore: JsonParse.parseDouble(json['averageScore']) ?? 0,
         highest: JsonParse.parseMap(json['highest']) == null
             ? null
             : TopPerformer.fromJson(JsonParse.parseMap(json['highest'])!),

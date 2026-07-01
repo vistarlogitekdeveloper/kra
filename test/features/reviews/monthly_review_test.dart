@@ -1,0 +1,249 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/features/auth/data/models/user.dart';
+import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
+import 'package:vistar_app/features/reviews/data/models/monthly_kra_row.dart';
+import 'package:vistar_app/features/reviews/data/models/monthly_review.dart';
+import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
+import 'package:vistar_app/features/reviews/data/models/row_score.dart';
+import 'package:vistar_app/features/reviews/data/models/stage_record.dart';
+import 'package:vistar_app/features/reviews/data/models/stage_status.dart';
+
+/// Focused coverage for the derived state on [MonthlyReview]. The
+/// aggregate is where per-stage progress, actionable role, and payout
+/// math all live — those are the behaviours the UI relies on the most
+/// and the easiest to break silently in a refactor.
+void main() {
+  MonthlyReview reviewAt(
+    ReviewStage stage, {
+    List<MonthlyKraRow>? rows,
+    Map<ReviewStage, StageRecord>? records,
+    IncentiveSnapshot? incentive,
+  }) {
+    return MonthlyReview(
+      id: 'r1',
+      employeeId: 'emp1',
+      employeeName: 'Asha',
+      period: const ReviewPeriod(2026, 6),
+      currentStage: stage,
+      stageRecords: records ?? const {},
+      rows: rows ?? const [],
+      incentive: incentive ?? const IncentiveSnapshot(),
+    );
+  }
+
+  group('MonthlyReview.statusOf', () {
+    test('a submitted stage (record present) reads as submitted', () {
+      final r = reviewAt(
+        ReviewStage.reportingManagerRating,
+        records: {
+          ReviewStage.selfRating: StageRecord(
+            actorId: 'emp1',
+            actorName: 'Asha',
+            submittedAt: DateTime(2026, 6, 10),
+          ),
+        },
+      );
+      expect(r.statusOf(ReviewStage.selfRating), StageStatus.submitted);
+    });
+
+    test('the current stage reads as in-progress', () {
+      final r = reviewAt(ReviewStage.reportingManagerRating);
+      expect(
+          r.statusOf(ReviewStage.reportingManagerRating),
+          StageStatus.inProgress);
+    });
+
+    test('a future stage reads as pending', () {
+      final r = reviewAt(ReviewStage.selfRating);
+      expect(r.statusOf(ReviewStage.incentivePayout), StageStatus.pending);
+    });
+
+    test('the terminal completed stage reads as submitted once complete', () {
+      final r = reviewAt(ReviewStage.completed);
+      expect(r.statusOf(ReviewStage.completed), StageStatus.submitted);
+    });
+
+    test('a non-current stage without a record reads as pending, even '
+        'when the review has moved past it (should never happen but is '
+        'defensive)', () {
+      final r = reviewAt(ReviewStage.incentivePayout);
+      // No record for selfRating even though the review is 4 stages past.
+      expect(r.statusOf(ReviewStage.selfRating), StageStatus.pending);
+    });
+  });
+
+  group('MonthlyReview.isActionableBy', () {
+    test('true when the role can act on the current stage', () {
+      final r = reviewAt(ReviewStage.reportingManagerRating);
+      expect(r.isActionableBy(UserRole.manager), isTrue);
+    });
+
+    test('false for a role outside the current stage\'s actor set', () {
+      final r = reviewAt(ReviewStage.reportingManagerRating);
+      expect(r.isActionableBy(UserRole.employee), isFalse);
+    });
+
+    test('false on the terminal completed stage (no actor)', () {
+      final r = reviewAt(ReviewStage.completed);
+      for (final role in UserRole.values) {
+        expect(r.isActionableBy(role), isFalse,
+            reason: '$role should not be able to act on a completed review');
+      }
+    });
+  });
+
+  group('MonthlyReview.weightedScorePct', () {
+    const rows = [
+      MonthlyKraRow(
+          id: 'a', name: 'A', weightagePercent: 60, maxScore: 10),
+      MonthlyKraRow(
+          id: 'b', name: 'B', weightagePercent: 40, maxScore: 10),
+    ];
+
+    test('sums (value/max) × weight over rows with scores at the stage', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: [
+        rows[0].withStageScore(
+            ReviewStage.selfRating, const RowScore(value: 9)),
+        rows[1].withStageScore(
+            ReviewStage.selfRating, const RowScore(value: 5)),
+      ]);
+      // 60% × (9/10 × 100) + 40% × (5/10 × 100) = 54 + 20 = 74
+      expect(r.weightedScorePct(ReviewStage.selfRating), closeTo(74, 1e-9));
+    });
+
+    test('drops rows without a score (or N/A) from both numerator and '
+        'denominator so a partial rating doesn\'t under-count', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: [
+        rows[0].withStageScore(
+            ReviewStage.selfRating, const RowScore(value: 9)),
+        // rows[1] has no score for selfRating.
+      ]);
+      // Only row A counts; 100% × (9/10 × 100) = 90
+      expect(r.weightedScorePct(ReviewStage.selfRating), closeTo(90, 1e-9));
+    });
+
+    test('a N/A (value: null) row also drops out', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: [
+        rows[0].withStageScore(
+            ReviewStage.selfRating, const RowScore(value: 9)),
+        rows[1].withStageScore(
+            ReviewStage.selfRating, const RowScore(value: null)),
+      ]);
+      expect(r.weightedScorePct(ReviewStage.selfRating), closeTo(90, 1e-9));
+    });
+
+    test('returns 0 when no rows have a score for the stage', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: rows);
+      expect(r.weightedScorePct(ReviewStage.selfRating), 0);
+    });
+
+    test('clamps to 100 even if scores exceed max (defensive)', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: [
+        rows[0].withStageScore(
+            ReviewStage.selfRating, const RowScore(value: 20)),
+      ]);
+      expect(r.weightedScorePct(ReviewStage.selfRating), 100);
+    });
+  });
+
+  group('MonthlyReview.finalScorePct', () {
+    const rows = [
+      MonthlyKraRow(
+          id: 'a', name: 'A', weightagePercent: 100, maxScore: 10),
+    ];
+
+    test('prefers the reporting manager stage when it has any score', () {
+      final r = reviewAt(
+        ReviewStage.reportingManagerRating,
+        rows: [
+          rows[0]
+              .withStageScore(
+                  ReviewStage.selfRating, const RowScore(value: 5))
+              .withStageScore(
+                  ReviewStage.reportingManagerRating,
+                  const RowScore(value: 9)),
+        ],
+      );
+      expect(r.finalScorePct, closeTo(90, 1e-9));
+    });
+
+    test('falls back to account/HR when manager stage has no scores', () {
+      final r = reviewAt(
+        ReviewStage.reportingManagerRating,
+        rows: [
+          rows[0]
+              .withStageScore(
+                  ReviewStage.selfRating, const RowScore(value: 5))
+              .withStageScore(
+                  ReviewStage.accountHrRating, const RowScore(value: 8)),
+        ],
+      );
+      expect(r.finalScorePct, closeTo(80, 1e-9));
+    });
+
+    test('falls back to self-rating when both later stages are empty', () {
+      final r = reviewAt(
+        ReviewStage.reportingManagerRating,
+        rows: [
+          rows[0].withStageScore(
+              ReviewStage.selfRating, const RowScore(value: 5)),
+        ],
+      );
+      expect(r.finalScorePct, closeTo(50, 1e-9));
+    });
+
+    test('returns 0 when nothing has been scored yet', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: rows);
+      expect(r.finalScorePct, 0);
+    });
+  });
+
+  group('MonthlyReview.projectedPayout', () {
+    test('is eligibleAmount × finalScorePct / 100', () {
+      final r = reviewAt(
+        ReviewStage.reportingManagerRating,
+        rows: [
+          const MonthlyKraRow(
+              id: 'a', name: 'A', weightagePercent: 100, maxScore: 10)
+              .withStageScore(
+                  ReviewStage.reportingManagerRating,
+                  const RowScore(value: 7)),
+        ],
+        incentive: const IncentiveSnapshot(eligibleAmount: 10000),
+      );
+      // 70% of ₹10 000 = ₹7 000
+      expect(r.projectedPayout, closeTo(7000, 1e-9));
+    });
+
+    test('is 0 when nothing has been scored', () {
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        incentive: const IncentiveSnapshot(eligibleAmount: 10000),
+      );
+      expect(r.projectedPayout, 0);
+    });
+  });
+
+  group('MonthlyReview.isComplete', () {
+    test('true only on the terminal stage', () {
+      expect(reviewAt(ReviewStage.completed).isComplete, isTrue);
+      for (final s in ReviewStage.values.where((s) => !s.isTerminal)) {
+        expect(reviewAt(s).isComplete, isFalse,
+            reason: '$s should not read as complete');
+      }
+    });
+  });
+
+  group('IncentiveSnapshot.computedPayable', () {
+    test('returns null until computedScorePct is set', () {
+      const snap = IncentiveSnapshot(eligibleAmount: 5000);
+      expect(snap.computedPayable, isNull);
+    });
+
+    test('is amount × pct / 100 once the score lands', () {
+      const snap = IncentiveSnapshot(
+          eligibleAmount: 5000, computedScorePct: 82);
+      expect(snap.computedPayable, closeTo(4100, 1e-9));
+    });
+  });
+}

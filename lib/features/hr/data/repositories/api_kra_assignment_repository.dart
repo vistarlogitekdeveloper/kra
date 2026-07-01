@@ -14,7 +14,6 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
   @override
   Future<List<KraAssignment>> list({
     String? employeeId,
-    String? cycleId,
   }) async {
     try {
       final response = await _dio.get(
@@ -22,7 +21,6 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
         queryParameters: {
           if (employeeId != null && employeeId.isNotEmpty)
             'employeeId': employeeId,
-          if (cycleId != null && cycleId.isNotEmpty) 'cycleId': cycleId,
         },
       );
       return unwrapList(response)
@@ -37,7 +35,6 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
   @override
   Future<KraAssignment> create({
     required String employeeId,
-    required String cycleId,
     String? templateId,
     List<KraTemplateItem>? items,
   }) async {
@@ -46,10 +43,8 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
         ApiConstants.kraAssignments,
         data: {
           'employeeId': employeeId,
-          'cycleId': cycleId,
           if (templateId != null) 'templateId': templateId,
-          if (items != null)
-            'items': items.map((e) => e.toJson()).toList(),
+          if (items != null) 'items': items.map((e) => e.toJson()).toList(),
         },
       );
       return KraAssignment.fromJson(unwrapObject(response));
@@ -74,7 +69,6 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
   @override
   Future<BulkAssignResult> bulkAssign({
     required List<String> employeeIds,
-    required String cycleId,
     required String templateId,
   }) async {
     try {
@@ -82,7 +76,6 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
         ApiConstants.kraAssignmentsBulk,
         data: {
           'employeeIds': employeeIds,
-          'cycleId': cycleId,
           'templateId': templateId,
         },
       );

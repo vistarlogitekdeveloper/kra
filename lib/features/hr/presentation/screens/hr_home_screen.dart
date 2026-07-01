@@ -606,7 +606,7 @@ class _ActionItemsSection extends ConsumerWidget {
     AppRoutes.hrEmployees,
     AppRoutes.hrTemplates,
     AppRoutes.hrAssign,
-    AppRoutes.hrCycles,
+    AppRoutes.hrReviews,
     AppRoutes.hrReports,
     AppRoutes.hrLocations,
     AppRoutes.hrBulkSetup,
@@ -677,7 +677,7 @@ String? routeForActionKey(String key) {
     case 'FINANCE_SCORING_OVERDUE':
     case 'FINALIZATION_OVERDUE':
     case 'MISSING_BONUS_SLABS':
-      return AppRoutes.hrCycles;
+      return AppRoutes.hrReviews;
     case 'UNASSIGNED_EMPLOYEES':
     case 'INACTIVE_EMPLOYEES':
       return AppRoutes.hrEmployees;
@@ -918,10 +918,10 @@ class _QuickActionsGrid extends StatelessWidget {
         ),
         QuickActionButton(
           icon: Icons.event_available_rounded,
-          label: AppStrings.hrHomeQuickNewCycle,
+          label: AppStrings.hrHomeQuickReviews,
           iconBg: AppColors.success.withValues(alpha: 0.12),
           iconFg: AppColors.success,
-          onTap: () => context.push(AppRoutes.hrCycleNew),
+          onTap: () => context.push(AppRoutes.hrReviews),
         ),
       ],
     );

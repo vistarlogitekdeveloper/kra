@@ -84,7 +84,7 @@ class AppStrings {
   static const String hrShellHome = 'Home';
   static const String hrShellEmployees = 'Employees';
   static const String hrShellTemplates = 'Templates';
-  static const String hrShellCycles = 'Cycles';
+  static const String hrShellReviews = 'Reviews';
   static const String hrShellReports = 'Reports';
 
   // ───── HR home ─────
@@ -102,7 +102,7 @@ class AppStrings {
   static const String hrHomeQuickAddEmployee = 'Add Employee';
   static const String hrHomeQuickCreateTemplate = 'Create Template';
   static const String hrHomeQuickAssignKra = 'Assign KRAs';
-  static const String hrHomeQuickNewCycle = 'New Review Cycle';
+  static const String hrHomeQuickReviews = 'Monthly Reviews';
   static const String hrHomeNoActivity = 'No recent activity yet.';
   static const String hrHomeDaysRemaining = 'days remaining';
   static const String hrHomeDayRemaining = 'day remaining';
@@ -373,6 +373,7 @@ class AppStrings {
   // ───── Employee shell / bottom nav ─────
   static const String employeeShellHome = 'Home';
   static const String employeeShellSelfRate = 'Self-Rate';
+  static const String employeeShellReviews = 'Reviews';
   static const String employeeShellHistory = 'History';
   static const String employeeShellProfile = 'Profile';
 
@@ -423,6 +424,32 @@ class AppStrings {
   // ───── Monthly deadline notices (self 7th / manager 10th) ─────
   static const String deadlineSelfRatingTitle = 'Self-rating deadline';
   static const String deadlineManagerRatingTitle = 'Manager rating deadline';
+
+  // ───── Monthly reviews (new pipeline) ─────
+  static const String monthlyReviewsTitleSelf = 'My Monthly Reviews';
+  static const String monthlyReviewsTitleTeam = 'Team Monthly Reviews';
+  static const String monthlyReviewsTitleAll = 'Monthly Reviews';
+  static const String monthlyReviewsNavPreview = 'Monthly Reviews (preview)';
+  static const String monthlyReviewsEmpty = 'No reviews for this month.';
+  static const String monthlyReviewsNeedsYou = 'Needs you';
+  static const String monthlyReviewsWaitingOn = 'Waiting on';
+  static const String monthlyReviewStageDone = 'Done';
+  static const String monthlyReviewSubmit = 'Submit rating';
+  static const String monthlyReviewApprove = 'Approve';
+  static const String monthlyReviewReturn = 'Return for rework';
+  static const String monthlyReviewMarkPaid = 'Mark incentive paid';
+  static const String monthlyReviewCommentLabel = 'Comment (optional)';
+  static const String monthlyReviewScoreHint = 'Score';
+  static const String monthlyReviewRemarkHint = 'Remark (optional)';
+  static const String monthlyReviewSubmitted = 'Rating submitted.';
+  static const String monthlyReviewApproved = 'Approved — sent to payout.';
+  static const String monthlyReviewReturned =
+      'Returned to the reporting manager.';
+  static const String monthlyReviewPaid = 'Incentive marked as paid.';
+  static const String monthlyReviewActionFailed =
+      'Could not complete the action. Please try again.';
+  static const String monthlyReviewProjectedPayout = 'Projected payout';
+  static const String monthlyReviewEligible = 'Eligible amount';
 
   // ───── Self-Rate ─────
   static const String selfRateTitle = 'Rate yourself';
@@ -569,6 +596,7 @@ class AppStrings {
 
   // ───── Bottom nav — My Team ─────
   static const String managerTeamNavDashboard = 'Dashboard';
+  static const String managerTeamNavReviews = 'Reviews';
   static const String managerTeamNavTeam = 'Team';
   static const String managerTeamNavHistory = 'History';
   static const String managerTeamNavProfile = 'Profile';
