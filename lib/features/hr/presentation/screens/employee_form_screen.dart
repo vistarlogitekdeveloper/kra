@@ -184,6 +184,10 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               : _gradeController.text.trim(),
           'monthlyIncentiveAmount': monthlyIncentive,
           if (_joinedDate != null) 'joinedDate': _joinedDate!.toIso8601String(),
+          // Admin-set password change. Sent only when a new one is typed.
+          if (passwordText.isNotEmpty) 'password': passwordText,
+          if (passwordText.isNotEmpty)
+            'forcePasswordReset': _forcePasswordReset,
         });
         ref.read(employeeListProvider.notifier).replaceUpdated(updated);
         ref.invalidate(employeeDetailProvider(updated.id));
@@ -426,71 +430,76 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               return _fieldErrors['monthlyIncentiveAmount'];
             },
           ),
-          // Credentials are only collected on create. Editing an
-          // employee's password lives behind a separate "reset password"
-          // surface if/when it ships.
-          if (!widget.isEdit) ...[
-            const SizedBox(height: 20),
-            const _SectionHeader(title: 'Login credentials'),
-            const SizedBox(height: 6),
-            const Text(
-              'Optional. Leave blank to create the account without a '
-              'password — the employee won\'t be able to log in until '
-              'HR sets one later.',
-              style: TextStyle(
-                fontSize: 12.5,
-                color: AppColors.textSecondary,
-                height: 1.4,
+          // Credentials — collected on create, and changeable on edit so
+          // an admin can rotate the (hypothetical) passwords once the app
+          // is live. Everything on this form is editable, including email.
+          const SizedBox(height: 20),
+          _SectionHeader(
+            title: widget.isEdit ? 'Change password' : 'Login credentials',
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.isEdit
+                ? 'Leave blank to keep the current password. Enter a new one '
+                    'to set it for this employee.'
+                : 'Optional. Leave blank to create the account without a '
+                    'password — the employee won\'t be able to log in until '
+                    'HR sets one later.',
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          BrandedTextField(
+            controller: _passwordController,
+            label: widget.isEdit ? 'New password' : 'Initial password',
+            hint: 'At least 8 characters',
+            prefixIcon: Icons.lock_outline_rounded,
+            obscureText: _obscurePassword,
+            autofillHints: const [AutofillHints.newPassword],
+            suffixIcon: IconButton(
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
               ),
             ),
-            const SizedBox(height: 12),
-            BrandedTextField(
-              controller: _passwordController,
-              label: 'Initial password',
-              hint: 'At least 8 characters',
-              prefixIcon: Icons.lock_outline_rounded,
-              obscureText: _obscurePassword,
-              autofillHints: const [AutofillHints.newPassword],
-              suffixIcon: IconButton(
-                onPressed: () => setState(
-                    () => _obscurePassword = !_obscurePassword),
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  size: 20,
-                ),
+            validator: (v) {
+              final t = v ?? '';
+              if (t.isEmpty) return null; // optional
+              if (t.length < 8) {
+                return AppStrings.validationPasswordTooShort;
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 8),
+          CheckboxListTile(
+            value: _forcePasswordReset,
+            onChanged: _passwordController.text.isEmpty
+                ? null
+                : (v) => setState(() => _forcePasswordReset = v ?? false),
+            title: Text(
+              widget.isEdit
+                  ? 'Require the employee to change this password on next '
+                      'sign-in'
+                  : 'Require employee to change this password on first sign-in',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
-              validator: (v) {
-                final t = v ?? '';
-                if (t.isEmpty) return null; // optional
-                if (t.length < 8) {
-                  return AppStrings.validationPasswordTooShort;
-                }
-                return null;
-              },
             ),
-            const SizedBox(height: 8),
-            CheckboxListTile(
-              value: _forcePasswordReset,
-              onChanged: _passwordController.text.isEmpty
-                  ? null
-                  : (v) => setState(
-                      () => _forcePasswordReset = v ?? false),
-              title: const Text(
-                'Require employee to change this password on first sign-in',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              activeColor: AppColors.primaryPurple,
-            ),
-          ],
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            activeColor: AppColors.primaryPurple,
+          ),
           const SizedBox(height: 28),
           BrandedPrimaryButton(
             label: AppStrings.commonSave,
