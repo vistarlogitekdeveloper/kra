@@ -1,50 +1,57 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vistar_app/features/auth/data/models/user.dart';
-import 'package:vistar_app/features/reviews/data/models/monthly_kra_row.dart';
-import 'package:vistar_app/features/reviews/data/models/monthly_review.dart';
+import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
+import 'package:vistar_app/features/reviews/data/models/row_score.dart';
+import 'package:vistar_app/features/reviews/data/models/stage_status.dart';
 import 'package:vistar_app/features/reviews/data/repositories/mock_monthly_review_repository.dart';
-import 'package:vistar_app/features/reviews/data/repositories/monthly_review_repository.dart';
 
 void main() {
-  // Fixed clock so the seeded periods are deterministic.
+  // Fixed clock so the seeded periods/ids are deterministic.
   final now = DateTime(2026, 6, 22);
-  const current = ReviewPeriod(2026, 6);
-
   MockMonthlyReviewRepository repo() => MockMonthlyReviewRepository(now: now);
 
   group('MockMonthlyReviewRepository seeding + scoping', () {
-    test('exposes current + previous month', () async {
-      final periods = await repo().availablePeriods();
-      expect(periods.map((p) => p.key), containsAll(['2026-06', '2026-05']));
-      // newest first
-      expect(periods.first.key, '2026-06');
+    test('seeds both the current and previous month', () async {
+      final r = repo();
+      final current = await r.listMonthlyReviews(year: 2026, month: 6);
+      final previous = await r.listMonthlyReviews(year: 2026, month: 5);
+      expect(current, hasLength(3));
+      expect(previous, hasLength(3));
     });
 
-    test('employee sees only their own review', () async {
-      final list = await repo().listForMonth(
-        period: current,
-        scope: const ReviewScope(userId: 'emp1', role: UserRole.employee),
+    test('employee scope sees only their own review', () async {
+      final list = await repo().listMonthlyReviews(
+        year: 2026,
+        month: 6,
+        scopeEmployeeId: 'emp1',
       );
       expect(list, hasLength(1));
       expect(list.single.employeeId, 'emp1');
     });
 
-    test('manager sees their whole team', () async {
-      final list = await repo().listForMonth(
-        period: current,
-        scope: const ReviewScope(userId: 'm1', role: UserRole.manager),
+    test('manager scope sees their whole team', () async {
+      final list = await repo().listMonthlyReviews(
+        year: 2026,
+        month: 6,
+        scopeManagerId: MockMonthlyReviewRepository.demoManagerId,
       );
       expect(
           list.map((r) => r.employeeId), containsAll(['emp1', 'emp2', 'emp3']));
     });
 
-    test('HR sees the whole org', () async {
-      final list = await repo().listForMonth(
-        period: current,
-        scope: const ReviewScope(userId: 'hrx', role: UserRole.hr),
-      );
+    test('unscoped (HR/org) sees everyone', () async {
+      final list = await repo().listMonthlyReviews(year: 2026, month: 6);
       expect(list, hasLength(3));
+    });
+
+    test('currentStage filter narrows to a single stage', () async {
+      final list = await repo().listMonthlyReviews(
+        year: 2026,
+        month: 6,
+        currentStage: ReviewStage.incentivePayout,
+      );
+      expect(list, hasLength(1));
+      expect(list.single.currentStage, ReviewStage.incentivePayout);
     });
   });
 
@@ -56,17 +63,17 @@ void main() {
       expect(before.currentStage, ReviewStage.selfRating);
 
       final after = await r.submitStage(
-        reviewId: id,
-        stage: ReviewStage.selfRating,
-        actor: const ReviewScope(userId: 'emp1', role: UserRole.employee),
+        id,
+        ReviewStage.selfRating,
         rowScores: {
           for (final row in before.rows)
             row.id: const RowScore(value: 8, remark: 'ok'),
         },
+        actorId: 'emp1',
+        actorName: 'Asha',
       );
       expect(after.currentStage, ReviewStage.accountHrRating);
-      expect(after.recordFor(ReviewStage.selfRating).status, StageStatus.done);
-      // Scores were applied.
+      expect(after.statusOf(ReviewStage.selfRating), StageStatus.submitted);
       expect(after.rows.first.scoreFor(ReviewStage.selfRating)?.value, 8);
     });
 
@@ -74,9 +81,10 @@ void main() {
       final r = repo();
       expect(
         () => r.submitStage(
-          reviewId: '2026-06-emp1',
-          stage: ReviewStage.managementReview,
-          actor: const ReviewScope(userId: 'x', role: UserRole.admin),
+          '2026-06-emp1',
+          ReviewStage.managementReview,
+          actorId: 'x',
+          actorName: 'Admin',
         ),
         throwsStateError,
       );
@@ -84,37 +92,38 @@ void main() {
 
     test('management "return" sends it back to reporting manager', () async {
       final r = repo();
-      // Drive emp2 (seeded at reportingManagerRating) forward to management.
-      const id = '2026-06-emp2';
+      const id = '2026-06-emp2'; // seeded at reportingManagerRating
       var rev = await r.getReview(id);
       expect(rev.currentStage, ReviewStage.reportingManagerRating);
       rev = await r.submitStage(
-        reviewId: id,
-        stage: ReviewStage.reportingManagerRating,
-        actor: const ReviewScope(userId: 'm1', role: UserRole.manager),
+        id,
+        ReviewStage.reportingManagerRating,
         rowScores: {
-          for (final row in rev.rows) row.id: const RowScore(value: 7)
+          for (final row in rev.rows) row.id: const RowScore(value: 7),
         },
+        actorId: 'm1',
+        actorName: 'Manish',
       );
       expect(rev.currentStage, ReviewStage.managementReview);
 
       final returned = await r.submitStage(
-        reviewId: id,
-        stage: ReviewStage.managementReview,
-        actor: const ReviewScope(userId: 'a1', role: UserRole.admin),
-        decision: StageDecision.returnForRework,
+        id,
+        ReviewStage.managementReview,
+        approved: false,
         comment: 'Please revisit row 2',
+        actorId: 'a1',
+        actorName: 'Admin',
       );
       expect(returned.currentStage, ReviewStage.reportingManagerRating);
+      // The manager stage re-opens (its record was cleared).
+      expect(returned.statusOf(ReviewStage.reportingManagerRating),
+          StageStatus.inProgress);
     });
 
     test('markPaid completes the review', () async {
       final r = repo();
       const id = '2026-06-emp3'; // seeded at incentivePayout
-      final paid = await r.markPaid(
-        reviewId: id,
-        actor: const ReviewScope(userId: 'f1', role: UserRole.finance),
-      );
+      final paid = await r.markPaid(id, actorId: 'f1', actorName: 'Finance');
       expect(paid.currentStage, ReviewStage.completed);
       expect(paid.payoutStatus, PayoutStatus.paid);
       expect(paid.isComplete, isTrue);
@@ -126,7 +135,7 @@ void main() {
     test('finalScorePct uses the furthest rating stage and weights rows',
         () async {
       final r = repo();
-      // emp3 current month is fully scored through manager stage.
+      // emp3 current month is scored through the manager stage.
       final rev = await r.getReview('2026-06-emp3');
       expect(rev.finalScorePct, greaterThan(0));
       expect(rev.projectedPayout,
