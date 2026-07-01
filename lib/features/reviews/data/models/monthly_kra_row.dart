@@ -21,7 +21,16 @@ class MonthlyKraRow {
   /// wire; this row keeps it as a percentage so the UI renders directly.
   final double weightagePercent;
 
-  /// Row-level max score (default 100 unless the template overrides).
+  /// App-wide KRA score ceiling for generated monthly reviews.
+  ///
+  /// The backend's KRA templates/assignments carry no per-item max — in
+  /// the real model it's a per-row property a monthly backend supplies.
+  /// Until then every generated row uses this one value; change it here to
+  /// rescore the whole pipeline (e.g. set to `5` for a 1–5 scale).
+  static const double defaultMaxScore = 10;
+
+  /// Row-level max score. Defaults to [defaultMaxScore]; a real backend
+  /// row can override it.
   final double maxScore;
 
   final String? target;
@@ -37,7 +46,7 @@ class MonthlyKraRow {
     required this.name,
     this.category,
     required this.weightagePercent,
-    this.maxScore = 100,
+    this.maxScore = defaultMaxScore,
     this.target,
     this.trackingMethod,
     this.displayOrder = 0,

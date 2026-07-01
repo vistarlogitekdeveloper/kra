@@ -100,7 +100,7 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
           name: 'Delivery & targets',
           category: 'Output',
           weightagePercent: 40,
-          maxScore: 10,
+          maxScore: MonthlyKraRow.defaultMaxScore,
           displayOrder: 0,
         ),
         MonthlyKraRow(
@@ -108,7 +108,7 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
           name: 'Quality of work',
           category: 'Quality',
           weightagePercent: 35,
-          maxScore: 10,
+          maxScore: MonthlyKraRow.defaultMaxScore,
           displayOrder: 1,
         ),
         MonthlyKraRow(
@@ -116,7 +116,7 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
           name: 'Conduct & adherence',
           category: 'Ops',
           weightagePercent: 25,
-          maxScore: 10,
+          maxScore: MonthlyKraRow.defaultMaxScore,
           displayOrder: 2,
         ),
       ];

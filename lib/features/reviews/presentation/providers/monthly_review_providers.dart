@@ -142,7 +142,7 @@ List<MonthlyKraRow> _rowsFrom(
         name: sorted[i].name,
         category: sorted[i].category,
         weightagePercent: sorted[i].weightPct,
-        maxScore: 10,
+        maxScore: MonthlyKraRow.defaultMaxScore,
         target: sorted[i].target,
         trackingMethod: sorted[i].tracking,
         displayOrder: i,
