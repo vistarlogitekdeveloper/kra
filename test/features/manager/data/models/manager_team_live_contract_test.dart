@@ -170,4 +170,56 @@ void main() {
       expect(d.pendingActions.first.deadlineRemaining, 70);
     });
   });
+
+  group('manager dashboard team-trend contract', () {
+    // The live backend surfaces the trend under
+    // `teamPerformance.lastCompletedMonth`, not the flat `lastCycleTrend`
+    // the model originally read — so the "Team trend" card silently never
+    // rendered. It reads both keys now; these guard the mapping.
+    test('reads the live teamPerformance.lastCompletedMonth shape', () {
+      final live = {
+        'manager': {'id': 'm', 'name': 'Raj', 'employeeCode': 'EMP002'},
+        'stats': {'totalReports': 4},
+        'teamPerformance': {
+          'lastCompletedMonth': {
+            'monthId': 'mon_may26',
+            'monthLabel': 'May 2026',
+            'finalTotal': 82.5,
+          },
+        },
+      };
+      final d = ManagerDashboard.fromJson(live);
+      expect(d.lastCycleTrend, isNotNull);
+      // month-based keys map onto the cycle-trend fields.
+      expect(d.lastCycleTrend!.cycleId, 'mon_may26');
+      expect(d.lastCycleTrend!.cycleName, 'May 2026');
+      expect(d.lastCycleTrend!.averageScore, 82.5);
+    });
+
+    test('stays hidden when lastCompletedMonth is null (open cycle)', () {
+      final live = {
+        'manager': {'id': 'm', 'name': 'Raj', 'employeeCode': 'EMP002'},
+        'stats': {'totalReports': 4},
+        'teamPerformance': {'lastCompletedMonth': null},
+      };
+      expect(ManagerDashboard.fromJson(live).lastCycleTrend, isNull);
+    });
+
+    test('still reads the flat lastCycleTrend contract', () {
+      final flat = {
+        'manager': {'id': 'm', 'name': 'Raj', 'employeeCode': 'EMP002'},
+        'stats': {'totalReports': 4},
+        'lastCycleTrend': {
+          'cycleId': 'cyc_q1',
+          'cycleName': 'Q1 FY26-27',
+          'averageScore': 79.0,
+          'completionRate': 100,
+        },
+      };
+      final d = ManagerDashboard.fromJson(flat);
+      expect(d.lastCycleTrend!.cycleId, 'cyc_q1');
+      expect(d.lastCycleTrend!.cycleName, 'Q1 FY26-27');
+      expect(d.lastCycleTrend!.averageScore, 79.0);
+    });
+  });
 }
