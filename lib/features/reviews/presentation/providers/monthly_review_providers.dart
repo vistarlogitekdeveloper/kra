@@ -2,8 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/data/models/user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../employee/presentation/providers/my_kra_providers.dart';
 import '../../../hr/presentation/providers/employee_providers.dart';
+import '../../../hr/presentation/providers/kra_assignment_providers.dart';
 import '../../../manager/presentation/providers/manager_team_providers.dart';
+import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
 import '../../data/repositories/live_monthly_review_repository.dart';
@@ -41,8 +44,25 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
   switch (scope.role) {
     case UserRole.employee:
     case UserRole.ops:
-      // An employee can only see their own review.
-      return [RosterEntry(id: scope.userId, name: scope.userName)];
+      // An employee can only see their own review + their own KRAs.
+      List<MonthlyKraRow> rows = const [];
+      try {
+        final mine =
+            await ref.read(myKraRepositoryProvider).listMyAssignments();
+        rows = _rowsFrom(mine
+            .expand((a) => a.items)
+            .map((i) => (
+                  name: i.name,
+                  category: i.description,
+                  weightPct: i.weightagePercent,
+                  target: i.target,
+                  tracking: i.trackingMethod,
+                  sortOrder: i.sortOrder,
+                )));
+      } catch (_) {
+        // No assignment yet → the repo falls back to a generic template.
+      }
+      return [RosterEntry(id: scope.userId, name: scope.userName, rows: rows)];
 
     case UserRole.manager:
     case UserRole.bdManager:
@@ -63,9 +83,27 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.finance:
     case UserRole.admin:
     case UserRole.hrAdmin:
-      final page = await ref
+      // Fetch the roster and every assignment concurrently, then join the
+      // real KRA rows onto each employee by id.
+      final empFuture = ref
           .read(employeeRepositoryProvider)
           .list(page: 1, pageSize: 500, isActive: true);
+      final asgFuture = ref.read(kraAssignmentRepositoryProvider).list();
+      final page = await empFuture;
+      final assignments = await asgFuture;
+
+      final rowsByEmployee = <String, List<MonthlyKraRow>>{};
+      for (final a in assignments) {
+        rowsByEmployee[a.employeeId] = _rowsFrom(a.items.map((i) => (
+              name: i.name,
+              category: i.description,
+              weightPct: i.weightagePercent,
+              target: i.target,
+              tracking: i.trackingMethod,
+              sortOrder: i.sortOrder,
+            )));
+      }
+
       return page.employees
           .map((e) => RosterEntry(
                 id: e.id,
@@ -75,9 +113,41 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
                 managerId: e.managerId,
                 managerName: e.managerName,
                 eligibleAmount: e.monthlyIncentiveAmount ?? 0,
+                rows: rowsByEmployee[e.id] ?? const [],
               ))
           .toList();
   }
+}
+
+/// Maps raw KRA template/assignment items (from either the HR assignment
+/// or the employee's own KRA endpoint) into ordered [MonthlyKraRow]s.
+List<MonthlyKraRow> _rowsFrom(
+  Iterable<
+          ({
+            String name,
+            String? category,
+            double weightPct,
+            String? target,
+            String? tracking,
+            int sortOrder,
+          })>
+      items,
+) {
+  final sorted = items.toList()
+    ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  return [
+    for (var i = 0; i < sorted.length; i++)
+      MonthlyKraRow(
+        id: 'kra-$i',
+        name: sorted[i].name,
+        category: sorted[i].category,
+        weightagePercent: sorted[i].weightPct,
+        maxScore: 10,
+        target: sorted[i].target,
+        trackingMethod: sorted[i].tracking,
+        displayOrder: i,
+      ),
+  ];
 }
 
 /// The requesting user as a [ReviewScope]. Null until authenticated.

@@ -22,6 +22,10 @@ class RosterEntry {
   /// The employee's configured monthly incentive ceiling.
   final double eligibleAmount;
 
+  /// The employee's real assigned KRA rows. Empty → the repo falls back
+  /// to a generic template.
+  final List<MonthlyKraRow> rows;
+
   const RosterEntry({
     required this.id,
     required this.name,
@@ -30,6 +34,7 @@ class RosterEntry {
     this.managerId,
     this.managerName,
     this.eligibleAmount = 0,
+    this.rows = const [],
   });
 }
 
@@ -82,13 +87,13 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
         managerName: e.managerName,
         period: period,
         currentStage: ReviewStage.selfRating,
-        rows: _templateRows(),
+        // Real assigned KRAs when available; a generic template otherwise.
+        rows: e.rows.isNotEmpty ? e.rows : _templateRows(),
         incentive: IncentiveSnapshot(eligibleAmount: e.eligibleAmount),
       );
 
-  /// Default KRA template applied to a freshly generated review. These
-  /// are the *KRA structure*, not employee data — a real backend would
-  /// snapshot them from the employee's assigned template.
+  /// Fallback KRA template applied when an employee has no assigned KRAs
+  /// yet. A real backend would snapshot the employee's assigned template.
   List<MonthlyKraRow> _templateRows() => const [
         MonthlyKraRow(
           id: 'kra-delivery',
