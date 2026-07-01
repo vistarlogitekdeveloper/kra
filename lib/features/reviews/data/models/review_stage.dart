@@ -1,25 +1,82 @@
 import '../../../auth/data/models/user.dart';
 
-/// The five-stage monthly review pipeline. Every employee's review for a
-/// calendar month advances through these stages in order, each gated to a
-/// role and carrying a fixed day-of-month deadline.
+/// Ordered stages of a single monthly review.
 ///
-///   Self-Rating            → Employee            → 10th
-///   Account & HR Rating    → HR / Finance        → 12th
-///   Reporting Manager      → Manager             → 13th
-///   Management Review      → Admin / HR-Admin     → 15th
-///   Incentive Payout       → Finance / HR         → 20th
+/// Every calendar month, every employee runs through this pipeline in
+/// order. Only the roles in [actorRoles] can advance a stage, and only
+/// when the review's `currentStage` equals that stage. Submitting a
+/// stage moves the review to [next]; the terminal [completed] stage has
+/// no actor and loops to itself.
 ///
-/// [completed] is the terminal state once payout is marked.
+/// Deadlines are fixed to the same day of every month — see
+/// [deadlineDay] and `MonthlyDeadlines.forStage`.
 enum ReviewStage {
+  /// Employee scores every KRA row on their own review — the 10th.
   selfRating,
+
+  /// HR + Finance/Account provide a first-pass numerical check on the
+  /// self scores — the 12th.
   accountHrRating,
+
+  /// The employee's reporting manager writes the final per-row scores
+  /// and comments — the 13th.
   reportingManagerRating,
+
+  /// Admin / HR-Admin approves or returns the manager's rating with a
+  /// comment — the 15th.
   managementReview,
+
+  /// Finance / HR mark the computed incentive as paid — the 20th.
   incentivePayout,
+
+  /// Terminal state. No actor, no deadline, loops to itself as [next].
   completed;
 
-  /// Human-facing stage name.
+  /// UPPER_SNAKE wire form. Round-trips via [fromApi] / [toApiString].
+  static ReviewStage fromApi(String? value) {
+    final raw = (value ?? '').trim();
+    switch (raw.toUpperCase().replaceAll('-', '_')) {
+      case 'SELF_RATING':
+        return ReviewStage.selfRating;
+      case 'ACCOUNT_HR_RATING':
+        return ReviewStage.accountHrRating;
+      case 'REPORTING_MANAGER_RATING':
+        return ReviewStage.reportingManagerRating;
+      case 'MANAGEMENT_REVIEW':
+        return ReviewStage.managementReview;
+      case 'INCENTIVE_PAYOUT':
+        return ReviewStage.incentivePayout;
+      case 'COMPLETED':
+        return ReviewStage.completed;
+      default:
+        // Also tolerate camelCase (enum .name) from a newer backend,
+        // then pin unknowns to the earliest safe stage so the review
+        // still surfaces instead of taking out a whole dashboard.
+        for (final s in ReviewStage.values) {
+          if (s.name.toUpperCase() == raw.toUpperCase()) return s;
+        }
+        return ReviewStage.selfRating;
+    }
+  }
+
+  String toApiString() {
+    switch (this) {
+      case ReviewStage.selfRating:
+        return 'SELF_RATING';
+      case ReviewStage.accountHrRating:
+        return 'ACCOUNT_HR_RATING';
+      case ReviewStage.reportingManagerRating:
+        return 'REPORTING_MANAGER_RATING';
+      case ReviewStage.managementReview:
+        return 'MANAGEMENT_REVIEW';
+      case ReviewStage.incentivePayout:
+        return 'INCENTIVE_PAYOUT';
+      case ReviewStage.completed:
+        return 'COMPLETED';
+    }
+  }
+
+  /// Human label for chips, tiles, breadcrumbs.
   String get label {
     switch (this) {
       case ReviewStage.selfRating:
@@ -37,7 +94,8 @@ enum ReviewStage {
     }
   }
 
-  /// Day-of-month this stage is due. `null` for the terminal state.
+  /// Day of the reference month the stage is due. `null` for the
+  /// terminal [completed] stage. See `MonthlyDeadlines.forStage`.
   int? get deadlineDay {
     switch (this) {
       case ReviewStage.selfRating:
@@ -55,21 +113,28 @@ enum ReviewStage {
     }
   }
 
-  /// True when this stage captures per-KRA scores (vs. an approve/sign-off
-  /// or payout action). Drives whether the stage screen shows a rating
-  /// matrix.
-  bool get isRatingStage =>
-      this == ReviewStage.selfRating ||
-      this == ReviewStage.accountHrRating ||
-      this == ReviewStage.reportingManagerRating;
+  /// Roles that can advance this stage. A stage is actionable by a role
+  /// only when the review's current stage equals this stage AND the
+  /// caller's role is in this set.
+  Set<UserRole> get actorRoles {
+    switch (this) {
+      case ReviewStage.selfRating:
+        return const {UserRole.employee};
+      case ReviewStage.accountHrRating:
+        return const {UserRole.hr, UserRole.finance};
+      case ReviewStage.reportingManagerRating:
+        return const {UserRole.manager};
+      case ReviewStage.managementReview:
+        return const {UserRole.admin, UserRole.hrAdmin};
+      case ReviewStage.incentivePayout:
+        return const {UserRole.finance, UserRole.hr};
+      case ReviewStage.completed:
+        return const {};
+    }
+  }
 
-  bool get isTerminal => this == ReviewStage.completed;
-
-  /// Position in the pipeline (0-based), used for timeline UI. `completed`
-  /// sits past the last actionable stage.
-  int get pipelineIndex => index;
-
-  /// The next stage in the pipeline. `completed` stays `completed`.
+  /// Next stage in the pipeline. [completed] loops to itself so callers
+  /// never have to null-check the terminal edge.
   ReviewStage get next {
     switch (this) {
       case ReviewStage.selfRating:
@@ -87,112 +152,37 @@ enum ReviewStage {
     }
   }
 
-  /// Roles allowed to ACT on this stage. Self-rating is additionally
-  /// owner-scoped (only the review's own employee) and the manager stage
-  /// is scoped to the employee's reporting manager — that finer-grained
-  /// gating lives in the repository's list filters; this set is the coarse
-  /// role check used for routing and `MonthlyReview.isActionableBy`.
-  Set<UserRole> get actorRoles {
+  bool get isTerminal => this == ReviewStage.completed;
+
+  /// The three stages that capture per-row scores (self, account/HR,
+  /// reporting manager). Management review and incentive payout don't.
+  bool get isRatingStage =>
+      this == ReviewStage.selfRating ||
+      this == ReviewStage.accountHrRating ||
+      this == ReviewStage.reportingManagerRating;
+
+  /// 1-based position in the pipeline for the UI's "Step N / 5" chip.
+  /// [completed] returns 6 so a finished review still sorts last.
+  int get pipelineIndex {
     switch (this) {
       case ReviewStage.selfRating:
-        // Any authenticated user can self-rate their own review.
-        return UserRole.values.toSet();
+        return 1;
       case ReviewStage.accountHrRating:
-        return {
-          UserRole.hr,
-          UserRole.finance,
-          UserRole.hrAdmin,
-          UserRole.admin,
-        };
+        return 2;
       case ReviewStage.reportingManagerRating:
-        return {
-          UserRole.manager,
-          UserRole.bdManager,
-          UserRole.warehouseMgr,
-          UserRole.hrAdmin,
-          UserRole.admin,
-        };
+        return 3;
       case ReviewStage.managementReview:
-        return {UserRole.admin, UserRole.hrAdmin};
+        return 4;
       case ReviewStage.incentivePayout:
-        return {
-          UserRole.finance,
-          UserRole.hr,
-          UserRole.hrAdmin,
-          UserRole.admin,
-        };
+        return 5;
       case ReviewStage.completed:
-        return const {};
+        return 6;
     }
   }
 
-  String toApiString() => name;
+  /// Total pipeline length (excluding [completed]).
+  static const int pipelineLength = 5;
 
-  /// Tolerant parse from the wire (UPPER_SNAKE or camelCase). Falls back to
-  /// [selfRating] on anything unknown rather than throwing.
-  static ReviewStage fromApi(String? value) {
-    if (value == null) return ReviewStage.selfRating;
-    final n = value.trim().toUpperCase().replaceAll('-', '_');
-    switch (n) {
-      case 'SELF_RATING':
-      case 'SELFRATING':
-        return ReviewStage.selfRating;
-      case 'ACCOUNT_HR_RATING':
-      case 'ACCOUNTHRRATING':
-      case 'ACCOUNT_AND_HR':
-        return ReviewStage.accountHrRating;
-      case 'REPORTING_MANAGER_RATING':
-      case 'REPORTINGMANAGERRATING':
-      case 'MANAGER_RATING':
-        return ReviewStage.reportingManagerRating;
-      case 'MANAGEMENT_REVIEW':
-      case 'MANAGEMENTREVIEW':
-        return ReviewStage.managementReview;
-      case 'INCENTIVE_PAYOUT':
-      case 'INCENTIVEPAYOUT':
-        return ReviewStage.incentivePayout;
-      case 'COMPLETED':
-        return ReviewStage.completed;
-      default:
-        return ReviewStage.selfRating;
-    }
-  }
-}
-
-/// Status of an individual stage within a review.
-enum StageStatus {
-  /// Not yet reached (an upstream stage is still open).
-  notStarted,
-
-  /// This is the current stage and it's awaiting its actor.
-  pending,
-
-  /// Actor has begun but not submitted (e.g. a saved draft).
-  inProgress,
-
-  /// Actor has submitted / approved — the review has moved on.
-  done,
-
-  /// Stage was skipped (e.g. management returned without changes).
-  skipped;
-
-  String toApiString() => name;
-
-  static StageStatus fromApi(String? value) {
-    switch ((value ?? '').trim().toUpperCase()) {
-      case 'PENDING':
-        return StageStatus.pending;
-      case 'IN_PROGRESS':
-      case 'INPROGRESS':
-        return StageStatus.inProgress;
-      case 'DONE':
-      case 'SUBMITTED':
-      case 'APPROVED':
-        return StageStatus.done;
-      case 'SKIPPED':
-        return StageStatus.skipped;
-      default:
-        return StageStatus.notStarted;
-    }
-  }
+  /// True when [role] is one of [actorRoles].
+  bool isActionableBy(UserRole role) => actorRoles.contains(role);
 }

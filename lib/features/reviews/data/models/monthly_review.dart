@@ -1,7 +1,10 @@
 import '../../../../core/api/json_parse.dart';
 import '../../../auth/data/models/user.dart';
+import 'incentive_snapshot.dart';
 import 'monthly_kra_row.dart';
 import 'review_stage.dart';
+import 'stage_record.dart';
+import 'stage_status.dart';
 
 /// A calendar month a review belongs to. `month` is 1–12.
 class ReviewPeriod {
@@ -15,28 +18,27 @@ class ReviewPeriod {
   /// Stable key, e.g. "2026-06". Used for equality + map keys.
   String get key => '$year-${month.toString().padLeft(2, '0')}';
 
-  /// e.g. "June 2026".
-  String get label {
-    const names = [
-      '',
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    final m = (month >= 1 && month <= 12) ? names[month] : '';
-    return '$m $year';
-  }
+  static const _names = [
+    '',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
 
-  /// A DateTime anchored at the given [day] of this period.
+  /// e.g. "June 2026".
+  String get label => '${(month >= 1 && month <= 12) ? _names[month] : ''} '
+      '$year';
+
+  /// A DateTime anchored at [day] of this period.
   DateTime dateOn(int day) => DateTime(year, month, day);
 
   factory ReviewPeriod.parse(String key) {
@@ -55,77 +57,9 @@ class ReviewPeriod {
   int get hashCode => Object.hash(year, month);
 }
 
-enum PayoutStatus {
-  notReady,
-  ready,
-  paid;
-
-  String toApiString() => name;
-
-  static PayoutStatus fromApi(String? v) {
-    switch ((v ?? '').trim().toUpperCase()) {
-      case 'READY':
-        return PayoutStatus.ready;
-      case 'PAID':
-        return PayoutStatus.paid;
-      default:
-        return PayoutStatus.notReady;
-    }
-  }
-}
-
-/// Per-stage audit record: who acted, when, and any comment.
-class StageRecord {
-  final StageStatus status;
-  final String? actorId;
-  final String? actorName;
-  final DateTime? actedAt;
-  final String? comment;
-
-  const StageRecord({
-    this.status = StageStatus.notStarted,
-    this.actorId,
-    this.actorName,
-    this.actedAt,
-    this.comment,
-  });
-
-  factory StageRecord.fromJson(Map<String, dynamic> json) => StageRecord(
-        status: StageStatus.fromApi(JsonParse.parseString(json['status'])),
-        actorId: JsonParse.parseString(json['actorId']),
-        actorName: JsonParse.parseString(json['actorName']),
-        actedAt: JsonParse.parseDate(json['actedAt']),
-        comment: JsonParse.parseString(json['comment']),
-      );
-
-  Map<String, dynamic> toJson() => {
-        'status': status.toApiString(),
-        'actorId': actorId,
-        'actorName': actorName,
-        'actedAt': actedAt?.toIso8601String(),
-        'comment': comment,
-      };
-
-  StageRecord copyWith({
-    StageStatus? status,
-    String? actorId,
-    String? actorName,
-    DateTime? actedAt,
-    String? comment,
-  }) {
-    return StageRecord(
-      status: status ?? this.status,
-      actorId: actorId ?? this.actorId,
-      actorName: actorName ?? this.actorName,
-      actedAt: actedAt ?? this.actedAt,
-      comment: comment ?? this.comment,
-    );
-  }
-}
-
 /// One employee's review for one calendar month, moving through the
-/// 5-stage pipeline. This is the new replacement for the cycle-scoped
-/// review — there is exactly one per (employee, month).
+/// 5-stage pipeline. Exactly one exists per (employee, month) — the
+/// replacement for the cycle-scoped review.
 class MonthlyReview {
   final String id;
   final String employeeId;
@@ -137,13 +71,13 @@ class MonthlyReview {
 
   final ReviewPeriod period;
   final ReviewStage currentStage;
+
+  /// A record exists in this map only for **submitted** stages — its
+  /// presence is the source of truth for "this stage is done".
   final Map<ReviewStage, StageRecord> stageRecords;
   final List<MonthlyKraRow> rows;
 
-  /// Per-employee monthly incentive the payout is computed against.
-  final double eligibleAmount;
-  final PayoutStatus payoutStatus;
-  final DateTime? paidAt;
+  final IncentiveSnapshot incentive;
 
   const MonthlyReview({
     required this.id,
@@ -157,33 +91,43 @@ class MonthlyReview {
     this.currentStage = ReviewStage.selfRating,
     this.stageRecords = const {},
     this.rows = const [],
-    this.eligibleAmount = 0,
-    this.payoutStatus = PayoutStatus.notReady,
-    this.paidAt,
+    this.incentive = const IncentiveSnapshot(),
   });
 
-  StageRecord recordFor(ReviewStage stage) =>
-      stageRecords[stage] ?? const StageRecord();
+  // ── Incentive convenience (delegates to [incentive]) ──────────────────
+  double get eligibleAmount => incentive.eligibleAmount;
+  PayoutStatus get payoutStatus => incentive.payoutStatus;
+  DateTime? get paidAt => incentive.paidAt;
 
-  /// Coarse role gate: the review is sitting on [currentStage] and [role]
-  /// is allowed to act on it. Ownership/manager scoping is applied by the
-  /// repository when it lists "my actionable reviews".
+  StageRecord? recordFor(ReviewStage stage) => stageRecords[stage];
+
+  /// Derived coarse status of [stage] on this review.
+  StageStatus statusOf(ReviewStage stage) {
+    if (stage.isTerminal) {
+      return isComplete ? StageStatus.submitted : StageStatus.pending;
+    }
+    if (stageRecords.containsKey(stage)) return StageStatus.submitted;
+    if (stage == currentStage) return StageStatus.inProgress;
+    return StageStatus.pending;
+  }
+
+  /// Coarse role gate: the review sits on [currentStage] and [role] can
+  /// act on it. Ownership/manager scoping is applied by the repository.
   bool isActionableBy(UserRole role) =>
       !currentStage.isTerminal && currentStage.actorRoles.contains(role);
 
   bool get isComplete => currentStage.isTerminal;
 
-  /// Weighted 0–100 total of the scores recorded by [stage]. N/A handling
-  /// isn't modelled here yet (mock); rows without a score contribute 0.
+  /// Weighted 0–100 total of the scores recorded by [stage]. Rows
+  /// without a score (or N/A) drop out of both numerator and denominator.
   double weightedScorePct(ReviewStage stage) {
-    if (rows.isEmpty) return 0;
     double weighted = 0;
     double totalWeight = 0;
     for (final row in rows) {
-      totalWeight += row.weightagePercent;
       final s = row.scoreFor(stage);
-      if (s == null || row.maxScore <= 0) continue;
-      weighted += (s.value / row.maxScore) * row.weightagePercent;
+      if (s == null || s.value == null || row.maxScore <= 0) continue;
+      totalWeight += row.weightagePercent;
+      weighted += (s.value! / row.maxScore) * row.weightagePercent;
     }
     if (totalWeight <= 0) return 0;
     return (weighted * 100 / totalWeight).clamp(0, 100).toDouble();
@@ -197,7 +141,7 @@ class MonthlyReview {
       ReviewStage.accountHrRating,
       ReviewStage.selfRating,
     ]) {
-      if (rows.any((r) => r.scoreFor(stage) != null)) {
+      if (rows.any((r) => r.scoreFor(stage)?.value != null)) {
         return weightedScorePct(stage);
       }
     }
@@ -224,6 +168,17 @@ class MonthlyReview {
             JsonParse.parseInt(json['year']) ?? 0,
             JsonParse.parseInt(json['month']) ?? 1,
           );
+    // Incentive may arrive nested under `incentive`, or flat on the
+    // review (eligibleAmount / payoutStatus / paidAt) — read both.
+    final incentiveMap = JsonParse.parseMap(json['incentive']);
+    final incentive = incentiveMap != null
+        ? IncentiveSnapshot.fromJson(incentiveMap)
+        : IncentiveSnapshot(
+            eligibleAmount: JsonParse.parseDouble(json['eligibleAmount']) ?? 0,
+            payoutStatus: PayoutStatus.fromApi(
+                JsonParse.parseString(json['payoutStatus'])),
+            paidAt: JsonParse.parseDate(json['paidAt']),
+          );
     return MonthlyReview(
       id: JsonParse.parseString(json['id']) ?? '',
       employeeId: JsonParse.parseString(json['employeeId']) ?? '',
@@ -239,10 +194,7 @@ class MonthlyReview {
       rows: JsonParse.parseMapList(json['rows'])
           .map(MonthlyKraRow.fromJson)
           .toList(),
-      eligibleAmount: JsonParse.parseDouble(json['eligibleAmount']) ?? 0,
-      payoutStatus:
-          PayoutStatus.fromApi(JsonParse.parseString(json['payoutStatus'])),
-      paidAt: JsonParse.parseDate(json['paidAt']),
+      incentive: incentive,
     );
   }
 
@@ -259,9 +211,7 @@ class MonthlyReview {
         'stageRecords':
             stageRecords.map((k, v) => MapEntry(k.toApiString(), v.toJson())),
         'rows': rows.map((r) => r.toJson()).toList(),
-        'eligibleAmount': eligibleAmount,
-        'payoutStatus': payoutStatus.toApiString(),
-        'paidAt': paidAt?.toIso8601String(),
+        'incentive': incentive.toJson(),
       };
 
   MonthlyReview copyWith({
@@ -276,9 +226,7 @@ class MonthlyReview {
     ReviewStage? currentStage,
     Map<ReviewStage, StageRecord>? stageRecords,
     List<MonthlyKraRow>? rows,
-    double? eligibleAmount,
-    PayoutStatus? payoutStatus,
-    DateTime? paidAt,
+    IncentiveSnapshot? incentive,
   }) {
     return MonthlyReview(
       id: id ?? this.id,
@@ -292,9 +240,7 @@ class MonthlyReview {
       currentStage: currentStage ?? this.currentStage,
       stageRecords: stageRecords ?? this.stageRecords,
       rows: rows ?? this.rows,
-      eligibleAmount: eligibleAmount ?? this.eligibleAmount,
-      payoutStatus: payoutStatus ?? this.payoutStatus,
-      paidAt: paidAt ?? this.paidAt,
+      incentive: incentive ?? this.incentive,
     );
   }
 }
