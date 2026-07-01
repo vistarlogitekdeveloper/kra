@@ -76,10 +76,18 @@ class _MonthlyReviewDetailScreenState
     final reviewAsync = ref.watch(monthlyReviewDetailProvider(widget.reviewId));
     final scope = ref.watch(currentReviewScopeProvider);
 
+    // Title shows the employee once loaded so the app bar isn't a repeat
+    // of the dashboard. Falls back to the section label during the async
+    // fetch and any error state.
+    final title = reviewAsync.maybeWhen(
+      data: (r) => r.employeeName,
+      orElse: () => AppStrings.monthlyReviewsTitleAll,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(AppStrings.monthlyReviewsTitleAll),
+        title: Text(title),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
@@ -282,14 +290,19 @@ class _MonthlyReviewDetailScreenState
     ReviewScope scope, {
     required bool approved,
   }) async {
+    final comment = _commentCtrl.text.trim();
+    // Reject an empty-comment return — the reporting manager needs a
+    // reason to redo their stage, otherwise the return is unactionable.
+    if (!approved && comment.isEmpty) {
+      _snack('Add a comment before returning the review.');
+      return;
+    }
     await _run(
       () => ref.read(monthlyReviewRepositoryProvider).submitStage(
             review.id,
             ReviewStage.managementReview,
             approved: approved,
-            comment: _commentCtrl.text.trim().isEmpty
-                ? null
-                : _commentCtrl.text.trim(),
+            comment: comment.isEmpty ? null : comment,
             actorId: scope.userId,
             actorName: scope.userName,
           ),
