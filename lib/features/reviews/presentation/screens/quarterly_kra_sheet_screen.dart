@@ -260,11 +260,41 @@ class _Sheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final any = _any;
     if (any == null) {
+      // A review row only exists once HR has generated the cycle's monthly
+      // reviews. Employees added mid-cycle land here until that happens, so
+      // explain it rather than dead-ending on a bare "no review" line.
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: Text('No review for this employee this quarter.',
-              style: TextStyle(color: AppColors.textSecondary)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.event_note_outlined,
+                  size: 44, color: AppColors.textMuted),
+              SizedBox(height: 14),
+              Text(
+                'No review to rate yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'This quarter’s review hasn’t been set up for these '
+                'KRAs yet. It will appear here once HR generates it — '
+                'please check back or contact HR.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.45,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
