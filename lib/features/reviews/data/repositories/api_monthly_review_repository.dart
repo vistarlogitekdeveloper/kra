@@ -24,6 +24,7 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
   Future<List<MonthlyReviewSummary>> listMonthlyReviews({
     required int year,
     required int month,
+    bool mine = false,
     UserRole? scopeRole,
     String? scopeEmployeeId,
     String? scopeManagerId,
@@ -35,6 +36,10 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
         queryParameters: {
           'year': year,
           'month': month,
+          // `mine=true` forces the caller's OWN monthly review for every role
+          // (the "My KRA / self-rating" sheet). Without it the backend scopes
+          // by JWT and a manager would get their direct reports instead.
+          if (mine) 'mine': true,
           if (currentStage != null) 'currentStage': currentStage.toApiString(),
         },
       );

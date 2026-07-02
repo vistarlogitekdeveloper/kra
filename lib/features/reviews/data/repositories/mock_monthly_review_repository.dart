@@ -166,6 +166,7 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
   Future<List<MonthlyReviewSummary>> listMonthlyReviews({
     required int year,
     required int month,
+    bool mine = false,
     UserRole? scopeRole,
     String? scopeEmployeeId,
     String? scopeManagerId,

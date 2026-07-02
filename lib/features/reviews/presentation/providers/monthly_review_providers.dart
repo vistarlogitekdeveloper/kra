@@ -255,11 +255,18 @@ final quarterlySheetProvider = FutureProvider.autoDispose.family<
   final scope = ref.watch(currentReviewScopeProvider);
   final repo = ref.read(monthlyReviewRepositoryProvider);
   final months = quarterMonthsFor(args.anchor);
+  // When this sheet is the signed-in user's OWN (the "My KRA / self-rating"
+  // screen, for every role), force `mine=true` so the backend returns their
+  // own monthly review — a manager would otherwise get their direct reports
+  // and the self-id filter below would find nothing. A manager viewing a
+  // report's sheet (employeeId != own) keeps the default role scope.
+  final isOwnSheet = scope != null && args.employeeId == scope.userId;
   final reviews = <MonthlyReview?>[];
   for (final period in months) {
     final list = await repo.listMonthlyReviews(
       year: period.year,
       month: period.month,
+      mine: isOwnSheet,
       scopeRole: scope?.role,
     );
     final matches =

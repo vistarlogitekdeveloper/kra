@@ -133,11 +133,14 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
   Future<List<MonthlyReviewSummary>> listMonthlyReviews({
     required int year,
     required int month,
+    bool mine = false,
     UserRole? scopeRole,
     String? scopeEmployeeId,
     String? scopeManagerId,
     ReviewStage? currentStage,
   }) async {
+    // [mine] is a live-backend scope hint; this in-memory repo already builds
+    // a role-scoped roster in [_ensure], so there's nothing extra to filter.
     final period = ReviewPeriod(year, month);
     final roster = await _ensure(period);
     // Scope to THIS caller's roster ids — never the whole store, which may
