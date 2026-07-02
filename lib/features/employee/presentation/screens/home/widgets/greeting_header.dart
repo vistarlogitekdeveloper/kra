@@ -31,12 +31,17 @@ class GreetingHeader extends StatelessWidget {
   /// nothing and the widget reads `DateTime.now()`.
   final DateTime? now;
 
+  /// Optional top-right action (e.g. the workspace switcher for
+  /// manager/HR roles). Null for plain employees.
+  final Widget? trailing;
+
   const GreetingHeader({
     super.key,
     required this.name,
     required this.employeeCode,
     required this.roleLabel,
     this.now,
+    this.trailing,
   });
 
   String _greeting(int hour) {
@@ -54,14 +59,25 @@ class GreetingHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${_greeting(clock.hour)}, $name',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.4,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  '${_greeting(clock.hour)}, $name',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                trailing!,
+              ],
+            ],
           ),
           const SizedBox(height: 6),
           Row(

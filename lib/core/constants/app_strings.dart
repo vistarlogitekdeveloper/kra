@@ -697,8 +697,8 @@ class AppStrings {
   static const String managerDashboardNoReportsTitle =
       'You don\'t manage any team members';
   static const String managerDashboardNoReportsMessage =
-      'You\'re set up as a manager but no direct reports are assigned to you yet. Switch to "My Review" to rate yourself, or contact HR.';
-  static const String managerDashboardNoReportsCta = 'Go to My Review';
+      'You\'re set up as a manager but no direct reports are assigned to you yet. Open My KRA to rate yourself, or contact HR.';
+  static const String managerDashboardNoReportsCta = 'Go to My KRA';
 
   // ───── Team list ─────
   static const String managerTeamTitle = 'My team';
@@ -882,4 +882,28 @@ class AppStrings {
 
   // ───── Drawer / shared ─────
   static const String hrDrawerSwitchToManager = 'Switch to Manager view';
+
+  // ─────────────────────────────────────────────────────────────────
+  // My KRA (universal self-view) + cross-role workspace switching
+  // ─────────────────────────────────────────────────────────────────
+
+  // Empty state on the home tab when the signed-in user has no active
+  // KRA/review yet (no active cycle). Shown to EVERY role — a manager or
+  // HR admin who hasn't been assigned a KRA lands here too.
+  static const String myKraEmptyTitle = 'No active KRA yet';
+  static const String myKraEmptyMessage =
+      'You don\'t have a KRA to fill right now. It\'ll show up here as soon '
+      'as one is assigned to you.';
+
+  // Workspace switcher — lets manager/HR roles hop from their own KRA
+  // (the default landing) into the extra areas their role unlocks.
+  static const String workspaceSwitchTitle = 'Switch workspace';
+  static const String workspaceSwitchTooltip = 'Switch workspace';
+  static const String workspaceMyKra = 'My KRA';
+  static const String workspaceMyKraSubtitle = 'Your own review & self-rating';
+  static const String workspaceMyTeam = 'My Team';
+  static const String workspaceMyTeamSubtitle = 'Review your team';
+  static const String workspaceHrAdmin = 'HR Admin';
+  static const String workspaceHrAdminSubtitle =
+      'Employees, templates & reports';
 }

@@ -6,10 +6,12 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../../core/widgets/workspace_switcher.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../data/models/employee_dashboard.dart';
 import '../../providers/employee_dashboard_providers.dart';
 import '../../providers/my_profile_providers.dart';
+import '../../widgets/empty_my_dashboard.dart';
 import 'widgets/current_month_card.dart';
 import 'widgets/deadline_banner.dart';
 import 'widgets/greeting_header.dart';
@@ -64,6 +66,32 @@ class EmployeeHomeScreen extends ConsumerWidget {
     );
     final roleLabel = user?.role.displayName ?? '';
 
+    // Empty self-view is a normal state, not an error: when the signed-in
+    // user has no active cycle (`/employee/dashboard` returns 200 with a null
+    // cycle), show a clear "No active KRA yet" empty state instead of the
+    // populated sections. Only a SUCCESSFUL null-cycle payload triggers this —
+    // loading still shows shimmers and a real network error still shows the
+    // per-section retry card (see the sections below).
+    final showEmptyKra = ref.watch(
+      employeeDashboardProvider.select(
+        (a) => a.maybeWhen(
+          data: (d) => !d.hasActiveCycle,
+          orElse: () => false,
+        ),
+      ),
+    );
+
+    // Manager/HR roles land on their own KRA too; give them a one-tap hop to
+    // their extra workspace(s). Plain employees (only My KRA) get no button.
+    final header = GreetingHeader(
+      name: _firstName(fullName),
+      employeeCode: employeeCode,
+      roleLabel: roleLabel,
+      trailing: (user != null && WorkspaceSwitcher.hasExtras(user.role))
+          ? _WorkspaceSwitchButton(onTap: () => WorkspaceSwitcher.show(context, ref))
+          : null,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -71,24 +99,22 @@ class EmployeeHomeScreen extends ConsumerWidget {
         child: RefreshIndicator(
           color: AppColors.primaryPurple,
           onRefresh: () => _refresh(ref),
-          child: ListView(
-            // Always-scrollable so RefreshIndicator works even when the
-            // body would otherwise be too short to overscroll.
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 32),
-            children: [
-              GreetingHeader(
-                name: _firstName(fullName),
-                employeeCode: employeeCode,
-                roleLabel: roleLabel,
-              ),
-              const _DeadlineBannerSection(),
-              const _CurrentMonthSection(),
-              const _MyKrasSection(),
-              const _HistoryStripSection(),
-              const _IncentiveSection(),
-            ],
-          ),
+          child: showEmptyKra
+              ? _EmptyKraBody(header: header, onRetry: () => _refresh(ref))
+              : ListView(
+                  // Always-scrollable so RefreshIndicator works even when the
+                  // body would otherwise be too short to overscroll.
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 32),
+                  children: [
+                    header,
+                    const _DeadlineBannerSection(),
+                    const _CurrentMonthSection(),
+                    const _MyKrasSection(),
+                    const _HistoryStripSection(),
+                    const _IncentiveSection(),
+                  ],
+                ),
         ),
       ),
     );
@@ -97,6 +123,77 @@ class EmployeeHomeScreen extends ConsumerWidget {
   String _firstName(String fullName) {
     if (fullName.trim().isEmpty) return 'there';
     return fullName.trim().split(' ').first;
+  }
+}
+
+/// Top-right pill button in the greeting header that opens the workspace
+/// switcher. Only rendered for roles with more than one workspace.
+class _WorkspaceSwitchButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _WorkspaceSwitchButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: AppStrings.workspaceSwitchTooltip,
+      child: Material(
+        color: AppColors.primaryPurple.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: const Padding(
+            padding: EdgeInsets.all(9),
+            child: Icon(
+              Icons.grid_view_rounded,
+              color: AppColors.primaryPurple,
+              size: 20,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-height, pull-to-refreshable body shown when the user has no active
+/// KRA. Keeps the greeting header on top and centres [EmptyMyDashboard] in
+/// the remaining space.
+class _EmptyKraBody extends StatelessWidget {
+  final Widget header;
+  final VoidCallback onRetry;
+  const _EmptyKraBody({required this.header, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    // ConstrainedBox(minHeight) + IntrinsicHeight is the scroll-safe idiom for
+    // "header on top, empty state centred in the space below": on a tall
+    // viewport the Expanded fills and centres; on a short one (landscape /
+    // split-screen) the content keeps its intrinsic height and the whole body
+    // scrolls instead of overflowing. A fixed SizedBox(height: maxHeight)
+    // would clamp and overflow the empty card on short viewports.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: IntrinsicHeight(
+            child: Column(
+              children: [
+                header,
+                Expanded(
+                  child: EmptyMyDashboard(
+                    title: AppStrings.myKraEmptyTitle,
+                    message: AppStrings.myKraEmptyMessage,
+                    onRetry: onRetry,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

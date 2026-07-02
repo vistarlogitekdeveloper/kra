@@ -115,6 +115,12 @@ class ManagerTeamListState {
   final bool isLoadingMore;
   final String? error;
 
+  /// True when the backend answered a manager-scoped call with the
+  /// "you manage no one" 403 (see [ApiError.isNoDirectReports]). This is a
+  /// normal state, not a failure — the Team tab shows the no-reports empty
+  /// state (with a jump to the self-view) instead of a raw error.
+  final bool noReports;
+
   /// Multi-select state for bulk-approve. Holds review ids (not
   /// employee ids) because the bulk-approve endpoint takes reviewIds.
   final Set<String> selectedReviewIds;
@@ -129,6 +135,7 @@ class ManagerTeamListState {
     this.isInitialLoading = true,
     this.isLoadingMore = false,
     this.error,
+    this.noReports = false,
     this.selectedReviewIds = const {},
     this.isSelectionMode = false,
   });
@@ -142,6 +149,7 @@ class ManagerTeamListState {
     bool? isInitialLoading,
     bool? isLoadingMore,
     Object? error = _sentinel,
+    bool? noReports,
     Set<String>? selectedReviewIds,
     bool? isSelectionMode,
   }) {
@@ -154,6 +162,7 @@ class ManagerTeamListState {
       isInitialLoading: isInitialLoading ?? this.isInitialLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: identical(error, _sentinel) ? this.error : error as String?,
+      noReports: noReports ?? this.noReports,
       selectedReviewIds: selectedReviewIds ?? this.selectedReviewIds,
       isSelectionMode: isSelectionMode ?? this.isSelectionMode,
     );
@@ -182,6 +191,7 @@ class ManagerTeamListController extends StateNotifier<ManagerTeamListState> {
       members: const [],
       page: 0,
       error: null,
+      noReports: false,
     );
     try {
       final page = await _repo.listTeam(
@@ -200,7 +210,14 @@ class ManagerTeamListController extends StateNotifier<ManagerTeamListState> {
         isInitialLoading: false,
       );
     } on ApiError catch (e) {
-      state = state.copyWith(isInitialLoading: false, error: e.message);
+      // "You manage no one" is a data state, not an error — the Team tab
+      // empty-states it (with a jump to the self-view) rather than showing
+      // a raw 403.
+      if (e.isNoDirectReports) {
+        state = state.copyWith(isInitialLoading: false, noReports: true);
+      } else {
+        state = state.copyWith(isInitialLoading: false, error: e.message);
+      }
     } catch (e, st) {
       assert(() {
         debugPrint('team list parse failed: $e\n$st');

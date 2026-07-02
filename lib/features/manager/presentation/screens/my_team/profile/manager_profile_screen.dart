@@ -192,8 +192,19 @@ class _LinksSection extends StatelessWidget {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () =>
-                  context.go(AppRoutes.employeeProfile),
+              onTap: () => context.go(AppRoutes.employeeHome),
+              child: const ProfileFieldRow(
+                label: AppStrings.workspaceMyKra,
+                value: AppStrings.workspaceMyKraSubtitle,
+                icon: Icons.assignment_ind_rounded,
+                isLast: false,
+              ),
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.go(AppRoutes.employeeProfile),
               child: const ProfileFieldRow(
                 label: 'View as Employee',
                 value: 'Open the employee profile (self-rate / history)',

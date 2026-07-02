@@ -171,6 +171,19 @@ class _HrDrawer extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
+                  // Every role — HR included — owns a KRA/review. Keep the
+                  // self-view one tap away so HR can rate themselves without
+                  // leaving the admin surface behind.
+                  const _DrawerSectionLabel(title: 'Workspace'),
+                  _DrawerItem(
+                    icon: Icons.assignment_ind_rounded,
+                    label: AppStrings.workspaceMyKra,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.go(AppRoutes.employeeHome);
+                    },
+                  ),
+                  const Divider(color: AppColors.divider, height: 24),
                   const _DrawerSectionLabel(title: 'Management'),
                   _DrawerItem(
                     icon: Icons.location_on_rounded,

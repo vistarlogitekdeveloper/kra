@@ -49,7 +49,7 @@ class ManagerDashboardScreen extends ConsumerWidget {
           error: (e, _) {
             // `NO_DIRECT_REPORTS` is a structured "you don't have a
             // team yet" — render the empty-state, not the error view.
-            if (e is ApiError && e.code == 'NO_DIRECT_REPORTS') {
+            if (e is ApiError && e.isNoDirectReports) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: const [NoReportsEmptyState()],

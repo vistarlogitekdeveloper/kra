@@ -11,6 +11,7 @@ import '../../../../../hr/presentation/widgets/search_bar_filter.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/team_member.dart';
 import '../../../providers/manager_team_providers.dart';
+import '../dashboard/widgets/no_reports_empty_state.dart';
 import 'widgets/bulk_select_app_bar.dart';
 import 'widgets/team_filter_chips.dart';
 import 'widgets/team_member_tile.dart';
@@ -24,6 +25,15 @@ class TeamListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(managerTeamFilterProvider);
     final list = ref.watch(managerTeamListProvider);
+
+    // A manager with zero direct reports gets a friendly empty state (with a
+    // jump into their own KRA), never a raw 403.
+    if (list.noReports) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(child: NoReportsEmptyState()),
+      );
+    }
 
     final approveTargets = list.selectedReviewIds.toList();
 

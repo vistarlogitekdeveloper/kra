@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../auth/data/models/user.dart';
+import '../../../manager/presentation/screens/my_team/dashboard/widgets/no_reports_empty_state.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
@@ -79,15 +81,23 @@ class _ReviewList extends ConsumerWidget {
           ref.invalidate(monthlyReviewListProvider(period)),
       child: listAsync.when(
         loading: () => const _DashboardSkeleton(),
-        error: (e, _) => ListView(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(e.toString(),
-                  style: const TextStyle(color: AppColors.error)),
-            ),
-          ],
-        ),
+        error: (e, _) {
+          // A manager with zero direct reports (the roster load 403s) gets
+          // the friendly no-team empty state with a jump into their own KRA
+          // — never a raw 403 on the dashboard they land next to.
+          if (e is ApiError && e.isNoDirectReports) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [NoReportsEmptyState()],
+            );
+          }
+          // Everything else (cold-start timeout, roster failure, …) gets a
+          // friendly message + retry — never a raw `ApiError(...)` dump.
+          return _ReviewListError(
+            message: e is ApiError ? e.message : AppStrings.errorGeneric,
+            onRetry: () => ref.invalidate(monthlyReviewListProvider(period)),
+          );
+        },
         data: (items) {
           if (items.isEmpty) {
             return ListView(
@@ -234,6 +244,57 @@ class _DashboardSkeleton extends StatelessWidget {
         ShimmerBox(height: 78, borderRadius: 16),
         SizedBox(height: 12),
         ShimmerBox(height: 78, borderRadius: 16),
+      ],
+    );
+  }
+}
+
+/// Friendly, retryable error for the monthly-review list — replaces a raw
+/// `e.toString()` dump so a Render cold-start timeout reads as a message, not
+/// a technical class name. Scrollable so pull-to-refresh still works.
+class _ReviewListError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ReviewListError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 72),
+      children: [
+        const Icon(Icons.error_outline_rounded,
+            size: 44, color: AppColors.error),
+        const SizedBox(height: 14),
+        const Text(
+          AppStrings.errorGeneric,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 12.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text(AppStrings.commonRetry),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primaryPurple,
+            ),
+          ),
+        ),
       ],
     );
   }
