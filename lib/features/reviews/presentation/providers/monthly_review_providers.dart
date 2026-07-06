@@ -216,6 +216,49 @@ final monthlyReviewDetailProvider =
   return ref.read(monthlyReviewRepositoryProvider).getReview(id);
 });
 
+/// The three months of the fiscal quarter (Apr-start, matching the KRA
+/// sheet: Q1 = Apr–Jun) that contains [p].
+List<ReviewPeriod> quarterMonthsFor(ReviewPeriod p) {
+  final int start;
+  if (p.month >= 4 && p.month <= 6) {
+    start = 4;
+  } else if (p.month >= 7 && p.month <= 9) {
+    start = 7;
+  } else if (p.month >= 10 && p.month <= 12) {
+    start = 10;
+  } else {
+    start = 1; // Jan–Mar
+  }
+  return [
+    ReviewPeriod(p.year, start),
+    ReviewPeriod(p.year, start + 1),
+    ReviewPeriod(p.year, start + 2),
+  ];
+}
+
+/// One employee's three monthly reviews for the quarter that contains
+/// `anchor`. Any month with no review yet comes back null. Powers the
+/// quarterly KRA sheet.
+final quarterlySheetProvider = FutureProvider.autoDispose.family<
+    ({List<ReviewPeriod> months, List<MonthlyReview?> reviews}),
+    ({String employeeId, ReviewPeriod anchor})>((ref, args) async {
+  final scope = ref.watch(currentReviewScopeProvider);
+  final repo = ref.read(monthlyReviewRepositoryProvider);
+  final months = quarterMonthsFor(args.anchor);
+  final reviews = <MonthlyReview?>[];
+  for (final period in months) {
+    final list = await repo.listMonthlyReviews(
+      year: period.year,
+      month: period.month,
+      scopeRole: scope?.role,
+    );
+    final matches =
+        list.where((s) => s.employeeId == args.employeeId).toList();
+    reviews.add(matches.isEmpty ? null : await repo.getReview(matches.first.id));
+  }
+  return (months: months, reviews: reviews);
+});
+
 /// Full reviews (with their KRA rows) for [period], scoped to the signed-in
 /// user's role. Powers the admin dashboard's at-a-glance matrix, which needs
 /// per-KRA scores the lightweight summaries don't carry. Fetches each

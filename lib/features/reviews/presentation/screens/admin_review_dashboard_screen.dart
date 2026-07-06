@@ -31,6 +31,9 @@ class _AdminReviewDashboardScreenState
   /// Selected KRA header. Null → no per-KRA column (overview of everyone).
   String? _kraFilter;
 
+  /// Employee search text (name or code).
+  String _search = '';
+
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(currentReviewScopeProvider)?.role;
@@ -70,6 +73,8 @@ class _AdminReviewDashboardScreenState
                 role: role,
                 kraFilter: _kraFilter,
                 onKraFilter: (h) => setState(() => _kraFilter = h),
+                search: _search,
+                onSearch: (v) => setState(() => _search = v),
               ),
             ),
           ),
@@ -84,11 +89,15 @@ class _Content extends StatelessWidget {
   final UserRole? role;
   final String? kraFilter;
   final ValueChanged<String?> onKraFilter;
+  final String search;
+  final ValueChanged<String> onSearch;
   const _Content({
     required this.reviews,
     required this.role,
     required this.kraFilter,
     required this.onKraFilter,
+    required this.search,
+    required this.onSearch,
   });
 
   @override
@@ -110,16 +119,45 @@ class _Content extends StatelessWidget {
     }.toList()
       ..sort();
 
-    // When a KRA is selected, narrow to employees who actually have it.
-    final visible = kraFilter == null
-        ? reviews
-        : reviews
-            .where((r) => r.rows.any((row) => row.name == kraFilter))
-            .toList();
+    final q = search.trim().toLowerCase();
+    final visible = reviews.where((r) {
+      // KRA filter → only employees who have that KRA.
+      if (kraFilter != null && !r.rows.any((row) => row.name == kraFilter)) {
+        return false;
+      }
+      // Search → name or code.
+      if (q.isNotEmpty &&
+          !r.employeeName.toLowerCase().contains(q) &&
+          !r.employeeCode.toLowerCase().contains(q)) {
+        return false;
+      }
+      return true;
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: TextField(
+            onChanged: onSearch,
+            decoration: InputDecoration(
+              hintText: AppStrings.adminDashSearchHint,
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              isDense: true,
+              filled: true,
+              fillColor: AppColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+            ),
+          ),
+        ),
         _FilterBar(headers: headers, selected: kraFilter, onSelect: onKraFilter),
         const Divider(height: 1, color: AppColors.divider),
         Expanded(
@@ -242,7 +280,7 @@ class _ReviewTable extends StatelessWidget {
           DataRow(
             selected: role != null && r.isActionableBy(role!),
             onSelectChanged: (_) =>
-                context.push(AppRoutes.monthlyReviewDetail(r.id)),
+                context.push(AppRoutes.reviewsQuarterlyFor(r.employeeId)),
             cells: [
               DataCell(_EmployeeCell(
                 review: r,

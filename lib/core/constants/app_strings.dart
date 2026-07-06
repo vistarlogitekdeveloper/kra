@@ -14,6 +14,12 @@ class AppStrings {
   static const String adminDashColScore = 'Score';
   static const String adminDashColIncentive = 'Incentive';
   static const String adminDashNeedsReview = 'Awaiting your review';
+  static const String adminDashSearchHint = 'Search employees…';
+
+  // ───── Quarterly KRA sheet ─────
+  static const String quarterlySheetTitle = 'Quarterly KRA Sheet';
+  static const String quarterlyPayoutTitle = 'Quarter payout';
+  static const String quarterlyPayoutAmount = 'Payout this quarter';
 
   // ───── App ─────
   static const String appName = 'Vistar';

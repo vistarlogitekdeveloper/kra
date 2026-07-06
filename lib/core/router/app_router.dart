@@ -10,6 +10,7 @@ import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/reviews/presentation/screens/admin_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_detail_screen.dart';
+import '../../features/reviews/presentation/screens/quarterly_kra_sheet_screen.dart';
 import '../widgets/route_error_screen.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
 import '../../features/employee/presentation/screens/history/my_reviews_history_screen.dart';
@@ -64,6 +65,12 @@ class AppRoutes {
   // login can reach it. Phase 3 wires these into the role shells.
   static const String monthlyReviews = '/reviews/monthly';
   static String monthlyReviewDetail(String id) => '/reviews/monthly/$id';
+
+  // Quarterly KRA sheet — the per-employee 3-month sheet. No id → the
+  // signed-in user's own sheet (employee self view).
+  static const String reviewsQuarterly = '/reviews/quarterly';
+  static String reviewsQuarterlyFor(String employeeId) =>
+      '/reviews/quarterly/$employeeId';
 
   // ── Employee module nested routes ──
   // Every authenticated user (except ADMIN) lands inside /employee/* —
@@ -274,6 +281,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.forgotPassword,
         builder: (_, __) => const ForgotPasswordScreen(),
       ),
+
+      // ───── Quarterly KRA sheet (per-employee, full screen) ─────
+      GoRoute(
+        path: AppRoutes.reviewsQuarterly,
+        builder: (_, __) => const QuarterlyKraSheetScreen(),
+        routes: [
+          GoRoute(
+            path: ':employeeId',
+            builder: (_, state) => QuarterlyKraSheetScreen(
+              employeeId: state.pathParameters['employeeId'],
+            ),
+          ),
+        ],
+      ),
       GoRoute(
         path: AppRoutes.resetPassword,
         // Token arrives via the emailed deep link (?token=...).
@@ -330,7 +351,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.employeeSelfRate,
-                builder: (_, __) => const MonthlyReviewDashboardScreen(),
+                // The employee's own quarterly KRA sheet — they view and edit
+                // their Self scores across the quarter here.
+                builder: (_, __) => const QuarterlyKraSheetScreen(),
                 routes: [
                   GoRoute(
                     path: 'review',
