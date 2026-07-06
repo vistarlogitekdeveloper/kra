@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/shimmer_box.dart';
@@ -179,12 +180,12 @@ class _QuarterlyKraSheetScreenState
       ),
       body: sheetAsync.when(
         loading: () => const _Skeleton(),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(e.toString(),
-                style: const TextStyle(color: AppColors.error)),
-          ),
+        error: (e, _) => _SheetError(
+          message: e is ApiError
+              ? e.combinedMessage
+              : 'Something went wrong. Please try again.',
+          onRetry: () => ref.invalidate(quarterlySheetProvider(
+              (employeeId: employeeId, anchor: _anchor!))),
         ),
         data: (data) => _Sheet(
           months: data.months,
@@ -686,6 +687,48 @@ class _PayoutCard extends StatelessWidget {
                       ? AppColors.primaryPurple
                       : AppColors.textPrimary)),
         ],
+      ),
+    );
+  }
+}
+
+class _SheetError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _SheetError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryPurple,
+                side: const BorderSide(color: AppColors.primaryPurple),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
