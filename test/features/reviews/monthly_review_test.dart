@@ -3,6 +3,7 @@ import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_kra_row.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_review.dart';
+import 'package:vistar_app/features/reviews/data/models/monthly_review_summary.dart';
 import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 import 'package:vistar_app/features/reviews/data/models/row_score.dart';
 import 'package:vistar_app/features/reviews/data/models/stage_record.dart';
@@ -143,6 +144,62 @@ void main() {
             ReviewStage.selfRating, const RowScore(value: 20)),
       ]);
       expect(r.weightedScorePct(ReviewStage.selfRating), 100);
+    });
+  });
+
+  group('MonthlyReview derived display progress', () {
+    const rows = [
+      MonthlyKraRow(id: 'a', name: 'A', weightagePercent: 100, maxScore: 100),
+    ];
+
+    test('furthestScoredStage is null when nothing is scored', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: rows);
+      expect(r.furthestScoredStage, isNull);
+    });
+
+    test('Yash case: manager scores present but the pipeline cursor is '
+        'frozen at selfRating (save-scores never advances it) — the display '
+        'stage still reports the manager stage as submitted', () {
+      // Mirrors the live payload: currentStage SELF_RATING, but rows carry
+      // both self and reporting-manager scores.
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        rows: [
+          rows[0]
+              .withStageScore(
+                  ReviewStage.selfRating, const RowScore(value: 100))
+              .withStageScore(
+                  ReviewStage.reportingManagerRating,
+                  const RowScore(value: 95)),
+        ],
+      );
+      expect(r.furthestScoredStage, ReviewStage.reportingManagerRating);
+      expect(r.displayStage, ReviewStage.reportingManagerRating);
+      expect(r.displayStatus, StageStatus.submitted);
+      // The summary the dashboard renders picks this up instead of 0% / self.
+      final summary = MonthlyReviewSummary.fromReview(r);
+      expect(summary.currentStage, ReviewStage.reportingManagerRating);
+      expect(summary.currentStageStatus, StageStatus.submitted);
+      expect(summary.finalScorePct, closeTo(95, 1e-9));
+    });
+
+    test('with only self scored, display stage is self (submitted)', () {
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        rows: [
+          rows[0].withStageScore(
+              ReviewStage.selfRating, const RowScore(value: 80)),
+        ],
+      );
+      expect(r.displayStage, ReviewStage.selfRating);
+      expect(r.displayStatus, StageStatus.submitted);
+    });
+
+    test('respects a pipeline cursor that has advanced past the scores', () {
+      // No scores anywhere, but the review is formally at management review.
+      final r = reviewAt(ReviewStage.managementReview, rows: rows);
+      expect(r.furthestScoredStage, isNull);
+      expect(r.displayStage, ReviewStage.managementReview);
     });
   });
 

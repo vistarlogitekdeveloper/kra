@@ -82,8 +82,10 @@ class MonthlyReviewSummary {
         year: r.period.year,
         month: r.period.month,
         monthLabel: r.period.label,
-        currentStage: r.currentStage,
-        currentStageStatus: r.statusOf(r.currentStage),
+        // Derived from actual scores, not the frozen pipeline cursor —
+        // in-place `save-scores` never advances `currentStage`.
+        currentStage: r.displayStage,
+        currentStageStatus: r.displayStatus,
         finalScorePct: r.finalScorePct,
         incentiveEligibleAmount: r.eligibleAmount,
       );

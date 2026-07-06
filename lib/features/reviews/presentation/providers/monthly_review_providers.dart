@@ -200,17 +200,41 @@ final availablePeriodsProvider = Provider<List<ReviewPeriod>>((ref) {
 final selectedPeriodProvider = StateProvider<ReviewPeriod?>((ref) => null);
 
 /// Review summaries for [period], scoped to the signed-in user's role.
+///
+/// The live monthly backend's list endpoint returns `finalScorePct: 0` and a
+/// frozen `currentStage` (it carries no row scores), so a summary built
+/// straight off it would show 0% and "Self-Rating" even after ratings were
+/// saved. We therefore hydrate each summary with its full review and rebuild
+/// it via [MonthlyReviewSummary.fromReview], which derives the score and the
+/// display stage/status from the actual per-row scores. Hydration is skipped
+/// automatically for repositories whose list already carries a real score.
 final monthlyReviewListProvider = FutureProvider.autoDispose
     .family<List<MonthlyReviewSummary>, ReviewPeriod>((ref, period) async {
+  ref.keepAlive();
   final scope = ref.watch(currentReviewScopeProvider);
   if (scope == null) return const [];
+  final repo = ref.read(monthlyReviewRepositoryProvider);
   // The repository's roster is already role-scoped via [_loadRoster], so
   // we only pass the role along (informational).
-  return ref.read(monthlyReviewRepositoryProvider).listMonthlyReviews(
-        year: period.year,
-        month: period.month,
-        scopeRole: scope.role,
-      );
+  final base = await repo.listMonthlyReviews(
+    year: period.year,
+    month: period.month,
+    scopeRole: scope.role,
+  );
+
+  // Hydrate only the rows the backend scored as 0 (i.e. it gave us no
+  // computed score). A row already carrying a score is trusted as-is, so a
+  // future backend that computes scores incurs no extra fetches.
+  final hydrated = await Future.wait(base.map((s) async {
+    if (s.finalScorePct > 0) return s;
+    try {
+      return MonthlyReviewSummary.fromReview(await repo.getReview(s.id));
+    } catch (_) {
+      return s; // fall back to the un-hydrated summary for this row
+    }
+  }));
+
+  return hydrated;
 });
 
 /// Full review for the detail / stage screen.
