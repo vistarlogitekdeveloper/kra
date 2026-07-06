@@ -6,7 +6,6 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../employee/presentation/providers/my_kra_providers.dart';
 import '../../../hr/presentation/providers/employee_providers.dart';
 import '../../../hr/presentation/providers/kra_assignment_providers.dart';
-import '../../../manager/presentation/providers/manager_team_providers.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
@@ -82,15 +81,46 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.manager:
     case UserRole.bdManager:
     case UserRole.warehouseMgr:
-      final page =
-          await ref.read(managerTeamRepositoryProvider).listTeam(pageSize: 200);
-      return page.members
-          .map((m) => RosterEntry(
-                id: m.employeeId,
-                name: m.fullName,
-                code: m.employeeCode,
-                managerId: scope.userId,
-                managerName: scope.userName,
+      // The /manager/team endpoint is unreliable on the current backend
+      // (returns 0 members even when employees carry a valid managerId), so
+      // derive the manager's direct reports from the employee roster —
+      // managers can read /employees on this deployment. This also sets each
+      // report's managerId correctly so the manager can edit their scores.
+      final empPage = await ref
+          .read(employeeRepositoryProvider)
+          .list(page: 1, pageSize: 500, isActive: true);
+      final reports = empPage.employees
+          .where((e) => e.managerId == scope.userId)
+          .toList();
+      // Best-effort: attach each report's real KRA rows if assignments are
+      // readable for this role; otherwise the repo applies a template.
+      final teamRows = <String, List<MonthlyKraRow>>{};
+      try {
+        final assignments =
+            await ref.read(kraAssignmentRepositoryProvider).list();
+        for (final a in assignments) {
+          teamRows[a.employeeId] = _rowsFrom(a.items.map((i) => (
+                name: i.name,
+                category: i.description,
+                weightPct: i.weightagePercent,
+                target: i.target,
+                tracking: i.trackingMethod,
+                sortOrder: i.sortOrder,
+              )));
+        }
+      } catch (_) {
+        // Assignments not readable for a manager — fall back to templates.
+      }
+      return reports
+          .map((e) => RosterEntry(
+                id: e.id,
+                name: e.fullName,
+                code: e.employeeCode,
+                grade: e.grade,
+                managerId: e.managerId,
+                managerName: e.managerName,
+                eligibleAmount: e.monthlyIncentiveAmount ?? 0,
+                rows: teamRows[e.id] ?? const [],
               ))
           .toList();
 
