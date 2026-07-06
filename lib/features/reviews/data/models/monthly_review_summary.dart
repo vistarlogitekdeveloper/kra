@@ -49,6 +49,13 @@ class MonthlyReviewSummary {
   });
 
   /// Wire form from the monthly-review backend's list endpoint.
+  ///
+  /// The backend sends both the formal pipeline cursor (`currentStage`) and
+  /// scores-derived progress (`displayStage`/`displayStageStatus` — the
+  /// furthest rating stage that actually carries scores, since in-place
+  /// `save-scores` never advances the cursor). The tile should show real
+  /// progress, so prefer the display fields and fall back to the cursor for
+  /// older backends that don't send them.
   factory MonthlyReviewSummary.fromJson(Map<String, dynamic> json) =>
       MonthlyReviewSummary(
         id: JsonParse.parseString(json['id']) ?? '',
@@ -60,10 +67,12 @@ class MonthlyReviewSummary {
         year: JsonParse.parseInt(json['year']) ?? 0,
         month: JsonParse.parseInt(json['month']) ?? 1,
         monthLabel: JsonParse.parseString(json['monthLabel']) ?? '',
-        currentStage:
-            ReviewStage.fromApi(JsonParse.parseString(json['currentStage'])),
+        currentStage: ReviewStage.fromApi(
+            JsonParse.parseString(json['displayStage']) ??
+                JsonParse.parseString(json['currentStage'])),
         currentStageStatus: StageStatus.fromApi(
-            JsonParse.parseString(json['currentStageStatus'])),
+            JsonParse.parseString(json['displayStageStatus']) ??
+                JsonParse.parseString(json['currentStageStatus'])),
         finalScorePct: JsonParse.parseDouble(json['finalScorePct']) ?? 0,
         incentiveEligibleAmount:
             JsonParse.parseDouble(json['incentiveEligibleAmount']),
