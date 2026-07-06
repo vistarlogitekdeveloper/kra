@@ -258,22 +258,3 @@ final quarterlySheetProvider = FutureProvider.autoDispose.family<
   }
   return (months: months, reviews: reviews);
 });
-
-/// Full reviews (with their KRA rows) for [period], scoped to the signed-in
-/// user's role. Powers the admin dashboard's at-a-glance matrix, which needs
-/// per-KRA scores the lightweight summaries don't carry. Fetches each
-/// review's detail after the list — cheap on the in-memory repo; N calls on a
-/// future API impl.
-final monthlyReviewFullListProvider = FutureProvider.autoDispose
-    .family<List<MonthlyReview>, ReviewPeriod>((ref, period) async {
-  final scope = ref.watch(currentReviewScopeProvider);
-  if (scope == null) return const [];
-  final repo = ref.read(monthlyReviewRepositoryProvider);
-  final summaries = await repo.listMonthlyReviews(
-    year: period.year,
-    month: period.month,
-    scopeRole: scope.role,
-  );
-  final reviews = await Future.wait(summaries.map((s) => repo.getReview(s.id)));
-  return reviews;
-});
