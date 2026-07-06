@@ -24,7 +24,7 @@ import '../../data/repositories/monthly_review_repository.dart';
 /// pipeline). When `true`, [monthlyReviewRepositoryProvider] targets
 /// [ApiMonthlyReviewRepository] with no model/UI changes.
 final monthlyBackendEnabledProvider = Provider<bool>(
-  (ref) => const bool.fromEnvironment('MONTHLY_BACKEND', defaultValue: false),
+  (ref) => const bool.fromEnvironment('MONTHLY_BACKEND', defaultValue: true),
 );
 
 /// The signed-in user reduced to what the review layer needs: an id +
