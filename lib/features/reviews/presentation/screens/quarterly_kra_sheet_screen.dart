@@ -53,25 +53,21 @@ class _QuarterlyKraSheetScreenState
     return null;
   }
 
+  // Self rating: editable ONLY by the employee themselves (their own sheet).
+  // Admins, HR and managers can view it but not change someone's self score.
   bool _canEditSelf(MonthlyReview r, ReviewScope? scope) {
     if (scope == null) return false;
-    if (scope.role == UserRole.admin || scope.role == UserRole.hrAdmin) {
-      return true;
-    }
-    final isOwner = scope.userId == r.employeeId &&
-        (scope.role == UserRole.employee || scope.role == UserRole.ops);
-    return isOwner;
+    return scope.userId == r.employeeId;
   }
 
+  // Manager rating: editable ONLY by this employee's own reporting manager.
+  // Not admins/HR, not other managers, not the employee.
   bool _canEditManager(MonthlyReview r, ReviewScope? scope) {
     if (scope == null) return false;
-    if (scope.role == UserRole.admin || scope.role == UserRole.hrAdmin) {
-      return true;
-    }
-    final isManager = scope.role == UserRole.manager ||
+    final isManagerRole = scope.role == UserRole.manager ||
         scope.role == UserRole.bdManager ||
         scope.role == UserRole.warehouseMgr;
-    return isManager && r.managerId == scope.userId;
+    return isManagerRole && r.managerId != null && r.managerId == scope.userId;
   }
 
   Future<void> _editCell({
@@ -280,6 +276,14 @@ class _Sheet extends StatelessWidget {
     double qAvg(ReviewStage stage) =>
         (monthTotal(0, stage) + monthTotal(1, stage) + monthTotal(2, stage)) / 3;
 
+    final canSelf = canEditSelf(any);
+    final canMgr = canEditManager(any);
+    final scopeLabel = canSelf
+        ? 'You can edit the Self ratings on this sheet.'
+        : canMgr
+            ? 'You can edit the Manager ratings for your report.'
+            : 'View only — you cannot edit this sheet.';
+
     final qMgr = qAvg(ReviewStage.reportingManagerRating);
     final qSelf = qAvg(ReviewStage.selfRating);
     final eligibleMonthly = any.eligibleAmount;
@@ -294,6 +298,23 @@ class _Sheet extends StatelessWidget {
           months: months,
           onPrev: onPrevQuarter,
           onNext: onNextQuarter,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Row(
+            children: [
+              Icon(canSelf || canMgr ? Icons.edit_rounded : Icons.visibility_rounded,
+                  size: 14, color: AppColors.textMuted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(scopeLabel,
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
         ),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
