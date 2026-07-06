@@ -59,6 +59,7 @@ class HrHomeScreen extends ConsumerWidget {
             // Invalidate all root dashboard providers. Family providers
             // will auto-refresh when they get watched again.
             ref.invalidate(hrOverviewProvider);
+            ref.invalidate(hrActiveEmployeeCountProvider);
             ref.invalidate(hrRecentActivityProvider);
             // Wait for the root provider to finish so the pull spinner hides
             try {
@@ -212,17 +213,24 @@ class _GreetingCard extends StatelessWidget {
   }
 }
 
-class _StatsGrid extends StatelessWidget {
+class _StatsGrid extends ConsumerWidget {
   final HrOverview overview;
   const _StatsGrid({required this.overview});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The backend overview's `activeEmployees` is unreliable; prefer the
+    // authoritative roster count and fall back to the overview figure only
+    // while it loads or if it errors.
+    final activeCount = ref
+        .watch(hrActiveEmployeeCountProvider)
+        .maybeWhen(data: (n) => n, orElse: () => overview.activeEmployees);
+
     final cards = [
       OverviewStatCard(
         icon: Icons.groups_rounded,
         label: AppStrings.hrKpiActiveEmployees,
-        value: overview.activeEmployees.toString(),
+        value: activeCount.toString(),
         iconBg: AppColors.primaryPurple.withValues(alpha: 0.10),
         iconFg: AppColors.primaryPurple,
       ),

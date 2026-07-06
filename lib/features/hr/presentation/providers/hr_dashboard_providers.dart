@@ -4,6 +4,7 @@ import '../../../../core/api/dio_client.dart';
 import '../../data/models/hr_dashboard_models.dart';
 import '../../data/repositories/api_hr_dashboard_repository.dart';
 import '../../data/repositories/hr_dashboard_repository.dart';
+import 'employee_providers.dart';
 
 // ─────────────────────────────────────────────────────────────────────
 // Repository swap point
@@ -37,6 +38,21 @@ final hrDashboardRepositoryProvider = Provider<HrDashboardRepository>((ref) {
 final hrOverviewProvider = FutureProvider.autoDispose<HrOverview>((ref) {
   ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchOverview();
+});
+
+// Authoritative active-employee count for the overview card.
+//
+// The backend `GET /hr/dashboard` overview returns a wrong `activeEmployees`
+// figure (observed 6 while the roster actually holds 26 active employees).
+// The `/employees` list is the source of truth, so we read its paginated
+// `total` with `isActive: true`. We fetch `pageSize: 1` because only the
+// envelope's `total` is needed, not the rows themselves.
+final hrActiveEmployeeCountProvider = FutureProvider.autoDispose<int>((ref) {
+  ref.keepAlive();
+  return ref
+      .watch(employeeRepositoryProvider)
+      .list(page: 1, pageSize: 1, isActive: true)
+      .then((page) => page.total);
 });
 
 // ─────────────────────────────────────────────────────────────────────
