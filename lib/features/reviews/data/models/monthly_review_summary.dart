@@ -1,3 +1,4 @@
+import '../../../../core/api/json_parse.dart';
 import '../../../auth/data/models/user.dart';
 import 'monthly_review.dart';
 import 'review_stage.dart';
@@ -46,6 +47,27 @@ class MonthlyReviewSummary {
     this.finalScorePct = 0,
     this.incentiveEligibleAmount,
   });
+
+  /// Wire form from the monthly-review backend's list endpoint.
+  factory MonthlyReviewSummary.fromJson(Map<String, dynamic> json) =>
+      MonthlyReviewSummary(
+        id: JsonParse.parseString(json['id']) ?? '',
+        employeeId: JsonParse.parseString(json['employeeId']) ?? '',
+        employeeName: JsonParse.parseString(json['employeeName']) ?? '',
+        employeeCode: JsonParse.parseString(json['employeeCode']) ?? '',
+        employeeGrade: JsonParse.parseString(json['employeeGrade']),
+        managerName: JsonParse.parseString(json['managerName']),
+        year: JsonParse.parseInt(json['year']) ?? 0,
+        month: JsonParse.parseInt(json['month']) ?? 1,
+        monthLabel: JsonParse.parseString(json['monthLabel']) ?? '',
+        currentStage:
+            ReviewStage.fromApi(JsonParse.parseString(json['currentStage'])),
+        currentStageStatus: StageStatus.fromApi(
+            JsonParse.parseString(json['currentStageStatus'])),
+        finalScorePct: JsonParse.parseDouble(json['finalScorePct']) ?? 0,
+        incentiveEligibleAmount:
+            JsonParse.parseDouble(json['incentiveEligibleAmount']),
+      );
 
   /// Projection from a full review — used by the mock and any backend
   /// summary endpoint that returns whole reviews.

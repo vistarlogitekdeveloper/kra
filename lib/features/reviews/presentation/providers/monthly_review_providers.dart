@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/api/dio_client.dart';
 import '../../../auth/data/models/user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../employee/presentation/providers/my_kra_providers.dart';
@@ -9,8 +10,15 @@ import '../../../manager/presentation/providers/manager_team_providers.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
+import '../../data/repositories/api_monthly_review_repository.dart';
 import '../../data/repositories/live_monthly_review_repository.dart';
 import '../../data/repositories/monthly_review_repository.dart';
+
+/// Flip this to `true` once the monthly-review backend (`/reviews/monthly*`)
+/// is **deployed** to the live API. Until then the app runs on the
+/// live-roster repository (real employees from `/employees` etc. + an
+/// in-memory pipeline), because the endpoints 404 on the current deployment.
+final monthlyBackendEnabledProvider = Provider<bool>((ref) => false);
 
 /// The signed-in user reduced to what the review layer needs: an id +
 /// display name (for stage-submission audit) and a role (for gating).
@@ -34,6 +42,9 @@ class ReviewScope {
 /// API impl once one ships.
 final monthlyReviewRepositoryProvider =
     Provider<MonthlyReviewRepository>((ref) {
+  if (ref.watch(monthlyBackendEnabledProvider)) {
+    return ApiMonthlyReviewRepository(dio: ref.read(dioProvider));
+  }
   return LiveMonthlyReviewRepository(loadRoster: () => _loadRoster(ref));
 });
 
