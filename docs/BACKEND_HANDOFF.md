@@ -6,13 +6,13 @@ deploy-day checklist for the monthly-review cutover.
 
 **Status at time of writing (8 Jul 2026):**
 
-| # | Item | Status |
+| # | Item | Status (probed live 2026-07-10) |
 |---|------|--------|
-| P1 | Employee password create / update / reset | ❌ Not started — interim DB script exists (`scripts/set-employee-passwords.js` in the CRM repo) |
-| P2 | `passwordHash` / `samlNameId` leak on `GET /employees` | ❌ Not started |
-| P3 | KRA template delete / edit + soft-delete name reuse | ❌ Not started — blocks re-importing "BD Manager KRA" / "Regional Manager KRA" |
-| P4 | Assignment `cycleId` requirement | ✅ Worked around client-side (app auto-resolves the active cycle) — FYI only |
-| P5 | Monthly-review API | 🟡 **Built** on branch `feat/kra-monthly-reviews` (vistar_CRM repo, migration 069) — **not merged / not deployed**; live still 404s |
+| P1 | Employee password create / update / reset | ❌ **Confirmed NOT shipped** — `PATCH /employees/:id` with `password` returns 200 but silently ignores it (login still 401). The 46 imported employees still can't log in; `scripts/set-employee-passwords.js` (DB) remains the only path |
+| P2 | `passwordHash` / `samlNameId` leak on `GET /employees` | ✅ **Shipped** — verified live: neither field is serialized anymore |
+| P3 | KRA template delete / edit + soft-delete name reuse | ❌ Not started (7 templates currently load, no FK 500s in probe) |
+| P4 | Assignment `cycleId` requirement | ✅ Worked around client-side. Note: cycle ids are now proper **UUIDs** (`5633fe2a-…`), so the old slug-vs-UUID 400 is gone |
+| P5 | Monthly-review API | 🟡 **Built** on branch `feat/kra-monthly-reviews` (vistar_CRM repo, migration 069) — **not merged / not deployed**; live still 404s (`RES_001`) |
 
 The Flutter client is already prepared on branch `chirag`:
 - `ApiMonthlyReviewRepository` implements the Priority 5 contract exactly.
