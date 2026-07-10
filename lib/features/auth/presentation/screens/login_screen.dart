@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_assets.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/connectivity_service.dart';
@@ -364,14 +366,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
         ),
         TextButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(AppStrings.loginForgotComingSoon),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
+          onPressed: () => context.push(AppRoutes.forgotPassword),
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             minimumSize: Size.zero,

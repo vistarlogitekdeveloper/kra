@@ -11,7 +11,12 @@ abstract class KraTemplateRepository {
     required List<KraTemplateItem> items,
   });
   Future<KraTemplate> update(String id, Map<String, dynamic> changes);
-  Future<void> delete(String id);
+
+  /// Deletes a template. A template referenced by existing reviews cannot
+  /// be hard-deleted — the backend returns 409; pass [force] to archive
+  /// (soft-delete) it instead, which excludes it from lists/pickers while
+  /// preserving history and freeing its name for reuse.
+  Future<void> delete(String id, {bool force = false});
 
   /// Server-side clone — returns the new template with a fresh id.
   /// Cheaper and safer than rebuilding the payload client-side.

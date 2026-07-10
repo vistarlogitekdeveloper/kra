@@ -36,4 +36,12 @@ abstract class EmployeeRepository {
 
   /// Soft delete — flips `isActive` to false on the server.
   Future<void> deactivate(String id);
+
+  /// Admin-only: set a new login password for an employee via
+  /// POST /employees/:id/set-password. Returns the updated employee.
+  Future<Employee> setPassword(
+    String id, {
+    required String password,
+    bool forcePasswordReset = false,
+  });
 }

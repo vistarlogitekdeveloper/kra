@@ -23,6 +23,9 @@ class ApiConstants {
   static const String authLogout = '/auth/logout';
   static const String authRefresh = '/auth/refresh';
   static const String authMe = '/auth/me';
+  static const String authForgotPassword = '/auth/forgot-password';
+  static const String authResetPassword = '/auth/reset-password';
+  // Admin set-password is constructed: '$employees/$id/set-password'
 
   // HR module endpoints
   static const String employees = '/employees';
@@ -52,6 +55,16 @@ class ApiConstants {
   // Body must include `side: 'MANAGER'`.
   static const String reviewsScores = '/reviews';
 
+  // ───── Monthly reviews (new 5-stage pipeline) ─────
+  // Contract in docs/BACKEND_HANDOFF.md (PRIORITY 5). Sub-paths as actually
+  // constructed by ApiMonthlyReviewRepository:
+  //   GET  $monthlyReviews?year=&month=&currentStage=  → [MonthlyReviewSummary]
+  //                                              (scoped server-side from JWT)
+  //   GET  $monthlyReviews/:id                 → MonthlyReview
+  //   POST $monthlyReviews/:id/submit-stage    → submit/advance a stage
+  //   POST $monthlyReviews/:id/mark-paid        → mark incentive paid
+  static const String monthlyReviews = '/reviews/monthly';
+
   // ───── Endpoints that should NOT have a Bearer token attached ─────
   // Marked via options.extra['skipAuth'] = true at the call site.
   // /auth/me explicitly is NOT in this list — it requires a valid
@@ -59,6 +72,8 @@ class ApiConstants {
   static const Set<String> noAuthEndpoints = {
     authLogin,
     authRefresh,
+    authForgotPassword,
+    authResetPassword,
   };
 
   // ───── Endpoints that should NOT trigger refresh-and-retry on 401 ─────

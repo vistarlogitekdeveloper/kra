@@ -26,6 +26,30 @@ class KraTemplatesScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: AppStrings.kraTemplatesDeleteAllMenu,
+            onSelected: (v) {
+              if (v == 'deleteAll') _deleteAll(context, ref);
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem<String>(
+                value: 'deleteAll',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_sweep_rounded,
+                        color: AppColors.error, size: 20),
+                    SizedBox(width: 10),
+                    Text(
+                      AppStrings.kraTemplatesDeleteAllMenu,
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primaryPurple,
@@ -140,9 +164,114 @@ class KraTemplatesScreen extends ConsumerWidget {
       );
     } on ApiError catch (e) {
       if (!context.mounted) return;
+      // A template used by existing reviews can't be hard-deleted (409).
+      // Offer to archive it instead (soft-delete via ?force=true).
+      if (e.statusCode == 409) {
+        await _offerArchive(context, ref, id, e.message);
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
     }
+  }
+
+  Future<void> _offerArchive(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    String reason,
+  ) async {
+    final archive = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.kraTemplatesArchiveConfirmTitle,
+      message: reason,
+      confirmLabel: AppStrings.kraTemplatesArchiveCta,
+    );
+    if (archive != true || !context.mounted) return;
+    try {
+      await ref.read(kraTemplateActionsProvider).delete(id, force: true);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.kraTemplatesArchiveSuccess)),
+      );
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+  }
+
+  Future<void> _deleteAll(BuildContext context, WidgetRef ref) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.kraTemplatesDeleteAllConfirmTitle,
+      message: AppStrings.kraTemplatesDeleteAllConfirmMessage,
+      confirmLabel: AppStrings.kraTemplatesDeleteAllCta,
+    );
+    if (ok != true || !context.mounted) return;
+
+    BulkTemplateDeleteResult result;
+    try {
+      result = await ref.read(kraTemplateActionsProvider).deleteAll();
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    }
+    if (!context.mounted) return;
+
+    if (result.total == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.kraTemplatesDeleteAllNone)),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(AppStrings.kraTemplatesDeleteAllResultTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Deleted ${result.deleted} of ${result.total} '
+              'template${result.total == 1 ? '' : 's'}.',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if (result.failed.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Skipped — the backend protects these:',
+                style: TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              ...result.failed.map(
+                (f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '• ${f.name} — ${f.reason}',
+                    style: const TextStyle(
+                        fontSize: 12.5, color: AppColors.textSecondary),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(AppStrings.commonClose),
+          ),
+        ],
+      ),
+    );
   }
 }

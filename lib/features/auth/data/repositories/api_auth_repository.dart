@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/api/api_constants.dart';
 import '../../../../core/api/api_error.dart';
 import '../../../../core/api/envelope.dart';
+import '../../../../core/api/json_parse.dart';
 import '../../../../core/api/retry_policy.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../models/token_pair.dart';
@@ -120,6 +121,49 @@ class ApiAuthRepository implements AuthRepository {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  @override
+  Future<String> forgotPassword(String email) async {
+    try {
+      final response = await _dio.post(
+        ApiConstants.authForgotPassword,
+        data: {'email': email},
+        options: Options(extra: {'skipAuth': true}),
+      );
+      final data = unwrapObject(response);
+      return JsonParse.parseString(data['message']) ??
+          'If that email is registered, a reset link is on its way.';
+    } on DioException catch (e) {
+      throw _toAuthException(ApiError.fromDioException(e));
+    } on ApiError catch (e) {
+      throw _toAuthException(e);
+    } catch (e) {
+      throw const AuthException('Something went wrong. Please try again.');
+    }
+  }
+
+  @override
+  Future<String> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConstants.authResetPassword,
+        data: {'token': token, 'password': password},
+        options: Options(extra: {'skipAuth': true}),
+      );
+      final data = unwrapObject(response);
+      return JsonParse.parseString(data['message']) ??
+          'Password updated. You can now sign in.';
+    } on DioException catch (e) {
+      throw _toAuthException(ApiError.fromDioException(e));
+    } on ApiError catch (e) {
+      throw _toAuthException(e);
+    } catch (e) {
+      throw const AuthException('Something went wrong. Please try again.');
     }
   }
 

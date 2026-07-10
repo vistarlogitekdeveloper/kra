@@ -85,9 +85,12 @@ class ApiKraTemplateRepository implements KraTemplateRepository {
   }
 
   @override
-  Future<void> delete(String id) async {
+  Future<void> delete(String id, {bool force = false}) async {
     try {
-      await _dio.delete('${ApiConstants.kraTemplates}/$id');
+      await _dio.delete(
+        '${ApiConstants.kraTemplates}/$id',
+        queryParameters: {if (force) 'force': true},
+      );
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }

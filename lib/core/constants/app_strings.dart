@@ -19,8 +19,33 @@ class AppStrings {
   static const String loginForgotPassword = 'Forgot password?';
   static const String loginButton = 'Sign In';
   static const String loginFooter = 'Need help? Contact HR at hr@vistar.com';
-  static const String loginForgotComingSoon =
-      'Password reset is coming soon. For now, please contact HR.';
+
+  // ───── Forgot / reset password ─────
+  static const String forgotTitle = 'Reset your password';
+  static const String forgotSubtitle =
+      'Enter your account email and we\'ll send you a link to reset your '
+      'password.';
+  static const String forgotSubmit = 'Send reset link';
+  static const String forgotBackToLogin = 'Back to sign in';
+  static const String resetTitle = 'Set a new password';
+  static const String resetSubtitle =
+      'Paste the code from your reset email, then choose a new password.';
+  static const String resetTokenLabel = 'Reset code';
+  static const String resetTokenHint = 'From your reset email';
+  static const String resetNewPasswordLabel = 'New password';
+  static const String resetConfirmPasswordLabel = 'Confirm new password';
+  static const String resetSubmit = 'Update password';
+  static const String resetPasswordsDontMatch = 'Passwords do not match';
+  static const String resetTokenRequired = 'Enter the code from your email';
+
+  // ───── Admin: set employee password ─────
+  static const String setPasswordTitle = 'Reset password';
+  static const String setPasswordSubtitle =
+      'Set a new password for this employee. Share it with them securely.';
+  static const String setPasswordLabel = 'New password';
+  static const String setPasswordForceReset = 'Require change on next sign-in';
+  static const String setPasswordSubmit = 'Set password';
+  static const String setPasswordSuccess = 'Password updated';
 
   // ───── Dashboard ─────
   static const String dashboardLogoutTooltip = 'Logout';
@@ -84,7 +109,7 @@ class AppStrings {
   static const String hrShellHome = 'Home';
   static const String hrShellEmployees = 'Employees';
   static const String hrShellTemplates = 'Templates';
-  static const String hrShellCycles = 'Cycles';
+  static const String hrShellReviews = 'Reviews';
   static const String hrShellReports = 'Reports';
 
   // ───── HR home ─────
@@ -102,7 +127,7 @@ class AppStrings {
   static const String hrHomeQuickAddEmployee = 'Add Employee';
   static const String hrHomeQuickCreateTemplate = 'Create Template';
   static const String hrHomeQuickAssignKra = 'Assign KRAs';
-  static const String hrHomeQuickNewCycle = 'New Review Cycle';
+  static const String hrHomeQuickReviews = 'Monthly Reviews';
   static const String hrHomeNoActivity = 'No recent activity yet.';
   static const String hrHomeDaysRemaining = 'days remaining';
   static const String hrHomeDayRemaining = 'day remaining';
@@ -130,13 +155,19 @@ class AppStrings {
   static const String hrHeatmapViewEmployees = 'View employees here';
   static const String employeesInactive = 'Inactive';
   static const String employeesActionEdit = 'Edit';
-  static const String employeesActionDeactivate = 'Deactivate';
-  static const String employeesDeactivateConfirmTitle = 'Deactivate employee?';
+  // Delete = the backend's soft-delete (DELETE /employees/:id). The
+  // employee is removed from the active roster immediately; the record is
+  // retained server-side (shows under the "Inactive" filter) so it can be
+  // restored. Surfaced to users as "Delete" — the internal identifiers
+  // still say "deactivate".
+  static const String employeesActionDeactivate = 'Delete';
+  static const String employeesDeactivateConfirmTitle = 'Delete employee?';
   static const String employeesDeactivateConfirmMessage =
-      'They will lose access immediately. You can reactivate from the master record later.';
-  static const String employeesDeactivateSuccess = 'Employee deactivated.';
+      'They are removed from the active roster immediately. The record is '
+      'retained on the server and can be restored if this was a mistake.';
+  static const String employeesDeactivateSuccess = 'Employee deleted.';
   static const String employeesDeactivateFailed =
-      'Could not deactivate. Please try again.';
+      'Could not delete. Please try again.';
   static const String employeesLoadMoreFailed =
       'Could not load more employees. Tap to retry.';
 
@@ -177,6 +208,22 @@ class AppStrings {
   static const String kraTemplatesDeleteConfirmTitle = 'Delete template?';
   static const String kraTemplatesDeleteConfirmMessage =
       'This will not affect existing assignments, but the template can no longer be used for new ones.';
+  static const String kraTemplatesDeleteAllMenu = 'Delete all templates';
+  static const String kraTemplatesDeleteAllConfirmTitle =
+      'Delete all KRA templates?';
+  static const String kraTemplatesDeleteAllConfirmMessage =
+      'Permanently deletes every KRA template, including the default ones. '
+      'Templates already used by existing reviews are protected by the '
+      'backend and will be skipped.';
+  static const String kraTemplatesDeleteAllCta = 'Delete all';
+  static const String kraTemplatesDeleteAllResultTitle = 'Delete all templates';
+  static const String kraTemplatesDeleteAllNone = 'No templates to delete.';
+  static const String kraTemplatesArchiveConfirmTitle = 'Archive this template?';
+  static const String kraTemplatesArchiveCta = 'Archive instead';
+  static const String kraTemplatesArchiveSuccess =
+      'Template archived. It\'s hidden from lists and assignment, and its '
+      'name can be reused.';
+  static const String kraTemplatesItemInUseTitle = 'KRA in use';
 
   // ───── KRA template form ─────
   static const String kraItemDeleteConfirmTitle = 'Remove this KRA?';
@@ -373,6 +420,7 @@ class AppStrings {
   // ───── Employee shell / bottom nav ─────
   static const String employeeShellHome = 'Home';
   static const String employeeShellSelfRate = 'Self-Rate';
+  static const String employeeShellReviews = 'Reviews';
   static const String employeeShellHistory = 'History';
   static const String employeeShellProfile = 'Profile';
 
@@ -423,6 +471,32 @@ class AppStrings {
   // ───── Monthly deadline notices (self 7th / manager 10th) ─────
   static const String deadlineSelfRatingTitle = 'Self-rating deadline';
   static const String deadlineManagerRatingTitle = 'Manager rating deadline';
+
+  // ───── Monthly reviews (new pipeline) ─────
+  static const String monthlyReviewsTitleSelf = 'My Monthly Reviews';
+  static const String monthlyReviewsTitleTeam = 'Team Monthly Reviews';
+  static const String monthlyReviewsTitleAll = 'Monthly Reviews';
+  static const String monthlyReviewsNavPreview = 'Monthly Reviews (preview)';
+  static const String monthlyReviewsEmpty = 'No reviews for this month.';
+  static const String monthlyReviewsNeedsYou = 'Needs you';
+  static const String monthlyReviewsWaitingOn = 'Waiting on';
+  static const String monthlyReviewStageDone = 'Done';
+  static const String monthlyReviewSubmit = 'Submit rating';
+  static const String monthlyReviewApprove = 'Approve';
+  static const String monthlyReviewReturn = 'Return for rework';
+  static const String monthlyReviewMarkPaid = 'Mark incentive paid';
+  static const String monthlyReviewCommentLabel = 'Comment (optional)';
+  static const String monthlyReviewScoreHint = 'Score';
+  static const String monthlyReviewRemarkHint = 'Remark (optional)';
+  static const String monthlyReviewSubmitted = 'Rating submitted.';
+  static const String monthlyReviewApproved = 'Approved — sent to payout.';
+  static const String monthlyReviewReturned =
+      'Returned to the reporting manager.';
+  static const String monthlyReviewPaid = 'Incentive marked as paid.';
+  static const String monthlyReviewActionFailed =
+      'Could not complete the action. Please try again.';
+  static const String monthlyReviewProjectedPayout = 'Projected payout';
+  static const String monthlyReviewEligible = 'Eligible amount';
 
   // ───── Self-Rate ─────
   static const String selfRateTitle = 'Rate yourself';
@@ -569,6 +643,7 @@ class AppStrings {
 
   // ───── Bottom nav — My Team ─────
   static const String managerTeamNavDashboard = 'Dashboard';
+  static const String managerTeamNavReviews = 'Reviews';
   static const String managerTeamNavTeam = 'Team';
   static const String managerTeamNavHistory = 'History';
   static const String managerTeamNavProfile = 'Profile';

@@ -3,13 +3,12 @@ import '../models/kra_assignment.dart';
 import '../models/kra_template_item.dart';
 
 abstract class KraAssignmentRepository {
-  Future<List<KraAssignment>> list({String? employeeId, String? cycleId});
+  Future<List<KraAssignment>> list({String? employeeId});
 
   /// Single-employee assignment. Pass either [templateId] (snapshot from
   /// a template) or [items] (custom — built inline).
   Future<KraAssignment> create({
     required String employeeId,
-    required String cycleId,
     String? templateId,
     List<KraTemplateItem>? items,
   });
@@ -19,12 +18,11 @@ abstract class KraAssignmentRepository {
   Future<KraAssignment> update(String id, Map<String, dynamic> changes);
 
   /// Bulk-assigns the same [templateId] to N employees in one round
-  /// trip. The backend is idempotent — employees that already have an
-  /// assignment for this cycle land in [BulkAssignResult.skippedEmployeeIds]
-  /// rather than producing an error.
+  /// trip. The backend is idempotent — employees that already have this
+  /// template land in [BulkAssignResult.skippedEmployeeIds] rather than
+  /// producing an error.
   Future<BulkAssignResult> bulkAssign({
     required List<String> employeeIds,
-    required String cycleId,
     required String templateId,
   });
 }
