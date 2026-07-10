@@ -1,0 +1,5 @@
+# Cloudflare Pages SPA fallback for the Flutter/go_router app.
+# Existing static assets (main.dart.js, assets/*, canvaskit/*) are served
+# first; any other path (deep links like /hr/home, /reviews/monthly/:id)
+# falls back to index.html so the client router can handle it.
+/*    /index.html    200

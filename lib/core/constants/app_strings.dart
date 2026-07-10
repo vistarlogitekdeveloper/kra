@@ -13,6 +13,12 @@ class AppStrings {
   static const String loginSubtitle = 'Sign in to continue to your dashboard';
   static const String loginEmailLabel = 'Email';
   static const String loginEmailHint = 'you@vistar.com';
+  // The login identifier accepts an email OR an employee ID (many staff share
+  // a role mailbox / have no personal email, so the unique login key is the
+  // employee code). The value is sent in the `email` field; the backend
+  // resolves it against employee_code OR email.
+  static const String loginIdentifierLabel = 'Email or Employee ID';
+  static const String loginIdentifierHint = 'you@vistar.com or VLPL0123';
   static const String loginPasswordLabel = 'Password';
   static const String loginPasswordHint = 'Enter your password';
   static const String loginRememberMe = 'Remember me';
@@ -54,6 +60,10 @@ class AppStrings {
   static const String validationEmailRequired = 'Please enter your email';
   static const String validationEmailInvalid =
       'Please enter a valid email address';
+  static const String validationIdentifierRequired =
+      'Please enter your email or employee ID';
+  static const String validationIdentifierInvalid =
+      'Enter a valid email or employee ID';
   static const String validationPasswordRequired = 'Please enter your password';
   static const String validationPasswordTooShort =
       'Password must be at least 8 characters';
