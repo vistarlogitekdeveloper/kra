@@ -1,9 +1,12 @@
 # Deploying the KRA app to Cloudflare Pages
 
-The app is a Flutter **web** build (static files) served on Cloudflare Pages.
-Config lives in `wrangler.toml`, `web/_redirects` (SPA fallback) and
-`web/_headers` (cache control) — the two `web/*` files are copied verbatim
-into `build/web/` by `flutter build web`.
+The app is a Flutter **web** build (static files) served on Cloudflare as a
+Workers static-assets site. Config lives in `wrangler.toml` (`[assets]` +
+`not_found_handling = single-page-application` for SPA routing) and
+`web/_headers` (cache control) — `web/_headers` is copied verbatim into
+`build/web/` by `flutter build web`. Do NOT add a `_redirects` file: a
+`/* -> /index.html` rule is rejected by Cloudflare as an infinite loop, and
+`not_found_handling` already handles the SPA fallback.
 
 ## One-time setup
 ```bash
@@ -60,6 +63,8 @@ though the app loads. Coordinate this with the backend team before go-live.
 
 ## Notes
 - `build/` is gitignored — don't commit the compiled output.
-- SPA fallback (`web/_redirects`) makes deep links like `/hr/home` work on
-  refresh; static assets still resolve normally (Pages serves existing files
-  before applying the fallback).
+- SPA fallback (`not_found_handling = "single-page-application"`) makes deep
+  links like `/hr/home` work on refresh; existing static assets resolve
+  normally (they're matched before the not-found handler runs).
+- The Worker `name` in `wrangler.toml` must match the connected project
+  (`kra`), or Cloudflare overrides it and opens a config-fix PR.

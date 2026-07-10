@@ -7,11 +7,13 @@
 #   Build command:   flutter build web --release
 #   Deploy command:  npx wrangler deploy      (uploads the [assets] dir below)
 
-name = "vistar-kra"
+# `name` must match the connected Cloudflare Worker (the CI expects "kra").
+name = "kra"
 compatibility_date = "2024-11-01"
 
 [assets]
 directory = "./build/web"
 # Serve index.html for any non-asset path so go_router deep links
-# (/hr/home, /reviews/monthly/:id) resolve on refresh.
+# (/hr/home, /reviews/monthly/:id) resolve on refresh. This replaces a
+# _redirects file (a `/* -> /index.html` rule is rejected as an infinite loop).
 not_found_handling = "single-page-application"
