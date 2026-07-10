@@ -25,25 +25,29 @@ flutter build web --release --dart-define=MONTHLY_BACKEND=true
 (Optional) if you ever serve the app under a sub-path instead of the domain
 root, add `--base-href /your-subpath/` (must start and end with `/`).
 
-## Deploy (direct upload — recommended)
+## Deploy — Workers static assets
+The app is configured (`wrangler.toml` → `[assets]`) as a Cloudflare Workers
+static-assets site, so the standard deploy command works with no extra flags:
 ```bash
-npx wrangler pages deploy            # reads pages_build_output_dir from wrangler.toml
-# or explicitly:
-npx wrangler pages deploy build/web --project-name=vistar-kra
+npx wrangler deploy          # uploads build/web (the [assets] directory)
 ```
-The first deploy creates the `vistar-kra` project and returns a
-`https://vistar-kra.pages.dev` URL. Add a custom domain in the Cloudflare
-dashboard (Pages → the project → Custom domains) if wanted.
+First deploy creates the `vistar-kra` Worker and returns a
+`https://vistar-kra.<your-subdomain>.workers.dev` URL. Add a custom domain in
+the dashboard (Workers & Pages → the project → Domains & Routes) if wanted.
+SPA routing is handled by `not_found_handling = "single-page-application"`.
 
-## Alternative: Pages Git integration (Cloudflare builds on push)
-Connect the repo in the Cloudflare dashboard and set:
+## Git integration (Cloudflare builds + deploys on push)
+Connect the repo in the dashboard (Workers & Pages) and set:
 - **Build command:**
   ```
-  git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$HOME/flutter" && export PATH="$PATH:$HOME/flutter/bin" && flutter pub get && flutter build web --release
+  git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$HOME/flutter" && git config --global --add safe.directory "$HOME/flutter" && export PATH="$HOME/flutter/bin:$PATH" && flutter config --no-analytics && flutter pub get && flutter build web --release
   ```
-- **Build output directory:** `build/web`
-(The Pages build image has no Flutter SDK, so it's cloned each build — slower
-than the direct-upload path above.)
+- **Deploy command:** `npx wrangler deploy`  (the default)
+- **Build output / assets directory:** `build/web` (already in wrangler.toml)
+
+The build image has no Flutter SDK, so it's cloned each build (~3–6 min first
+run). Verified working: the Flutter build succeeds and wrangler reads all
+files from build/web.
 
 ## IMPORTANT — backend CORS
 Unlike the mobile app, a browser enforces CORS. The API at

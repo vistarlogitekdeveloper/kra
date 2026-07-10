@@ -1,13 +1,17 @@
-# Cloudflare Pages config for the Vistar KRA Flutter web app.
+# Cloudflare deploy config for the Vistar KRA Flutter web app.
 #
-# Deploy (after building — see the build command below):
-#   npx wrangler pages deploy
-# which uploads `pages_build_output_dir`. First run creates the project and
-# prompts `wrangler login`. Add `--project-name=vistar-kra` to be explicit.
+# Deployed as a Cloudflare **Workers static-assets** site (no Worker code) —
+# the whole app is the compiled Flutter bundle in build/web. This matches the
+# default Workers Builds deploy command `npx wrangler deploy`.
 #
-# This is a pure static site (no Pages Functions / Workers) — the whole app
-# is the compiled Flutter bundle in build/web.
+#   Build command:   flutter build web --release
+#   Deploy command:  npx wrangler deploy      (uploads the [assets] dir below)
 
 name = "vistar-kra"
 compatibility_date = "2024-11-01"
-pages_build_output_dir = "build/web"
+
+[assets]
+directory = "./build/web"
+# Serve index.html for any non-asset path so go_router deep links
+# (/hr/home, /reviews/monthly/:id) resolve on refresh.
+not_found_handling = "single-page-application"
