@@ -450,15 +450,15 @@ class AppStrings {
   static const String homeCurrentMonthStartRating = 'Start rating →';
   static const String homeCurrentMonthViewSubmission = 'View my submission';
   static const String homeCurrentMonthViewDetails = 'View details';
-  static const String homeNoActiveCycleTitle = 'No active review cycle';
+  static const String homeNoActiveCycleTitle = 'No active review';
   static const String homeNoActiveCycleMessage =
-      'Your HR team hasn\'t opened a cycle yet. Check back soon.';
+      'Your HR team hasn\'t started this month\'s review yet. Check back soon.';
 
   // ───── Home — KRAs summary ─────
   static const String homeMyKrasTitle = 'My KRAs';
   static const String homeMyKrasViewAll = 'View all';
   static const String homeMyKrasEmpty =
-      'No KRAs assigned for this cycle. Contact HR.';
+      'No KRAs assigned yet. Contact HR.';
   static const String homeMyKrasItemsCountSingular = '1 item';
   // Plural form composed at the call-site: "$count items"
 
@@ -467,7 +467,7 @@ class AppStrings {
   static const String homeHistoryStripPending = 'Pending';
 
   // ───── Home — incentive snapshot ─────
-  static const String homeIncentiveTitle = 'My incentive this quarter';
+  static const String homeIncentiveTitle = 'My incentive this month';
   static const String homeIncentiveCaption =
       'Based on finalized reviews. Subject to change.';
   static const String homeIncentiveOf = 'of';
