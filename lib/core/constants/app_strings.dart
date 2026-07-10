@@ -413,7 +413,7 @@ class AppStrings {
   // ───── KPI / Dashboard extras ─────
   static const String hrKpiActiveEmployees = 'Active Employees';
   static const String hrKpiPendingReviews = 'Pending Reviews';
-  static const String hrKpiQuarterPayout = 'Quarter Payout';
+  static const String hrKpiQuarterPayout = 'Incentive Payout';
   static const String hrKpiCompletion = 'Completion';
   static const String hrPipelineTitle = 'Review Pipeline';
   static const String hrActionItemsTitle = 'Needs your attention';
