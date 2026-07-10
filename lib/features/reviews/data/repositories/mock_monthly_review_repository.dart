@@ -209,6 +209,11 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
         'Review is at ${review.currentStage.label}, not ${stage.label}',
       );
     }
+    // The payout stage is settled via markPaid (it flips payout status).
+    // submitStage would advance to completed leaving payout still pending.
+    if (stage == ReviewStage.incentivePayout || stage.isTerminal) {
+      throw StateError('Use markPaid to settle ${stage.label}');
+    }
 
     // Apply rating-stage scores onto the rows.
     var rows = review.rows;
@@ -228,6 +233,14 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
     final returning = stage == ReviewStage.managementReview && approved == false;
     if (returning) {
       records.remove(ReviewStage.reportingManagerRating);
+      // Keep WHY it was returned (the comment is mandatory in the UI) so the
+      // reporting manager can see it. Cleared again when they resubmit below.
+      records[ReviewStage.managementReview] = StageRecord(
+        actorId: actorId,
+        actorName: actorName,
+        submittedAt: _now,
+        comment: comment,
+      );
       final updated = review.copyWith(
         rows: rows,
         currentStage: ReviewStage.reportingManagerRating,
@@ -235,6 +248,12 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
       );
       _byId[reviewId] = updated;
       return updated;
+    }
+
+    // Manager resubmitting after a return: drop the stale return note so the
+    // management stage reads as in-progress (and re-badges) on its next pass.
+    if (stage == ReviewStage.reportingManagerRating) {
+      records.remove(ReviewStage.managementReview);
     }
 
     records[stage] = StageRecord(

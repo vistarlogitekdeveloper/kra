@@ -119,15 +119,29 @@ enum ReviewStage {
   Set<UserRole> get actorRoles {
     switch (this) {
       case ReviewStage.selfRating:
-        return const {UserRole.employee};
+        // Owner-scoped: anyone who has their own review self-rates it. The
+        // roster layer treats ops as a self-scope participant, so ops must
+        // be able to submit their own self-rating too.
+        return const {UserRole.employee, UserRole.ops};
       case ReviewStage.accountHrRating:
-        return const {UserRole.hr, UserRole.finance};
+        // HR_ADMIN is the live HR persona (UserRole.fromApi maps HR_ADMIN →
+        // hrAdmin), so it must be able to act here or the pipeline stalls
+        // at stage 2. Matches docs/BACKEND_HANDOFF.md (HR_ADMIN, FINANCE).
+        return const {UserRole.hr, UserRole.hrAdmin, UserRole.finance};
       case ReviewStage.reportingManagerRating:
-        return const {UserRole.manager};
+        // Any manager-tier role gets a team roster from the provider, so
+        // BD / warehouse managers must be able to rate their reports too.
+        return const {
+          UserRole.manager,
+          UserRole.bdManager,
+          UserRole.warehouseMgr,
+        };
       case ReviewStage.managementReview:
         return const {UserRole.admin, UserRole.hrAdmin};
       case ReviewStage.incentivePayout:
-        return const {UserRole.finance, UserRole.hr};
+        // HR_ADMIN again — same reason as accountHrRating (stall at stage 5
+        // otherwise). Matches docs/BACKEND_HANDOFF.md (FINANCE, HR_ADMIN).
+        return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.completed:
         return const {};
     }

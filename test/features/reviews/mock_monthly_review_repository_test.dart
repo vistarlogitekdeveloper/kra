@@ -120,6 +120,59 @@ void main() {
           StageStatus.inProgress);
     });
 
+    test('submitStage rejects the payout stage (must use markPaid)', () async {
+      final r = repo();
+      // emp3 is seeded at incentivePayout — submitStage would otherwise
+      // advance it to completed while leaving payout PENDING.
+      expect(
+        () => r.submitStage(
+          '2026-06-emp3',
+          ReviewStage.incentivePayout,
+          actorId: 'f1',
+          actorName: 'Finance',
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('management "return" preserves the reason, cleared on resubmit',
+        () async {
+      final r = repo();
+      const id = '2026-06-emp2'; // seeded at reportingManagerRating
+      final seeded = await r.getReview(id);
+      await r.submitStage(
+        id,
+        ReviewStage.reportingManagerRating,
+        rowScores: {for (final row in seeded.rows) row.id: const RowScore(value: 7)},
+        actorId: 'm1',
+        actorName: 'Manish',
+      );
+      final returned = await r.submitStage(
+        id,
+        ReviewStage.managementReview,
+        approved: false,
+        comment: 'Please revisit row 2',
+        actorId: 'a1',
+        actorName: 'Admin',
+      );
+      // The mandatory return reason is retained for the reporting manager.
+      expect(returned.recordFor(ReviewStage.managementReview)?.comment,
+          'Please revisit row 2');
+
+      final resubmitted = await r.submitStage(
+        id,
+        ReviewStage.reportingManagerRating,
+        rowScores: {for (final row in returned.rows) row.id: const RowScore(value: 9)},
+        actorId: 'm1',
+        actorName: 'Manish',
+      );
+      // Once redone, the stale note is gone so management re-badges as pending.
+      expect(resubmitted.currentStage, ReviewStage.managementReview);
+      expect(resubmitted.recordFor(ReviewStage.managementReview), isNull);
+      expect(resubmitted.statusOf(ReviewStage.managementReview),
+          StageStatus.inProgress);
+    });
+
     test('markPaid completes the review', () async {
       final r = repo();
       const id = '2026-06-emp3'; // seeded at incentivePayout

@@ -75,7 +75,7 @@ class MonthlyKraRow {
       name: JsonParse.parseString(json['name']) ?? '',
       category: JsonParse.parseString(json['category']),
       weightagePercent: JsonParse.parseDouble(json['weightagePercent']) ?? 0,
-      maxScore: JsonParse.parseDouble(json['maxScore']) ?? 100,
+      maxScore: JsonParse.parseDouble(json['maxScore']) ?? defaultMaxScore,
       target: JsonParse.parseString(json['target']),
       trackingMethod: JsonParse.parseString(json['trackingMethod']),
       displayOrder: JsonParse.parseInt(json['displayOrder']) ?? 0,

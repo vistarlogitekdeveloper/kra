@@ -65,7 +65,12 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
 
   // ── Materialisation ────────────────────────────────────────────────────
 
-  Future<void> _ensure(ReviewPeriod period) async {
+  /// Materialises [period] for the caller's roster and returns that roster
+  /// so reads can be scoped to it. The [_store] is process-wide and outlives
+  /// logout, so a prior (e.g. HR org-wide) session can leave other people's
+  /// reviews in it — reads MUST intersect with the current roster or a later
+  /// employee/manager login would see everyone. See [listMonthlyReviews].
+  Future<List<RosterEntry>> _ensure(ReviewPeriod period) async {
     final roster = await loadRoster();
     for (final e in roster) {
       final id = '${period.key}-${e.id}';
@@ -74,6 +79,7 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
       _store.putIfAbsent(id, () => _build(id, period, e));
     }
     _materialised.add(period.key);
+    return roster;
   }
 
   MonthlyReview _build(String id, ReviewPeriod period, RosterEntry e) =>
@@ -133,11 +139,14 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
     ReviewStage? currentStage,
   }) async {
     final period = ReviewPeriod(year, month);
-    await _ensure(period);
+    final roster = await _ensure(period);
+    // Scope to THIS caller's roster ids — never the whole store, which may
+    // hold reviews materialised for a different user earlier this session.
+    final allowedIds = roster.map((e) => e.id).toSet();
     final list = _store.values.where((r) {
       if (r.period != period) return false;
-      // The roster is already role-scoped by [loadRoster]; these extra
-      // filters just support the payout/stage-specific dashboards.
+      if (!allowedIds.contains(r.employeeId)) return false;
+      // Extra filters support the payout / stage-specific dashboards.
       if (scopeEmployeeId != null && r.employeeId != scopeEmployeeId) {
         return false;
       }
@@ -174,6 +183,11 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
         'Review is at ${review.currentStage.label}, not ${stage.label}',
       );
     }
+    // The payout stage is settled via markPaid (it flips payout status).
+    // submitStage would advance to completed leaving payout still pending.
+    if (stage == ReviewStage.incentivePayout || stage.isTerminal) {
+      throw StateError('Use markPaid to settle ${stage.label}');
+    }
 
     var rows = review.rows;
     if (stage.isRatingStage && rowScores != null) {
@@ -190,6 +204,14 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
     final returning = stage == ReviewStage.managementReview && approved == false;
     if (returning) {
       records.remove(ReviewStage.reportingManagerRating);
+      // Keep WHY it was returned (the comment is mandatory in the UI) so the
+      // reporting manager can see it. Cleared again when they resubmit below.
+      records[ReviewStage.managementReview] = StageRecord(
+        actorId: actorId,
+        actorName: actorName,
+        submittedAt: _clock(),
+        comment: comment,
+      );
       final updated = review.copyWith(
         rows: rows,
         currentStage: ReviewStage.reportingManagerRating,
@@ -197,6 +219,12 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
       );
       _store[reviewId] = updated;
       return updated;
+    }
+
+    // Manager resubmitting after a return: drop the stale return note so the
+    // management stage reads as in-progress (and re-badges) on its next pass.
+    if (stage == ReviewStage.reportingManagerRating) {
+      records.remove(ReviewStage.managementReview);
     }
 
     records[stage] = StageRecord(

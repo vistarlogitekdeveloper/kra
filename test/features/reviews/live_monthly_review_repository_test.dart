@@ -64,6 +64,30 @@ void main() {
     });
   });
 
+  group('read scoping (cross-user leak)', () {
+    test('reads are scoped to the caller roster, not the whole store',
+        () async {
+      // The store is process-wide and outlives logout. Simulate an HR
+      // (org-wide) session followed by an employee session on the SAME repo
+      // instance: loadRoster returns whoever the current caller should see.
+      var current = roster(); // HR: sees both employees
+      final r = LiveMonthlyReviewRepository(
+        loadRoster: () async => current,
+        clock: () => now,
+      );
+      final hrView = await r.listMonthlyReviews(year: 2026, month: 7);
+      expect(hrView, hasLength(2)); // store now holds both e-101 and e-102
+
+      // Now an employee logs in — roster narrows to just themselves.
+      current = const [
+        RosterEntry(id: 'e-101', name: 'Real Employee One', code: 'VLPL0101'),
+      ];
+      final empView = await r.listMonthlyReviews(year: 2026, month: 7);
+      expect(empView, hasLength(1));
+      expect(empView.single.employeeId, 'e-101'); // must NOT see e-102
+    });
+  });
+
   group('pipeline persists in-session', () {
     test('submitting self-rating advances and sticks across a refresh',
         () async {

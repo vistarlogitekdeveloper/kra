@@ -62,11 +62,23 @@ void main() {
     test('per stage → role wiring — each stage lights up for exactly the '
         'roles agreed in the pipeline spec', () {
       const table = <ReviewStage, Set<UserRole>>{
-        ReviewStage.selfRating: {UserRole.employee},
-        ReviewStage.accountHrRating: {UserRole.hr, UserRole.finance},
-        ReviewStage.reportingManagerRating: {UserRole.manager},
+        ReviewStage.selfRating: {UserRole.employee, UserRole.ops},
+        ReviewStage.accountHrRating: {
+          UserRole.hr,
+          UserRole.hrAdmin,
+          UserRole.finance,
+        },
+        ReviewStage.reportingManagerRating: {
+          UserRole.manager,
+          UserRole.bdManager,
+          UserRole.warehouseMgr,
+        },
         ReviewStage.managementReview: {UserRole.admin, UserRole.hrAdmin},
-        ReviewStage.incentivePayout: {UserRole.finance, UserRole.hr},
+        ReviewStage.incentivePayout: {
+          UserRole.finance,
+          UserRole.hr,
+          UserRole.hrAdmin,
+        },
       };
       for (final entry in table.entries) {
         final s = summary(stage: entry.key);

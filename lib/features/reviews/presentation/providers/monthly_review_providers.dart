@@ -56,23 +56,20 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.employee:
     case UserRole.ops:
       // An employee can only see their own review + their own KRAs.
-      List<MonthlyKraRow> rows = const [];
-      try {
-        final mine =
-            await ref.read(myKraRepositoryProvider).listMyAssignments();
-        rows = _rowsFrom(mine
-            .expand((a) => a.items)
-            .map((i) => (
-                  name: i.name,
-                  category: i.description,
-                  weightPct: i.weightagePercent,
-                  target: i.target,
-                  tracking: i.trackingMethod,
-                  sortOrder: i.sortOrder,
-                )));
-      } catch (_) {
-        // No assignment yet → the repo falls back to a generic template.
-      }
+      // listMyAssignments returns [] when there's simply no assignment (the
+      // repo then applies a generic template). A *thrown* error is a real
+      // failure (e.g. Render cold-start timeout) and must propagate so the
+      // dashboard shows error+retry — swallowing it here would silently lock
+      // a generic-template review in via putIfAbsent for the whole session.
+      final mine = await ref.read(myKraRepositoryProvider).listMyAssignments();
+      final rows = _rowsFrom(mine.expand((a) => a.items).map((i) => (
+            name: i.name,
+            category: i.description,
+            weightPct: i.weightagePercent,
+            target: i.target,
+            tracking: i.trackingMethod,
+            sortOrder: i.sortOrder,
+          )));
       return [RosterEntry(id: scope.userId, name: scope.userName, rows: rows)];
 
     case UserRole.manager:

@@ -53,14 +53,13 @@ class ApiConstants {
   static const String reviewsScores = '/reviews';
 
   // ───── Monthly reviews (new 5-stage pipeline) ─────
-  // PROPOSED contract — confirm/adjust against the real monthly backend.
-  // Sub-paths are constructed by ApiMonthlyReviewRepository:
-  //   GET  $monthlyReviews/periods            → ["2026-06", ...]
-  //   GET  $monthlyReviews?period=YYYY-MM      → [MonthlyReview...] (scoped
-  //                                              server-side from the token)
+  // Contract in docs/BACKEND_HANDOFF.md (PRIORITY 5). Sub-paths as actually
+  // constructed by ApiMonthlyReviewRepository:
+  //   GET  $monthlyReviews?year=&month=&currentStage=  → [MonthlyReviewSummary]
+  //                                              (scoped server-side from JWT)
   //   GET  $monthlyReviews/:id                 → MonthlyReview
-  //   POST $monthlyReviews/:id/stages/:stage   → submit/advance a stage
-  //   POST $monthlyReviews/:id/payout          → mark incentive paid
+  //   POST $monthlyReviews/:id/submit-stage    → submit/advance a stage
+  //   POST $monthlyReviews/:id/mark-paid        → mark incentive paid
   static const String monthlyReviews = '/reviews/monthly';
 
   // ───── Endpoints that should NOT have a Bearer token attached ─────

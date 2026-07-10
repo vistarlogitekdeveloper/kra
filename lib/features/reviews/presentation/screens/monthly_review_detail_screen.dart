@@ -160,10 +160,28 @@ class _MonthlyReviewDetailScreenState
     }
     final stage = review.currentStage;
     if (stage.isRatingStage) {
-      return _primaryButton(
+      final submit = _primaryButton(
         AppStrings.monthlyReviewSubmit,
         Icons.check_rounded,
         () => _submitRating(review, scope!, stage),
+      );
+      // Reporting manager reopened by a management "return": show the reason.
+      final returnNote = stage == ReviewStage.reportingManagerRating
+          ? review.recordFor(ReviewStage.managementReview)
+          : null;
+      final reason = returnNote?.comment?.trim() ?? '';
+      if (reason.isEmpty) return submit;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _InfoBanner(
+            icon: Icons.undo_rounded,
+            color: AppColors.error,
+            text: 'Returned by ${returnNote!.actorName}: $reason',
+          ),
+          const SizedBox(height: 12),
+          submit,
+        ],
       );
     }
     if (stage == ReviewStage.managementReview) {

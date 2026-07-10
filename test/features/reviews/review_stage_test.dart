@@ -34,18 +34,28 @@ void main() {
     });
 
     test('actor roles match the agreed stage→role mapping', () {
+      // HR_ADMIN is the live HR persona (fromApi maps HR_ADMIN → hrAdmin),
+      // so it must be able to act on the account/HR and payout stages or the
+      // pipeline stalls there — see docs/BACKEND_HANDOFF.md.
       expect(ReviewStage.accountHrRating.actorRoles,
-          containsAll([UserRole.hr, UserRole.finance]));
-      expect(ReviewStage.reportingManagerRating.actorRoles,
-          contains(UserRole.manager));
+          containsAll([UserRole.hr, UserRole.hrAdmin, UserRole.finance]));
+      expect(ReviewStage.incentivePayout.actorRoles,
+          containsAll([UserRole.finance, UserRole.hr, UserRole.hrAdmin]));
+      // Any manager-tier role gets a team roster, so all of them can rate.
+      expect(
+          ReviewStage.reportingManagerRating.actorRoles,
+          containsAll([
+            UserRole.manager,
+            UserRole.bdManager,
+            UserRole.warehouseMgr,
+          ]));
       expect(ReviewStage.managementReview.actorRoles,
           containsAll([UserRole.admin, UserRole.hrAdmin]));
       expect(ReviewStage.managementReview.actorRoles,
           isNot(contains(UserRole.manager)));
-      expect(ReviewStage.incentivePayout.actorRoles,
-          containsAll([UserRole.finance, UserRole.hr]));
-      // Self-rating is owner-scoped, so any role can do their own.
-      expect(ReviewStage.selfRating.actorRoles, contains(UserRole.employee));
+      // Self-rating is owner-scoped; ops holds its own review too.
+      expect(ReviewStage.selfRating.actorRoles,
+          containsAll([UserRole.employee, UserRole.ops]));
     });
 
     test('fromApi tolerates snake/camel/unknown', () {
