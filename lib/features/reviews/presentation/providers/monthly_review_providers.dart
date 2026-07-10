@@ -14,11 +14,18 @@ import '../../data/repositories/api_monthly_review_repository.dart';
 import '../../data/repositories/live_monthly_review_repository.dart';
 import '../../data/repositories/monthly_review_repository.dart';
 
-/// Flip this to `true` once the monthly-review backend (`/reviews/monthly*`)
-/// is **deployed** to the live API. Until then the app runs on the
-/// live-roster repository (real employees from `/employees` etc. + an
-/// in-memory pipeline), because the endpoints 404 on the current deployment.
-final monthlyBackendEnabledProvider = Provider<bool>((ref) => false);
+/// Whether to use the live monthly-review backend (`/reviews/monthly*`).
+///
+/// Gated on a build-time flag so the switch is a deploy-day config change,
+/// not a code edit: pass `--dart-define=MONTHLY_BACKEND=true` once those
+/// endpoints are deployed. Defaults to `false` because they 404 on the
+/// current deployment — until then the app runs on the live-roster
+/// repository (real employees from `/employees` etc. + an in-memory
+/// pipeline). When `true`, [monthlyReviewRepositoryProvider] targets
+/// [ApiMonthlyReviewRepository] with no model/UI changes.
+final monthlyBackendEnabledProvider = Provider<bool>(
+  (ref) => const bool.fromEnvironment('MONTHLY_BACKEND', defaultValue: false),
+);
 
 /// The signed-in user reduced to what the review layer needs: an id +
 /// display name (for stage-submission audit) and a role (for gating).

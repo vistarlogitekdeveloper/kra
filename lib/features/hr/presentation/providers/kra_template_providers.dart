@@ -115,8 +115,10 @@ class KraTemplateActions {
     return updated;
   }
 
-  Future<void> delete(String id) async {
-    await _repo.delete(id);
+  /// Deletes a template. On 409 (referenced by reviews) the caller can
+  /// retry with [force] to archive it instead.
+  Future<void> delete(String id, {bool force = false}) async {
+    await _repo.delete(id, force: force);
     ref.invalidate(kraTemplatesProvider);
   }
 
@@ -151,11 +153,13 @@ class KraTemplateActions {
 
   String _deleteFailureReason(ApiError e) {
     final msg = e.message.toLowerCase();
-    if (msg.contains('review_rows') ||
+    if (e.statusCode == 409 ||
+        msg.contains('in use') ||
+        msg.contains('review_rows') ||
         msg.contains('foreign key') ||
         msg.contains('constraint') ||
         (e.statusCode == 500 && msg.contains('delete'))) {
-      return 'In use by existing reviews';
+      return 'In use by existing reviews (archive it individually)';
     }
     if (msg.contains('default')) return 'Protected default template';
     return e.message;

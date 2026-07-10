@@ -164,6 +164,39 @@ class KraTemplatesScreen extends ConsumerWidget {
       );
     } on ApiError catch (e) {
       if (!context.mounted) return;
+      // A template used by existing reviews can't be hard-deleted (409).
+      // Offer to archive it instead (soft-delete via ?force=true).
+      if (e.statusCode == 409) {
+        await _offerArchive(context, ref, id, e.message);
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+  }
+
+  Future<void> _offerArchive(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    String reason,
+  ) async {
+    final archive = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.kraTemplatesArchiveConfirmTitle,
+      message: reason,
+      confirmLabel: AppStrings.kraTemplatesArchiveCta,
+    );
+    if (archive != true || !context.mounted) return;
+    try {
+      await ref.read(kraTemplateActionsProvider).delete(id, force: true);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.kraTemplatesArchiveSuccess)),
+      );
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );

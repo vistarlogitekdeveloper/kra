@@ -23,6 +23,9 @@ class ApiConstants {
   static const String authLogout = '/auth/logout';
   static const String authRefresh = '/auth/refresh';
   static const String authMe = '/auth/me';
+  static const String authForgotPassword = '/auth/forgot-password';
+  static const String authResetPassword = '/auth/reset-password';
+  // Admin set-password is constructed: '$employees/$id/set-password'
 
   // HR module endpoints
   static const String employees = '/employees';
@@ -69,6 +72,8 @@ class ApiConstants {
   static const Set<String> noAuthEndpoints = {
     authLogin,
     authRefresh,
+    authForgotPassword,
+    authResetPassword,
   };
 
   // ───── Endpoints that should NOT trigger refresh-and-retry on 401 ─────

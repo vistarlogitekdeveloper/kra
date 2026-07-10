@@ -110,4 +110,24 @@ class ApiEmployeeRepository implements EmployeeRepository {
       rethrowAsApiError(e, st);
     }
   }
+
+  @override
+  Future<Employee> setPassword(
+    String id, {
+    required String password,
+    bool forcePasswordReset = false,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.employees}/$id/set-password',
+        data: {
+          'password': password,
+          'forcePasswordReset': forcePasswordReset,
+        },
+      );
+      return Employee.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
 }

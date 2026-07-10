@@ -27,6 +27,20 @@ abstract class AuthRepository {
   /// user on success, or null on any failure (caller decides whether
   /// to surface the error).
   Future<User?> refreshCurrentUser();
+
+  /// Requests a password-reset email for [email]. Resolves with a
+  /// user-safe message; the backend returns the same response whether or
+  /// not the address exists (no account enumeration). Throws
+  /// [AuthException] only on transport failure.
+  Future<String> forgotPassword(String email);
+
+  /// Completes a password reset using the emailed [token] + a new
+  /// [password]. Returns a user-safe success message. Throws
+  /// [AuthException] (e.g. "Invalid or expired reset token") on failure.
+  Future<String> resetPassword({
+    required String token,
+    required String password,
+  });
 }
 
 /// UI-safe exception type. The repository implementation is responsible

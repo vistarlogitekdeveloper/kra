@@ -19,8 +19,33 @@ class AppStrings {
   static const String loginForgotPassword = 'Forgot password?';
   static const String loginButton = 'Sign In';
   static const String loginFooter = 'Need help? Contact HR at hr@vistar.com';
-  static const String loginForgotComingSoon =
-      'Password reset is coming soon. For now, please contact HR.';
+
+  // ───── Forgot / reset password ─────
+  static const String forgotTitle = 'Reset your password';
+  static const String forgotSubtitle =
+      'Enter your account email and we\'ll send you a link to reset your '
+      'password.';
+  static const String forgotSubmit = 'Send reset link';
+  static const String forgotBackToLogin = 'Back to sign in';
+  static const String resetTitle = 'Set a new password';
+  static const String resetSubtitle =
+      'Paste the code from your reset email, then choose a new password.';
+  static const String resetTokenLabel = 'Reset code';
+  static const String resetTokenHint = 'From your reset email';
+  static const String resetNewPasswordLabel = 'New password';
+  static const String resetConfirmPasswordLabel = 'Confirm new password';
+  static const String resetSubmit = 'Update password';
+  static const String resetPasswordsDontMatch = 'Passwords do not match';
+  static const String resetTokenRequired = 'Enter the code from your email';
+
+  // ───── Admin: set employee password ─────
+  static const String setPasswordTitle = 'Reset password';
+  static const String setPasswordSubtitle =
+      'Set a new password for this employee. Share it with them securely.';
+  static const String setPasswordLabel = 'New password';
+  static const String setPasswordForceReset = 'Require change on next sign-in';
+  static const String setPasswordSubmit = 'Set password';
+  static const String setPasswordSuccess = 'Password updated';
 
   // ───── Dashboard ─────
   static const String dashboardLogoutTooltip = 'Logout';
@@ -193,6 +218,12 @@ class AppStrings {
   static const String kraTemplatesDeleteAllCta = 'Delete all';
   static const String kraTemplatesDeleteAllResultTitle = 'Delete all templates';
   static const String kraTemplatesDeleteAllNone = 'No templates to delete.';
+  static const String kraTemplatesArchiveConfirmTitle = 'Archive this template?';
+  static const String kraTemplatesArchiveCta = 'Archive instead';
+  static const String kraTemplatesArchiveSuccess =
+      'Template archived. It\'s hidden from lists and assignment, and its '
+      'name can be reused.';
+  static const String kraTemplatesItemInUseTitle = 'KRA in use';
 
   // ───── KRA template form ─────
   static const String kraItemDeleteConfirmTitle = 'Remove this KRA?';

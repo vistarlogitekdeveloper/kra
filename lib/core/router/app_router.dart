@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/data/models/user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_detail_screen.dart';
 import '../widgets/route_error_screen.dart';
@@ -51,6 +53,8 @@ class AppRoutes {
   AppRoutes._();
 
   static const String login = '/login';
+  static const String forgotPassword = '/forgot-password';
+  static const String resetPassword = '/reset-password';
   static const String employeeDashboard = '/employee';
   static const String managerDashboard = '/manager';
   static const String hrDashboard = '/hr';
@@ -207,6 +211,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // hypothetical sibling like `/hr-self-service`, which a naive
       // startsWith would have silently inherited the HR-only guard.
       final loc = state.matchedLocation;
+      // Routes reachable while signed out (login + the password-recovery
+      // flow). Anything else, unauthenticated, bounces to /login.
+      final isPublicRoute = loc == AppRoutes.login ||
+          loc == AppRoutes.forgotPassword ||
+          loc == AppRoutes.resetPassword;
       final goingToHrArea = loc == AppRoutes.hrDashboard ||
           loc.startsWith('${AppRoutes.hrDashboard}/');
       final goingToManagerArea = loc == AppRoutes.managerDashboard ||
@@ -249,16 +258,27 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      // Unauthenticated (Initial / Loading / Error) — anywhere except
-      // login bounces to login. Loading stays on login so the
+      // Unauthenticated (Initial / Loading / Error) — anywhere except the
+      // public routes bounces to login. Loading stays on login so the
       // BrandedPrimaryButton's spinner is visible.
-      if (!goingToLogin) return AppRoutes.login;
+      if (!isPublicRoute) return AppRoutes.login;
       return null;
     },
     routes: [
       GoRoute(
         path: AppRoutes.login,
         builder: (_, __) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (_, __) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        // Token arrives via the emailed deep link (?token=...).
+        builder: (_, state) => ResetPasswordScreen(
+          token: state.uri.queryParameters['token'],
+        ),
       ),
 
       // ───── Monthly reviews (new pipeline) ─────

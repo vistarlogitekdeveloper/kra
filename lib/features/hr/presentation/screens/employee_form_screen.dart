@@ -184,10 +184,9 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               : _gradeController.text.trim(),
           'monthlyIncentiveAmount': monthlyIncentive,
           if (_joinedDate != null) 'joinedDate': _joinedDate!.toIso8601String(),
-          // Admin-set password change. Sent only when a new one is typed.
-          if (passwordText.isNotEmpty) 'password': passwordText,
-          if (passwordText.isNotEmpty)
-            'forcePasswordReset': _forcePasswordReset,
+          // NB: password is NOT sent here — the update endpoint ignores it.
+          // Edit-mode password changes go through the dedicated
+          // POST /employees/:id/set-password (see _showResetPasswordDialog).
         });
         ref.read(employeeListProvider.notifier).replaceUpdated(updated);
         ref.invalidate(employeeDetailProvider(updated.id));
@@ -251,6 +250,23 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       setState(() => _serverError = AppStrings.errorGeneric);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  /// Edit mode: opens the secure set-password dialog (dedicated endpoint,
+  /// separate from the profile PATCH which ignores `password`).
+  Future<void> _showResetPasswordDialog() async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ResetPasswordDialog(
+        employeeId: widget.employeeId!,
+        employeeName: _nameController.text.trim(),
+      ),
+    );
+    if (changed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.setPasswordSuccess)),
+      );
     }
   }
 
@@ -435,71 +451,86 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           // is live. Everything on this form is editable, including email.
           const SizedBox(height: 20),
           _SectionHeader(
-            title: widget.isEdit ? 'Change password' : 'Login credentials',
+            title: widget.isEdit ? 'Password' : 'Login credentials',
           ),
           const SizedBox(height: 6),
-          Text(
-            widget.isEdit
-                ? 'Leave blank to keep the current password. Enter a new one '
-                    'to set it for this employee.'
-                : 'Optional. Leave blank to create the account without a '
-                    'password — the employee won\'t be able to log in until '
-                    'HR sets one later.',
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 12),
-          BrandedTextField(
-            controller: _passwordController,
-            label: widget.isEdit ? 'New password' : 'Initial password',
-            hint: 'At least 8 characters',
-            prefixIcon: Icons.lock_outline_rounded,
-            obscureText: _obscurePassword,
-            autofillHints: const [AutofillHints.newPassword],
-            suffixIcon: IconButton(
-              onPressed: () =>
-                  setState(() => _obscurePassword = !_obscurePassword),
-              icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
-                size: 20,
+          if (widget.isEdit) ...[
+            const Text(
+              'Reset this employee\'s password via a secure set-password '
+              'action, then share the new one with them directly.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+                height: 1.4,
               ),
             ),
-            validator: (v) {
-              final t = v ?? '';
-              if (t.isEmpty) return null; // optional
-              if (t.length < 8) {
-                return AppStrings.validationPasswordTooShort;
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 8),
-          CheckboxListTile(
-            value: _forcePasswordReset,
-            onChanged: _passwordController.text.isEmpty
-                ? null
-                : (v) => setState(() => _forcePasswordReset = v ?? false),
-            title: Text(
-              widget.isEdit
-                  ? 'Require the employee to change this password on next '
-                      'sign-in'
-                  : 'Require employee to change this password on first sign-in',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _isSubmitting ? null : _showResetPasswordDialog,
+                icon: const Icon(Icons.lock_reset_rounded),
+                label: const Text(AppStrings.setPasswordTitle),
               ),
             ),
-            controlAffinity: ListTileControlAffinity.leading,
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            activeColor: AppColors.primaryPurple,
-          ),
+          ] else ...[
+            const Text(
+              'Optional. Leave blank to create the account without a '
+              'password — the employee won\'t be able to log in until '
+              'HR sets one later.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            BrandedTextField(
+              controller: _passwordController,
+              label: 'Initial password',
+              hint: 'At least 8 characters',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: _obscurePassword,
+              autofillHints: const [AutofillHints.newPassword],
+              suffixIcon: IconButton(
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 20,
+                ),
+              ),
+              validator: (v) {
+                final t = v ?? '';
+                if (t.isEmpty) return null; // optional
+                if (t.length < 8) {
+                  return AppStrings.validationPasswordTooShort;
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              value: _forcePasswordReset,
+              onChanged: _passwordController.text.isEmpty
+                  ? null
+                  : (v) => setState(() => _forcePasswordReset = v ?? false),
+              title: const Text(
+                'Require employee to change this password on first sign-in',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              activeColor: AppColors.primaryPurple,
+            ),
+          ],
           const SizedBox(height: 28),
           BrandedPrimaryButton(
             label: AppStrings.commonSave,
@@ -509,6 +540,153 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Admin dialog to set an employee's password via the dedicated
+/// POST /employees/:id/set-password endpoint.
+class _ResetPasswordDialog extends ConsumerStatefulWidget {
+  final String employeeId;
+  final String employeeName;
+  const _ResetPasswordDialog({
+    required this.employeeId,
+    required this.employeeName,
+  });
+
+  @override
+  ConsumerState<_ResetPasswordDialog> createState() =>
+      _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _controller = TextEditingController();
+  bool _obscure = true;
+  bool _forceReset = true;
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ref.read(employeeRepositoryProvider).setPassword(
+            widget.employeeId,
+            password: _controller.text,
+            forcePasswordReset: _forceReset,
+          );
+      if (mounted) Navigator.of(context).pop(true);
+    } on ApiError catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _submitting = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = AppStrings.errorGeneric;
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(AppStrings.setPasswordTitle),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.employeeName.isEmpty
+                  ? AppStrings.setPasswordSubtitle
+                  : 'For ${widget.employeeName}. '
+                      '${AppStrings.setPasswordSubtitle}',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 14),
+            BrandedTextField(
+              controller: _controller,
+              label: AppStrings.setPasswordLabel,
+              hint: 'At least 8 characters',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: _obscure,
+              autofillHints: const [AutofillHints.newPassword],
+              suffixIcon: IconButton(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 20,
+                ),
+              ),
+              validator: (v) {
+                final t = v ?? '';
+                if (t.isEmpty) return AppStrings.validationPasswordRequired;
+                if (t.length < 8) return AppStrings.validationPasswordTooShort;
+                return null;
+              },
+            ),
+            const SizedBox(height: 4),
+            CheckboxListTile(
+              value: _forceReset,
+              onChanged: (v) => setState(() => _forceReset = v ?? false),
+              title: const Text(
+                AppStrings.setPasswordForceReset,
+                style: TextStyle(fontSize: 13),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              activeColor: AppColors.primaryPurple,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 12.5),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                )
+              : const Text(AppStrings.setPasswordSubmit),
+        ),
+      ],
     );
   }
 }
