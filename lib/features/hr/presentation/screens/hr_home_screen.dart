@@ -116,7 +116,7 @@ class _OverviewSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _GreetingCard(name: fullName, cycle: overview.cycle),
+            _GreetingCard(name: fullName),
             const SizedBox(height: 18),
             _StatsGrid(overview: overview),
           ],
@@ -158,8 +158,7 @@ class _OverviewLoading extends StatelessWidget {
 
 class _GreetingCard extends StatelessWidget {
   final String name;
-  final HrOverviewCycle? cycle;
-  const _GreetingCard({required this.name, required this.cycle});
+  const _GreetingCard({required this.name});
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -208,83 +207,6 @@ class _GreetingCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.80),
               fontSize: 13,
               fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (cycle != null)
-            _ActiveCyclePill(cycle: cycle!)
-          else
-            const _NoActiveCyclePill(),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActiveCyclePill extends StatelessWidget {
-  final HrOverviewCycle cycle;
-  const _ActiveCyclePill({required this.cycle});
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final daysRemaining =
-        cycle.endDate.difference(DateTime(now.year, now.month, now.day)).inDays;
-    final daysLabel = daysRemaining < 0
-        ? AppStrings.hrHomeCycleEnded
-        : '$daysRemaining ${daysRemaining == 1 ? AppStrings.hrHomeDayRemaining : AppStrings.hrHomeDaysRemaining}';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.event_outlined, color: Colors.white, size: 14),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              '${cycle.name} · $daysLabel',
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NoActiveCyclePill extends StatelessWidget {
-  const _NoActiveCyclePill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.info_outline_rounded, color: Colors.white, size: 14),
-          SizedBox(width: 6),
-          Text(
-            AppStrings.hrHomeNoActiveCycle,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],
