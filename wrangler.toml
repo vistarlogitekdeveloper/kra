@@ -1,0 +1,13 @@
+# Cloudflare Pages config for the Vistar KRA Flutter web app.
+#
+# Deploy (after building — see the build command below):
+#   npx wrangler pages deploy
+# which uploads `pages_build_output_dir`. First run creates the project and
+# prompts `wrangler login`. Add `--project-name=vistar-kra` to be explicit.
+#
+# This is a pure static site (no Pages Functions / Workers) — the whole app
+# is the compiled Flutter bundle in build/web.
+
+name = "vistar-kra"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "build/web"

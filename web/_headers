@@ -1,0 +1,10 @@
+# Don't cache the app shell / service worker, so a new deploy is picked up
+# immediately instead of users being stuck on a cached version. Hashed
+# assets (main.dart.js, canvaskit, assets/) are safe to cache and are
+# handled by Cloudflare's defaults.
+/index.html
+  Cache-Control: no-cache
+/flutter_service_worker.js
+  Cache-Control: no-cache
+/manifest.json
+  Cache-Control: no-cache
