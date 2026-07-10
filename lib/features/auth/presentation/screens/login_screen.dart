@@ -20,6 +20,10 @@ final RegExp _emailRegex = RegExp(
   r'^[\w.+-]+@([\w-]+\.)+[\w-]{2,}$',
 );
 
+/// Employee-code pattern (e.g. VLPL0123, EMP003) — the alternative login
+/// identifier for staff who share a role mailbox or have no personal email.
+final RegExp _empCodeRegex = RegExp(r'^[A-Za-z]{2,5}[0-9]{3,8}$');
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -193,14 +197,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             const SizedBox(height: 32),
             BrandedTextField(
               controller: _emailController,
-              label: AppStrings.loginEmailLabel,
-              hint: AppStrings.loginEmailHint,
+              label: AppStrings.loginIdentifierLabel,
+              hint: AppStrings.loginIdentifierHint,
               prefixIcon: Icons.person_outline_rounded,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.username],
               autofocus: true,
               onSubmitted: (_) => _passwordFocus.requestFocus(),
-              validator: _validateEmail,
+              validator: _validateIdentifier,
             ),
             const SizedBox(height: 18),
             BrandedTextField(
@@ -260,10 +264,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  String? _validateEmail(String? value) {
+  String? _validateIdentifier(String? value) {
     final v = (value ?? '').trim();
-    if (v.isEmpty) return AppStrings.validationEmailRequired;
-    if (!_emailRegex.hasMatch(v)) return AppStrings.validationEmailInvalid;
+    if (v.isEmpty) return AppStrings.validationIdentifierRequired;
+    // Accept either an email or an employee code — the backend resolves the
+    // identifier against email OR employee_code.
+    if (!_emailRegex.hasMatch(v) && !_empCodeRegex.hasMatch(v)) {
+      return AppStrings.validationIdentifierInvalid;
+    }
     return null;
   }
 
