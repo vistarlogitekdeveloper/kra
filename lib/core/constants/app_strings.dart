@@ -3,6 +3,18 @@
 class AppStrings {
   AppStrings._();
 
+  // ───── Admin review dashboard ─────
+  static const String adminDashTitle = 'Review Dashboard';
+  static const String adminDashEmpty = 'No reviews for this month.';
+  static const String adminDashFilterAll = 'All KRAs';
+  static const String adminDashFilterHint = 'Filter by KRA';
+  static const String adminDashColEmployee = 'Employee';
+  static const String adminDashColGrade = 'Grade';
+  static const String adminDashColStage = 'Stage';
+  static const String adminDashColScore = 'Score';
+  static const String adminDashColIncentive = 'Incentive';
+  static const String adminDashNeedsReview = 'Awaiting your review';
+
   // ───── App ─────
   static const String appName = 'Vistar';
   static const String appTagline = 'KRA Review & Incentive Management';

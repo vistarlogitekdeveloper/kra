@@ -7,6 +7,7 @@ import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
+import '../../features/reviews/presentation/screens/admin_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_detail_screen.dart';
 import '../widgets/route_error_screen.dart';
@@ -537,7 +538,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.hrReviews,
-                builder: (_, __) => const MonthlyReviewDashboardScreen(),
+                // HR-tier (HR / HR_ADMIN / ADMIN) get the consolidated review
+                // dashboard: every employee's review at a glance, filterable
+                // by KRA header, tap-through to perform the management review.
+                builder: (_, __) => const AdminReviewDashboardScreen(),
               ),
             ],
           ),
