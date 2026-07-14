@@ -52,6 +52,12 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   bool _isDirty = false;
   bool _hydrated = false;
 
+  /// The employee as first loaded (edit mode). Used to send only the fields
+  /// that actually changed on save, so an untouched record isn't re-sent
+  /// wholesale — that re-clobbered nullable columns and, before the backend
+  /// accepted nulls, 500'd on a cleared incentive.
+  Employee? _original;
+
   /// Field-level server errors keyed by field name. Surface from the
   /// API on a 400 (validation) and clear on the next keystroke.
   final Map<String, String> _fieldErrors = {};
@@ -107,6 +113,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
 
   void _hydrateFrom(Employee e) {
     if (_hydrated) return;
+    _original = e;
     _codeController.text = e.employeeCode;
     _nameController.text = e.fullName;
     _emailController.text = e.email;
@@ -180,23 +187,36 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           _role == 'EMPLOYEE' ? _managerId : null;
       final passwordText = _passwordController.text;
       if (widget.isEdit) {
-        final updated = await repo.update(widget.employeeId!, {
-          'employeeCode': _codeController.text.trim(),
-          'name': _nameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'role': _role,
-          'department': _department,
-          'projectLocationId': _projectLocationId,
-          'managerId': managerIdForPayload,
-          'grade': _gradeController.text.trim().isEmpty
-              ? null
-              : _gradeController.text.trim(),
-          'monthlyIncentiveAmount': monthlyIncentive,
-          if (_joinedDate != null) 'joinedDate': _joinedDate!.toIso8601String(),
-          // NB: password is NOT sent here — the update endpoint ignores it.
-          // Edit-mode password changes go through the dedicated
-          // POST /employees/:id/set-password (see _showResetPasswordDialog).
-        });
+        final grade =
+            _gradeController.text.trim().isEmpty ? null : _gradeController.text.trim();
+        // Send only the fields that actually changed. Re-sending an
+        // untouched record clobbers nullable columns needlessly (and used
+        // to 500 on a null incentive); a field the user deliberately
+        // cleared still differs from the original, so it's sent as null and
+        // clears server-side. NB: password is never sent here — edit-mode
+        // password changes go through POST /employees/:id/set-password
+        // (see _showResetPasswordDialog).
+        final changes = _diffFromOriginal(
+          code: _codeController.text.trim(),
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          role: _role,
+          department: _department,
+          projectLocationId: _projectLocationId,
+          managerId: managerIdForPayload,
+          grade: grade,
+          monthlyIncentiveAmount: monthlyIncentive,
+          joinedDate: _joinedDate,
+        );
+        if (changes.isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(AppStrings.employeeFormSaved)),
+          );
+          context.pop();
+          return;
+        }
+        final updated = await repo.update(widget.employeeId!, changes);
         ref.read(employeeListProvider.notifier).replaceUpdated(updated);
         ref.invalidate(employeeDetailProvider(updated.id));
         if (!mounted) return;
@@ -258,6 +278,62 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  /// Builds the PATCH body for edit mode, keeping only fields whose value
+  /// differs from the originally-loaded employee. A field the user cleared
+  /// still differs from its original, so it's sent as null and cleared
+  /// server-side; untouched fields are omitted entirely. Falls back to the
+  /// full field set if the original wasn't captured.
+  Map<String, dynamic> _diffFromOriginal({
+    required String code,
+    required String name,
+    required String email,
+    required String role,
+    required String? department,
+    required String? projectLocationId,
+    required String? managerId,
+    required String? grade,
+    required double? monthlyIncentiveAmount,
+    required DateTime? joinedDate,
+  }) {
+    final o = _original;
+    if (o == null) {
+      return {
+        'employeeCode': code,
+        'name': name,
+        'email': email,
+        'role': role,
+        'department': department,
+        'projectLocationId': projectLocationId,
+        'managerId': managerId,
+        'grade': grade,
+        'monthlyIncentiveAmount': monthlyIncentiveAmount,
+        if (joinedDate != null) 'joinedDate': joinedDate.toIso8601String(),
+      };
+    }
+
+    final oDept = (o.department?.isEmpty ?? true) ? null : o.department;
+    final oGrade = (o.grade?.isEmpty ?? true) ? null : o.grade;
+    final changes = <String, dynamic>{};
+    if (code != o.employeeCode) changes['employeeCode'] = code;
+    if (name != o.fullName) changes['name'] = name;
+    if (email != o.email) changes['email'] = email;
+    if (role != o.role) changes['role'] = role;
+    if (department != oDept) changes['department'] = department;
+    if (projectLocationId != o.projectLocationId) {
+      changes['projectLocationId'] = projectLocationId;
+    }
+    if (managerId != o.managerId) changes['managerId'] = managerId;
+    if (grade != oGrade) changes['grade'] = grade;
+    if (monthlyIncentiveAmount != o.monthlyIncentiveAmount) {
+      changes['monthlyIncentiveAmount'] = monthlyIncentiveAmount;
+    }
+    final a = joinedDate, b = o.joinedDate;
+    final sameDate = (a == null && b == null) ||
+        (a != null && b != null && a.isAtSameMomentAs(b));
+    if (!sameDate) changes['joinedDate'] = a?.toIso8601String();
+    return changes;
   }
 
   /// Edit mode: opens the secure set-password dialog (dedicated endpoint,
