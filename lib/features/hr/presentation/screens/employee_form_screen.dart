@@ -34,7 +34,6 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   final _codeController = TextEditingController();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _departmentController = TextEditingController();
   final _gradeController = TextEditingController();
   final _monthlyIncentiveController = TextEditingController();
   // Create-mode only. Edits don't change the password here — that's a
@@ -42,6 +41,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   final _passwordController = TextEditingController();
 
   String _role = 'EMPLOYEE';
+  String? _department;
   String? _projectLocationId;
   String? _managerId;
   DateTime? _joinedDate;
@@ -67,6 +67,18 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     'WAREHOUSE_MGR',
   ];
 
+  /// Department options as they appear in the company Master Data sheet.
+  /// Values are stored verbatim on the employee record, so they must match
+  /// the sheet spelling exactly (including "Wh-Operation" and the sheet's
+  /// "Transporation" spelling) — the imported roster already carries these.
+  static const _departments = [
+    'Wh-Operation',
+    'Accounts & Finance',
+    'Transporation',
+    'HR',
+    'IT Department',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -74,7 +86,6 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       _codeController,
       _nameController,
       _emailController,
-      _departmentController,
       _gradeController,
       _monthlyIncentiveController,
       _passwordController,
@@ -88,7 +99,6 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _codeController.dispose();
     _nameController.dispose();
     _emailController.dispose();
-    _departmentController.dispose();
     _gradeController.dispose();
     _monthlyIncentiveController.dispose();
     _passwordController.dispose();
@@ -100,13 +110,14 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _codeController.text = e.employeeCode;
     _nameController.text = e.fullName;
     _emailController.text = e.email;
-    _departmentController.text = e.department ?? '';
     _gradeController.text = e.grade ?? '';
     _monthlyIncentiveController.text = e.monthlyIncentiveAmount == null
         ? ''
         : e.monthlyIncentiveAmount!.toStringAsFixed(0);
     setState(() {
       _role = e.role;
+      _department =
+          (e.department?.isEmpty ?? true) ? null : e.department;
       _projectLocationId = e.projectLocationId;
       _managerId = e.managerId;
       _joinedDate = e.joinedDate;
@@ -174,9 +185,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'role': _role,
-          'department': _departmentController.text.trim().isEmpty
-              ? null
-              : _departmentController.text.trim(),
+          'department': _department,
           'projectLocationId': _projectLocationId,
           'managerId': managerIdForPayload,
           'grade': _gradeController.text.trim().isEmpty
@@ -201,9 +210,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           fullName: _nameController.text.trim(),
           email: _emailController.text.trim(),
           role: _role,
-          department: _departmentController.text.trim().isEmpty
-              ? null
-              : _departmentController.text.trim(),
+          department: _department,
           projectLocationId: _projectLocationId,
           managerId: managerIdForPayload,
           grade: _gradeController.text.trim().isEmpty
@@ -401,10 +408,13 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             ),
           ],
           const SizedBox(height: 14),
-          BrandedTextField(
-            controller: _departmentController,
-            label: AppStrings.employeeFormDepartment,
-            prefixIcon: Icons.business_outlined,
+          _DepartmentDropdown(
+            value: _department,
+            departments: _departments,
+            onChanged: (d) => setState(() {
+              _department = d;
+              _isDirty = true;
+            }),
           ),
           const SizedBox(height: 14),
           _LocationDropdown(
@@ -776,6 +786,73 @@ class _RoleDropdown extends StatelessWidget {
               onChanged: (v) {
                 if (v != null) onChanged(v);
               },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Department picker — fixed options from the company Master Data sheet.
+/// Optional (— None — clears it). An employee whose stored department
+/// isn't in the list (legacy/free-text data) is surfaced as an extra item
+/// so the dropdown can render without asserting, mirroring [_RoleDropdown].
+class _DepartmentDropdown extends StatelessWidget {
+  final String? value;
+  final List<String> departments;
+  final ValueChanged<String?> onChanged;
+  const _DepartmentDropdown({
+    required this.value,
+    required this.departments,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasOrphan = value != null && !departments.contains(value);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          AppStrings.employeeFormDepartment,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InputDecorator(
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.business_outlined, size: 20),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              value: value,
+              isExpanded: true,
+              hint: const Text(
+                'Select department',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('— None —'),
+                ),
+                if (hasOrphan)
+                  DropdownMenuItem<String?>(
+                    value: value,
+                    child: Text('$value (current)'),
+                  ),
+                for (final d in departments)
+                  DropdownMenuItem<String?>(
+                    value: d,
+                    child: Text(d),
+                  ),
+              ],
+              onChanged: onChanged,
             ),
           ),
         ),
