@@ -325,9 +325,10 @@ final employeeDetailProvider =
 final allEmployeesProvider =
     FutureProvider.autoDispose<List<Employee>>((ref) async {
   final repo = ref.watch(employeeRepositoryProvider);
-  // pageSize=500 covers the realistic ceiling of an org's headcount;
-  // if it ever exceeds, the picker can be upgraded to paginate.
-  final page = await repo.list(page: 1, pageSize: 500, isActive: true);
+  // 200 is the backend's max page size (larger → 400 VAL_001). It covers
+  // the current headcount comfortably; if the org ever exceeds 200 this
+  // must loop pages rather than raise the limit, which the server rejects.
+  final page = await repo.list(page: 1, pageSize: 200, isActive: true);
   return page.employees;
 });
 

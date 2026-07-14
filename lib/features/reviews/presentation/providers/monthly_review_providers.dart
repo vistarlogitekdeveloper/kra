@@ -102,10 +102,11 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.admin:
     case UserRole.hrAdmin:
       // Fetch the roster and every assignment concurrently, then join the
-      // real KRA rows onto each employee by id.
+      // real KRA rows onto each employee by id. 200 is the backend's max
+      // page size (larger → 400); fine for the current headcount.
       final empFuture = ref
           .read(employeeRepositoryProvider)
-          .list(page: 1, pageSize: 500, isActive: true);
+          .list(page: 1, pageSize: 200, isActive: true);
       final asgFuture = ref.read(kraAssignmentRepositoryProvider).list();
       final page = await empFuture;
       final assignments = await asgFuture;
