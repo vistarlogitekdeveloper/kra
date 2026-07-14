@@ -67,14 +67,14 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     'WAREHOUSE_MGR',
   ];
 
-  /// Department options as they appear in the company Master Data sheet.
-  /// Values are stored verbatim on the employee record, so they must match
-  /// the sheet spelling exactly (including "Wh-Operation" and the sheet's
-  /// "Transporation" spelling) — the imported roster already carries these.
+  /// Department options as they appear in the company Master Data sheet,
+  /// with the sheet's "Transporation" typo corrected — the backend data is
+  /// being normalised to "Transportation" to match. Values are stored
+  /// verbatim on the employee record.
   static const _departments = [
     'Wh-Operation',
     'Accounts & Finance',
-    'Transporation',
+    'Transportation',
     'HR',
     'IT Department',
   ];
