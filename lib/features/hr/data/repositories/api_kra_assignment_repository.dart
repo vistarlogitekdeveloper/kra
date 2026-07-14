@@ -102,7 +102,8 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
   Future<String> _resolveActiveCycleId() async {
     final response = await _dio.get(
       ApiConstants.reviewCycles,
-      queryParameters: {'page': 1, 'pageSize': 50},
+      // Backend honours `limit`, not `pageSize`.
+      queryParameters: {'page': 1, 'limit': 50},
     );
     final cycles =
         unwrapList(response).whereType<Map<String, dynamic>>().toList();
