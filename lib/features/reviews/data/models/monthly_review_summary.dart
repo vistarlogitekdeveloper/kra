@@ -106,4 +106,12 @@ class MonthlyReviewSummary {
     if (currentStageStatus == StageStatus.submitted) return false;
     return currentStage.isActionableBy(role);
   }
+
+  /// Management review (approve/return) and incentive payout (mark paid) are
+  /// non-rating actions performed on the single-review detail screen; the
+  /// rating stages are edited on the per-employee quarterly KRA sheet. This
+  /// picks the right destination so a tap lands where the action lives.
+  bool get opensReviewDetail =>
+      currentStage == ReviewStage.managementReview ||
+      currentStage == ReviewStage.incentivePayout;
 }

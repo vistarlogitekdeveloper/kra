@@ -150,8 +150,11 @@ class _ReviewTable extends StatelessWidget {
         for (final s in items)
           DataRow(
             selected: role != null && s.needsActionBy(role!),
-            onSelectChanged: (_) =>
-                context.push(AppRoutes.reviewsQuarterlyFor(s.employeeId)),
+            onSelectChanged: (_) => context.push(
+              s.opensReviewDetail
+                  ? AppRoutes.monthlyReviewDetail(s.id)
+                  : AppRoutes.reviewsQuarterlyFor(s.employeeId),
+            ),
             cells: [
               DataCell(_EmployeeCell(
                 summary: s,
