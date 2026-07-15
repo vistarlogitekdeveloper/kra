@@ -89,12 +89,9 @@ class _MyKrasSummaryCardState extends ConsumerState<MyKrasSummaryCard> {
       );
     }
 
-    final cycleName = assignment?.cycle?.name ?? '';
-    final templateName = assignment?.template?.name ?? '';
-    final subtitle = [
-      if (cycleName.isNotEmpty) cycleName,
-      if (templateName.isNotEmpty) templateName,
-    ].join(' • ');
+    // Subtitle shows the assigned template only — the review-cycle name is
+    // intentionally omitted now that reviews are monthly.
+    final subtitle = assignment?.template?.name ?? '';
 
     final visible = _expanded ? items : items.take(_collapsedCount).toList();
     final hasMore = items.length > _collapsedCount;

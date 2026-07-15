@@ -125,7 +125,11 @@ class _ReviewTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => context.push(AppRoutes.monthlyReviewDetail(summary.id)),
+        onTap: () => context.push(
+          summary.opensReviewDetail
+              ? AppRoutes.monthlyReviewDetail(summary.id)
+              : AppRoutes.reviewsQuarterlyFor(summary.employeeId),
+        ),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           decoration: BoxDecoration(

@@ -53,4 +53,14 @@ abstract class MonthlyReviewRepository {
     required String actorId,
     required String actorName,
   });
+
+  /// Sets/overwrites the per-row scores for [stage] on [reviewId] **without**
+  /// advancing the pipeline. Used by the quarterly KRA sheet, where the
+  /// employee (self) and reporting manager edit scores directly across the
+  /// three months of a quarter rather than through the staged submit flow.
+  Future<MonthlyReview> saveStageScores(
+    String reviewId,
+    ReviewStage stage, {
+    required Map<String, RowScore> rowScores,
+  });
 }

@@ -49,6 +49,13 @@ class MonthlyReviewSummary {
   });
 
   /// Wire form from the monthly-review backend's list endpoint.
+  ///
+  /// The backend sends both the formal pipeline cursor (`currentStage`) and
+  /// scores-derived progress (`displayStage`/`displayStageStatus` — the
+  /// furthest rating stage that actually carries scores, since in-place
+  /// `save-scores` never advances the cursor). The tile should show real
+  /// progress, so prefer the display fields and fall back to the cursor for
+  /// older backends that don't send them.
   factory MonthlyReviewSummary.fromJson(Map<String, dynamic> json) =>
       MonthlyReviewSummary(
         id: JsonParse.parseString(json['id']) ?? '',
@@ -60,10 +67,12 @@ class MonthlyReviewSummary {
         year: JsonParse.parseInt(json['year']) ?? 0,
         month: JsonParse.parseInt(json['month']) ?? 1,
         monthLabel: JsonParse.parseString(json['monthLabel']) ?? '',
-        currentStage:
-            ReviewStage.fromApi(JsonParse.parseString(json['currentStage'])),
+        currentStage: ReviewStage.fromApi(
+            JsonParse.parseString(json['displayStage']) ??
+                JsonParse.parseString(json['currentStage'])),
         currentStageStatus: StageStatus.fromApi(
-            JsonParse.parseString(json['currentStageStatus'])),
+            JsonParse.parseString(json['displayStageStatus']) ??
+                JsonParse.parseString(json['currentStageStatus'])),
         finalScorePct: JsonParse.parseDouble(json['finalScorePct']) ?? 0,
         incentiveEligibleAmount:
             JsonParse.parseDouble(json['incentiveEligibleAmount']),
@@ -82,8 +91,10 @@ class MonthlyReviewSummary {
         year: r.period.year,
         month: r.period.month,
         monthLabel: r.period.label,
-        currentStage: r.currentStage,
-        currentStageStatus: r.statusOf(r.currentStage),
+        // Derived from actual scores, not the frozen pipeline cursor —
+        // in-place `save-scores` never advances `currentStage`.
+        currentStage: r.displayStage,
+        currentStageStatus: r.displayStatus,
         finalScorePct: r.finalScorePct,
         incentiveEligibleAmount: r.eligibleAmount,
       );
@@ -95,4 +106,12 @@ class MonthlyReviewSummary {
     if (currentStageStatus == StageStatus.submitted) return false;
     return currentStage.isActionableBy(role);
   }
+
+  /// Management review (approve/return) and incentive payout (mark paid) are
+  /// non-rating actions performed on the single-review detail screen; the
+  /// rating stages are edited on the per-employee quarterly KRA sheet. This
+  /// picks the right destination so a tap lands where the action lives.
+  bool get opensReviewDetail =>
+      currentStage == ReviewStage.managementReview ||
+      currentStage == ReviewStage.incentivePayout;
 }

@@ -24,7 +24,7 @@ import '../../data/repositories/monthly_review_repository.dart';
 /// pipeline). When `true`, [monthlyReviewRepositoryProvider] targets
 /// [ApiMonthlyReviewRepository] with no model/UI changes.
 final monthlyBackendEnabledProvider = Provider<bool>(
-  (ref) => const bool.fromEnvironment('MONTHLY_BACKEND', defaultValue: false),
+  (ref) => const bool.fromEnvironment('MONTHLY_BACKEND', defaultValue: true),
 );
 
 /// The signed-in user reduced to what the review layer needs: an id +
@@ -82,6 +82,9 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.manager:
     case UserRole.bdManager:
     case UserRole.warehouseMgr:
+      // Direct reports come from /manager/team (backend-scoped by the manager's
+      // JWT). managerId is set to the signed-in manager so the quarterly sheet
+      // lets them edit their reports' manager scores.
       final page =
           await ref.read(managerTeamRepositoryProvider).listTeam(pageSize: 200);
       return page.members
@@ -99,10 +102,11 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.admin:
     case UserRole.hrAdmin:
       // Fetch the roster and every assignment concurrently, then join the
-      // real KRA rows onto each employee by id.
+      // real KRA rows onto each employee by id. 200 is the backend's max
+      // page size (larger → 400); fine for the current headcount.
       final empFuture = ref
           .read(employeeRepositoryProvider)
-          .list(page: 1, pageSize: 500, isActive: true);
+          .list(page: 1, pageSize: 200, isActive: true);
       final asgFuture = ref.read(kraAssignmentRepositoryProvider).list();
       final page = await empFuture;
       final assignments = await asgFuture;
@@ -197,8 +201,14 @@ final availablePeriodsProvider = Provider<List<ReviewPeriod>>((ref) {
 final selectedPeriodProvider = StateProvider<ReviewPeriod?>((ref) => null);
 
 /// Review summaries for [period], scoped to the signed-in user's role.
+///
+/// The list endpoint computes `finalScorePct` and the scores-derived
+/// `displayStage`/`displayStageStatus` server-side (mapped onto
+/// [MonthlyReviewSummary.currentStage] by `fromJson`), so summaries are
+/// rendered as-is — no per-row detail hydration.
 final monthlyReviewListProvider = FutureProvider.autoDispose
     .family<List<MonthlyReviewSummary>, ReviewPeriod>((ref, period) async {
+  ref.keepAlive();
   final scope = ref.watch(currentReviewScopeProvider);
   if (scope == null) return const [];
   // The repository's roster is already role-scoped via [_loadRoster], so
@@ -214,4 +224,47 @@ final monthlyReviewListProvider = FutureProvider.autoDispose
 final monthlyReviewDetailProvider =
     FutureProvider.autoDispose.family<MonthlyReview, String>((ref, id) async {
   return ref.read(monthlyReviewRepositoryProvider).getReview(id);
+});
+
+/// The three months of the fiscal quarter (Apr-start, matching the KRA
+/// sheet: Q1 = Apr–Jun) that contains [p].
+List<ReviewPeriod> quarterMonthsFor(ReviewPeriod p) {
+  final int start;
+  if (p.month >= 4 && p.month <= 6) {
+    start = 4;
+  } else if (p.month >= 7 && p.month <= 9) {
+    start = 7;
+  } else if (p.month >= 10 && p.month <= 12) {
+    start = 10;
+  } else {
+    start = 1; // Jan–Mar
+  }
+  return [
+    ReviewPeriod(p.year, start),
+    ReviewPeriod(p.year, start + 1),
+    ReviewPeriod(p.year, start + 2),
+  ];
+}
+
+/// One employee's three monthly reviews for the quarter that contains
+/// `anchor`. Any month with no review yet comes back null. Powers the
+/// quarterly KRA sheet.
+final quarterlySheetProvider = FutureProvider.autoDispose.family<
+    ({List<ReviewPeriod> months, List<MonthlyReview?> reviews}),
+    ({String employeeId, ReviewPeriod anchor})>((ref, args) async {
+  final scope = ref.watch(currentReviewScopeProvider);
+  final repo = ref.read(monthlyReviewRepositoryProvider);
+  final months = quarterMonthsFor(args.anchor);
+  final reviews = <MonthlyReview?>[];
+  for (final period in months) {
+    final list = await repo.listMonthlyReviews(
+      year: period.year,
+      month: period.month,
+      scopeRole: scope?.role,
+    );
+    final matches =
+        list.where((s) => s.employeeId == args.employeeId).toList();
+    reviews.add(matches.isEmpty ? null : await repo.getReview(matches.first.id));
+  }
+  return (months: months, reviews: reviews);
 });

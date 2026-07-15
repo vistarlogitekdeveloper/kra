@@ -269,4 +269,22 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
     _store[reviewId] = updated;
     return updated;
   }
+
+  @override
+  Future<MonthlyReview> saveStageScores(
+    String reviewId,
+    ReviewStage stage, {
+    required Map<String, RowScore> rowScores,
+  }) async {
+    final review = await getReview(reviewId);
+    final rows = [
+      for (final row in review.rows)
+        rowScores.containsKey(row.id)
+            ? row.withStageScore(stage, rowScores[row.id]!)
+            : row,
+    ];
+    final updated = review.copyWith(rows: rows);
+    _store[reviewId] = updated;
+    return updated;
+  }
 }

@@ -3,6 +3,24 @@
 class AppStrings {
   AppStrings._();
 
+  // ───── Admin review dashboard ─────
+  static const String adminDashTitle = 'Review Dashboard';
+  static const String adminDashEmpty = 'No reviews for this month.';
+  static const String adminDashFilterAll = 'All KRAs';
+  static const String adminDashFilterHint = 'Filter by KRA';
+  static const String adminDashColEmployee = 'Employee';
+  static const String adminDashColGrade = 'Grade';
+  static const String adminDashColStage = 'Stage';
+  static const String adminDashColScore = 'Score';
+  static const String adminDashColIncentive = 'Incentive';
+  static const String adminDashNeedsReview = 'Awaiting your review';
+  static const String adminDashSearchHint = 'Search employees…';
+
+  // ───── Quarterly KRA sheet ─────
+  static const String quarterlySheetTitle = 'Quarterly KRA Sheet';
+  static const String quarterlyPayoutTitle = 'Quarter payout';
+  static const String quarterlyPayoutAmount = 'Payout this quarter';
+
   // ───── App ─────
   static const String appName = 'Vistar';
   static const String appTagline = 'KRA Review & Incentive Management';
@@ -413,7 +431,7 @@ class AppStrings {
   // ───── KPI / Dashboard extras ─────
   static const String hrKpiActiveEmployees = 'Active Employees';
   static const String hrKpiPendingReviews = 'Pending Reviews';
-  static const String hrKpiQuarterPayout = 'Quarter Payout';
+  static const String hrKpiQuarterPayout = 'Incentive Payout';
   static const String hrKpiCompletion = 'Completion';
   static const String hrPipelineTitle = 'Review Pipeline';
   static const String hrActionItemsTitle = 'Needs your attention';
@@ -450,15 +468,15 @@ class AppStrings {
   static const String homeCurrentMonthStartRating = 'Start rating →';
   static const String homeCurrentMonthViewSubmission = 'View my submission';
   static const String homeCurrentMonthViewDetails = 'View details';
-  static const String homeNoActiveCycleTitle = 'No active review cycle';
+  static const String homeNoActiveCycleTitle = 'No active review';
   static const String homeNoActiveCycleMessage =
-      'Your HR team hasn\'t opened a cycle yet. Check back soon.';
+      'Your HR team hasn\'t started this month\'s review yet. Check back soon.';
 
   // ───── Home — KRAs summary ─────
   static const String homeMyKrasTitle = 'My KRAs';
   static const String homeMyKrasViewAll = 'View all';
   static const String homeMyKrasEmpty =
-      'No KRAs assigned for this cycle. Contact HR.';
+      'No KRAs assigned yet. Contact HR.';
   static const String homeMyKrasItemsCountSingular = '1 item';
   // Plural form composed at the call-site: "$count items"
 
@@ -467,7 +485,7 @@ class AppStrings {
   static const String homeHistoryStripPending = 'Pending';
 
   // ───── Home — incentive snapshot ─────
-  static const String homeIncentiveTitle = 'My incentive this quarter';
+  static const String homeIncentiveTitle = 'My incentive this month';
   static const String homeIncentiveCaption =
       'Based on finalized reviews. Subject to change.';
   static const String homeIncentiveOf = 'of';

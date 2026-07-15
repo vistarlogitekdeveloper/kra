@@ -34,7 +34,6 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   final _codeController = TextEditingController();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _departmentController = TextEditingController();
   final _gradeController = TextEditingController();
   final _monthlyIncentiveController = TextEditingController();
   // Create-mode only. Edits don't change the password here — that's a
@@ -42,6 +41,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   final _passwordController = TextEditingController();
 
   String _role = 'EMPLOYEE';
+  String? _department;
   String? _projectLocationId;
   String? _managerId;
   DateTime? _joinedDate;
@@ -51,6 +51,12 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   bool _isSubmitting = false;
   bool _isDirty = false;
   bool _hydrated = false;
+
+  /// The employee as first loaded (edit mode). Used to send only the fields
+  /// that actually changed on save, so an untouched record isn't re-sent
+  /// wholesale — that re-clobbered nullable columns and, before the backend
+  /// accepted nulls, 500'd on a cleared incentive.
+  Employee? _original;
 
   /// Field-level server errors keyed by field name. Surface from the
   /// API on a 400 (validation) and clear on the next keystroke.
@@ -67,6 +73,18 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     'WAREHOUSE_MGR',
   ];
 
+  /// Department options as they appear in the company Master Data sheet,
+  /// with the sheet's "Transporation" typo corrected — the backend data is
+  /// being normalised to "Transportation" to match. Values are stored
+  /// verbatim on the employee record.
+  static const _departments = [
+    'Wh-Operation',
+    'Accounts & Finance',
+    'Transportation',
+    'HR',
+    'IT Department',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -74,7 +92,6 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       _codeController,
       _nameController,
       _emailController,
-      _departmentController,
       _gradeController,
       _monthlyIncentiveController,
       _passwordController,
@@ -88,7 +105,6 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _codeController.dispose();
     _nameController.dispose();
     _emailController.dispose();
-    _departmentController.dispose();
     _gradeController.dispose();
     _monthlyIncentiveController.dispose();
     _passwordController.dispose();
@@ -97,16 +113,18 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
 
   void _hydrateFrom(Employee e) {
     if (_hydrated) return;
+    _original = e;
     _codeController.text = e.employeeCode;
     _nameController.text = e.fullName;
     _emailController.text = e.email;
-    _departmentController.text = e.department ?? '';
     _gradeController.text = e.grade ?? '';
     _monthlyIncentiveController.text = e.monthlyIncentiveAmount == null
         ? ''
         : e.monthlyIncentiveAmount!.toStringAsFixed(0);
     setState(() {
       _role = e.role;
+      _department =
+          (e.department?.isEmpty ?? true) ? null : e.department;
       _projectLocationId = e.projectLocationId;
       _managerId = e.managerId;
       _joinedDate = e.joinedDate;
@@ -169,25 +187,36 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           _role == 'EMPLOYEE' ? _managerId : null;
       final passwordText = _passwordController.text;
       if (widget.isEdit) {
-        final updated = await repo.update(widget.employeeId!, {
-          'employeeCode': _codeController.text.trim(),
-          'name': _nameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'role': _role,
-          'department': _departmentController.text.trim().isEmpty
-              ? null
-              : _departmentController.text.trim(),
-          'projectLocationId': _projectLocationId,
-          'managerId': managerIdForPayload,
-          'grade': _gradeController.text.trim().isEmpty
-              ? null
-              : _gradeController.text.trim(),
-          'monthlyIncentiveAmount': monthlyIncentive,
-          if (_joinedDate != null) 'joinedDate': _joinedDate!.toIso8601String(),
-          // NB: password is NOT sent here — the update endpoint ignores it.
-          // Edit-mode password changes go through the dedicated
-          // POST /employees/:id/set-password (see _showResetPasswordDialog).
-        });
+        final grade =
+            _gradeController.text.trim().isEmpty ? null : _gradeController.text.trim();
+        // Send only the fields that actually changed. Re-sending an
+        // untouched record clobbers nullable columns needlessly (and used
+        // to 500 on a null incentive); a field the user deliberately
+        // cleared still differs from the original, so it's sent as null and
+        // clears server-side. NB: password is never sent here — edit-mode
+        // password changes go through POST /employees/:id/set-password
+        // (see _showResetPasswordDialog).
+        final changes = _diffFromOriginal(
+          code: _codeController.text.trim(),
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          role: _role,
+          department: _department,
+          projectLocationId: _projectLocationId,
+          managerId: managerIdForPayload,
+          grade: grade,
+          monthlyIncentiveAmount: monthlyIncentive,
+          joinedDate: _joinedDate,
+        );
+        if (changes.isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(AppStrings.employeeFormSaved)),
+          );
+          context.pop();
+          return;
+        }
+        final updated = await repo.update(widget.employeeId!, changes);
         ref.read(employeeListProvider.notifier).replaceUpdated(updated);
         ref.invalidate(employeeDetailProvider(updated.id));
         if (!mounted) return;
@@ -201,9 +230,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           fullName: _nameController.text.trim(),
           email: _emailController.text.trim(),
           role: _role,
-          department: _departmentController.text.trim().isEmpty
-              ? null
-              : _departmentController.text.trim(),
+          department: _department,
           projectLocationId: _projectLocationId,
           managerId: managerIdForPayload,
           grade: _gradeController.text.trim().isEmpty
@@ -251,6 +278,62 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  /// Builds the PATCH body for edit mode, keeping only fields whose value
+  /// differs from the originally-loaded employee. A field the user cleared
+  /// still differs from its original, so it's sent as null and cleared
+  /// server-side; untouched fields are omitted entirely. Falls back to the
+  /// full field set if the original wasn't captured.
+  Map<String, dynamic> _diffFromOriginal({
+    required String code,
+    required String name,
+    required String email,
+    required String role,
+    required String? department,
+    required String? projectLocationId,
+    required String? managerId,
+    required String? grade,
+    required double? monthlyIncentiveAmount,
+    required DateTime? joinedDate,
+  }) {
+    final o = _original;
+    if (o == null) {
+      return {
+        'employeeCode': code,
+        'name': name,
+        'email': email,
+        'role': role,
+        'department': department,
+        'projectLocationId': projectLocationId,
+        'managerId': managerId,
+        'grade': grade,
+        'monthlyIncentiveAmount': monthlyIncentiveAmount,
+        if (joinedDate != null) 'joinedDate': joinedDate.toIso8601String(),
+      };
+    }
+
+    final oDept = (o.department?.isEmpty ?? true) ? null : o.department;
+    final oGrade = (o.grade?.isEmpty ?? true) ? null : o.grade;
+    final changes = <String, dynamic>{};
+    if (code != o.employeeCode) changes['employeeCode'] = code;
+    if (name != o.fullName) changes['name'] = name;
+    if (email != o.email) changes['email'] = email;
+    if (role != o.role) changes['role'] = role;
+    if (department != oDept) changes['department'] = department;
+    if (projectLocationId != o.projectLocationId) {
+      changes['projectLocationId'] = projectLocationId;
+    }
+    if (managerId != o.managerId) changes['managerId'] = managerId;
+    if (grade != oGrade) changes['grade'] = grade;
+    if (monthlyIncentiveAmount != o.monthlyIncentiveAmount) {
+      changes['monthlyIncentiveAmount'] = monthlyIncentiveAmount;
+    }
+    final a = joinedDate, b = o.joinedDate;
+    final sameDate = (a == null && b == null) ||
+        (a != null && b != null && a.isAtSameMomentAs(b));
+    if (!sameDate) changes['joinedDate'] = a?.toIso8601String();
+    return changes;
   }
 
   /// Edit mode: opens the secure set-password dialog (dedicated endpoint,
@@ -401,10 +484,13 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             ),
           ],
           const SizedBox(height: 14),
-          BrandedTextField(
-            controller: _departmentController,
-            label: AppStrings.employeeFormDepartment,
-            prefixIcon: Icons.business_outlined,
+          _DepartmentDropdown(
+            value: _department,
+            departments: _departments,
+            onChanged: (d) => setState(() {
+              _department = d;
+              _isDirty = true;
+            }),
           ),
           const SizedBox(height: 14),
           _LocationDropdown(
@@ -776,6 +862,73 @@ class _RoleDropdown extends StatelessWidget {
               onChanged: (v) {
                 if (v != null) onChanged(v);
               },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Department picker — fixed options from the company Master Data sheet.
+/// Optional (— None — clears it). An employee whose stored department
+/// isn't in the list (legacy/free-text data) is surfaced as an extra item
+/// so the dropdown can render without asserting, mirroring [_RoleDropdown].
+class _DepartmentDropdown extends StatelessWidget {
+  final String? value;
+  final List<String> departments;
+  final ValueChanged<String?> onChanged;
+  const _DepartmentDropdown({
+    required this.value,
+    required this.departments,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasOrphan = value != null && !departments.contains(value);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          AppStrings.employeeFormDepartment,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InputDecorator(
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.business_outlined, size: 20),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              value: value,
+              isExpanded: true,
+              hint: const Text(
+                'Select department',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('— None —'),
+                ),
+                if (hasOrphan)
+                  DropdownMenuItem<String?>(
+                    value: value,
+                    child: Text('$value (current)'),
+                  ),
+                for (final d in departments)
+                  DropdownMenuItem<String?>(
+                    value: d,
+                    child: Text(d),
+                  ),
+              ],
+              onChanged: onChanged,
             ),
           ),
         ),

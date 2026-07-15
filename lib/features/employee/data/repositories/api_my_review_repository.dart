@@ -22,7 +22,8 @@ class ApiMyReviewRepository implements MyReviewRepository {
         ApiConstants.employeeReviews,
         queryParameters: {
           'page': page,
-          'pageSize': pageSize,
+          // Backend honours `limit`, not `pageSize` (see EmployeeRepository).
+          'limit': pageSize,
           if (cycleId != null && cycleId.isNotEmpty) 'cycleId': cycleId,
         },
       );

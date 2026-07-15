@@ -151,6 +151,44 @@ class MonthlyReview {
   /// Projected payout = eligible × finalScore%.
   double get projectedPayout => eligibleAmount * finalScorePct / 100;
 
+  /// The furthest-along rating stage that carries any recorded score, or
+  /// null if nothing has been scored yet.
+  ///
+  /// Scores are entered in place via `save-scores`, which deliberately does
+  /// NOT advance [currentStage]. So a review whose manager has already rated
+  /// still reports `currentStage == selfRating`. Progress must therefore be
+  /// read off the scores themselves, not the (frozen) pipeline cursor.
+  ReviewStage? get furthestScoredStage {
+    ReviewStage? found;
+    for (final stage in const [
+      ReviewStage.selfRating,
+      ReviewStage.accountHrRating,
+      ReviewStage.reportingManagerRating,
+    ]) {
+      if (rows.any((r) => r.scoreFor(stage)?.value != null)) found = stage;
+    }
+    return found;
+  }
+
+  /// Stage to show on dashboards: whichever is further along — the formal
+  /// pipeline cursor or the furthest stage that actually has scores. This
+  /// keeps the badge honest when rating happens via in-place `save-scores`.
+  ReviewStage get displayStage {
+    final scored = furthestScoredStage;
+    if (scored == null) return currentStage;
+    return scored.pipelineIndex >= currentStage.pipelineIndex
+        ? scored
+        : currentStage;
+  }
+
+  /// Status of [displayStage] — submitted once that stage carries scores.
+  StageStatus get displayStatus {
+    if (isComplete) return StageStatus.submitted;
+    final scored = furthestScoredStage;
+    if (scored != null && scored == displayStage) return StageStatus.submitted;
+    return statusOf(displayStage);
+  }
+
   factory MonthlyReview.fromJson(Map<String, dynamic> json) {
     final records = <ReviewStage, StageRecord>{};
     final rawRecords = JsonParse.parseMap(json['stageRecords']);

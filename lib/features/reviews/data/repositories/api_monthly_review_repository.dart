@@ -100,4 +100,26 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
       rethrowAsApiError(e, st);
     }
   }
+
+  @override
+  Future<MonthlyReview> saveStageScores(
+    String reviewId,
+    ReviewStage stage, {
+    required Map<String, RowScore> rowScores,
+  }) async {
+    try {
+      // Edit-in-place (no stage advance) for the quarterly grid. Proposed
+      // backend endpoint — see docs/BACKEND_HANDOFF.md.
+      final response = await _dio.post(
+        '${ApiConstants.monthlyReviews}/$reviewId/save-scores',
+        data: {
+          'stage': stage.toApiString(),
+          'rowScores': rowScores.map((k, v) => MapEntry(k, v.toJson())),
+        },
+      );
+      return MonthlyReview.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
 }

@@ -15,7 +15,6 @@ import '../../data/models/hr_dashboard_models.dart';
 import '../providers/hr_dashboard_providers.dart';
 import '../widgets/_formatters.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/location_heatmap.dart';
 import '../widgets/overview_stat_card.dart';
 import '../widgets/quick_action_button.dart';
 
@@ -60,7 +59,7 @@ class HrHomeScreen extends ConsumerWidget {
             // Invalidate all root dashboard providers. Family providers
             // will auto-refresh when they get watched again.
             ref.invalidate(hrOverviewProvider);
-            ref.invalidate(hrActiveCycleProvider);
+            ref.invalidate(hrActiveEmployeeCountProvider);
             ref.invalidate(hrRecentActivityProvider);
             // Wait for the root provider to finish so the pull spinner hides
             try {
@@ -79,7 +78,6 @@ class HrHomeScreen extends ConsumerWidget {
               SizedBox(height: 10),
               _QuickActionsGrid(),
               SizedBox(height: 24),
-              _CycleDependentSections(),
               _SectionHeader(title: AppStrings.hrRecentActivityTitle),
               SizedBox(height: 6),
               _RecentActivitySection(),
@@ -93,7 +91,7 @@ class HrHomeScreen extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Overview Section (Greeting + 4 Stats)
+// Overview Section (Greeting + Stats)
 // ─────────────────────────────────────────────────────────────────────
 
 class _OverviewSection extends ConsumerWidget {
@@ -116,7 +114,7 @@ class _OverviewSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _GreetingCard(name: fullName, cycle: overview.cycle),
+            _GreetingCard(name: fullName),
             const SizedBox(height: 18),
             _StatsGrid(overview: overview),
           ],
@@ -158,8 +156,7 @@ class _OverviewLoading extends StatelessWidget {
 
 class _GreetingCard extends StatelessWidget {
   final String name;
-  final HrOverviewCycle? cycle;
-  const _GreetingCard({required this.name, required this.cycle});
+  const _GreetingCard({required this.name});
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -210,100 +207,30 @@ class _GreetingCard extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 14),
-          if (cycle != null)
-            _ActiveCyclePill(cycle: cycle!)
-          else
-            const _NoActiveCyclePill(),
         ],
       ),
     );
   }
 }
 
-class _ActiveCyclePill extends StatelessWidget {
-  final HrOverviewCycle cycle;
-  const _ActiveCyclePill({required this.cycle});
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final daysRemaining =
-        cycle.endDate.difference(DateTime(now.year, now.month, now.day)).inDays;
-    final daysLabel = daysRemaining < 0
-        ? AppStrings.hrHomeCycleEnded
-        : '$daysRemaining ${daysRemaining == 1 ? AppStrings.hrHomeDayRemaining : AppStrings.hrHomeDaysRemaining}';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.event_outlined, color: Colors.white, size: 14),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              '${cycle.name} · $daysLabel',
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NoActiveCyclePill extends StatelessWidget {
-  const _NoActiveCyclePill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.info_outline_rounded, color: Colors.white, size: 14),
-          SizedBox(width: 6),
-          Text(
-            AppStrings.hrHomeNoActiveCycle,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatsGrid extends StatelessWidget {
+class _StatsGrid extends ConsumerWidget {
   final HrOverview overview;
   const _StatsGrid({required this.overview});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The backend overview's `activeEmployees` is unreliable; prefer the
+    // authoritative roster count and fall back to the overview figure only
+    // while it loads or if it errors.
+    final activeCount = ref
+        .watch(hrActiveEmployeeCountProvider)
+        .maybeWhen(data: (n) => n, orElse: () => overview.activeEmployees);
+
     final cards = [
       OverviewStatCard(
         icon: Icons.groups_rounded,
         label: AppStrings.hrKpiActiveEmployees,
-        value: overview.activeEmployees.toString(),
+        value: activeCount.toString(),
         iconBg: AppColors.primaryPurple.withValues(alpha: 0.10),
         iconFg: AppColors.primaryPurple,
       ),
@@ -344,318 +271,12 @@ class _StatsGrid extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Cycle-Dependent Sections (Deadlines, Pipeline, Action Items)
-// ─────────────────────────────────────────────────────────────────────
-
-class _CycleDependentSections extends ConsumerWidget {
-  const _CycleDependentSections();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final activeCycleIdAsync = ref.watch(hrActiveCycleIdProvider);
-
-    return activeCycleIdAsync.when(
-      loading: () => const _CycleDependentLoading(),
-      error: (e, _) => _ErrorPanel(
-        message: e.toString(),
-        onRetry: () => ref.invalidate(hrActiveCycleProvider),
-      ),
-      data: (cycleId) {
-        if (cycleId == null) {
-          return const SizedBox
-              .shrink(); // No active cycle -> hide these panels
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _SectionHeader(title: AppStrings.hrDeadlinesTitle),
-            const SizedBox(height: 6),
-            _DeadlinesSection(cycleId: cycleId),
-            const SizedBox(height: 24),
-            const _SectionHeader(title: AppStrings.hrActionItemsTitle),
-            const SizedBox(height: 6),
-            _ActionItemsSection(cycleId: cycleId),
-            const SizedBox(height: 24),
-            const _SectionHeader(title: AppStrings.hrPipelineTitle),
-            const SizedBox(height: 6),
-            _PipelineSection(cycleId: cycleId),
-            const SizedBox(height: 24),
-            const _SectionHeader(title: AppStrings.hrHeatmapTitle),
-            const SizedBox(height: 6),
-            LocationHeatmap(cycleId: cycleId),
-            const SizedBox(height: 24),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _CycleDependentLoading extends StatelessWidget {
-  const _CycleDependentLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const ShimmerBox(height: 16, width: 120, borderRadius: 6),
-        const SizedBox(height: 12),
-        for (int i = 0; i < 2; i++) ...[
-          const ShimmerBox(height: 60, borderRadius: 14),
-          const SizedBox(height: 8),
-        ],
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-}
-
-// ── Deadlines ──
-
-class _DeadlinesSection extends ConsumerWidget {
-  final String cycleId;
-  const _DeadlinesSection({required this.cycleId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final deadlinesAsync = ref.watch(hrDeadlinesProvider(cycleId));
-
-    return deadlinesAsync.when(
-      loading: () => const ShimmerBox(height: 80, borderRadius: 14),
-      error: (e, _) => _ErrorPanel(
-        message: e.toString(),
-        onRetry: () => ref.invalidate(hrDeadlinesProvider(cycleId)),
-      ),
-      data: (deadlines) {
-        if (deadlines.isEmpty) {
-          return const Text('No upcoming deadlines.',
-              style: TextStyle(color: AppColors.textMuted));
-        }
-        return SizedBox(
-          height: 90,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: deadlines.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final d = deadlines[index];
-              return Container(
-                width: 140,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: d.isOverdue
-                        ? AppColors.error.withValues(alpha: 0.5)
-                        : d.isUrgent
-                            ? AppColors.accentOrange.withValues(alpha: 0.5)
-                            : AppColors.divider,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      d.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      d.isOverdue
-                          ? AppStrings.hrOverdue
-                          : '${d.daysRemaining} days left',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: d.isOverdue
-                            ? AppColors.error
-                            : d.isUrgent
-                                ? AppColors.accentOrange
-                                : AppColors.primaryPurple,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── Action Items ──
-
-class _ActionItemsSection extends ConsumerWidget {
-  final String cycleId;
-  const _ActionItemsSection({required this.cycleId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final actionsAsync = ref.watch(hrActionItemsProvider(cycleId));
-
-    return actionsAsync.when(
-      loading: () => const ShimmerBox(height: 100, borderRadius: 14),
-      error: (e, _) => _ErrorPanel(
-        message: e.toString(),
-        onRetry: () => ref.invalidate(hrActionItemsProvider(cycleId)),
-      ),
-      data: (actions) {
-        if (actions.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-              border:
-                  Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: AppColors.success),
-                SizedBox(width: 12),
-                Text(
-                  AppStrings.hrAllCaughtUp,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.success,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: actions.map((item) {
-            Color color;
-            IconData icon;
-            if (item.severity == ActionSeverity.critical) {
-              color = AppColors.error;
-              icon = Icons.error_rounded;
-            } else if (item.severity == ActionSeverity.warning) {
-              color = AppColors.accentOrange;
-              icon = Icons.warning_rounded;
-            } else {
-              color = AppColors.primaryPurple;
-              icon = Icons.info_rounded;
-            }
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: color.withValues(alpha: 0.3)),
-              ),
-              child: ListTile(
-                leading: Icon(icon, color: color),
-                title: Text(
-                  item.headline,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                trailing: item.deepLink != null
-                    ? const Icon(Icons.chevron_right_rounded,
-                        color: AppColors.textMuted)
-                    : null,
-                onTap: item.deepLink == null
-                    ? null
-                    : () => _openActionItem(context, item),
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  /// Routes an action item to the right screen. Two resolution paths:
-  ///
-  ///   1. **Direct path** — if `deepLink` looks like an internal route
-  ///      (starts with `/hr/` or `/employee/`), navigate to it directly.
-  ///      Lets the backend point at any in-app surface, including
-  ///      parameterised paths the client doesn't need to know about.
-  ///   2. **Key-based fallback** — older payloads supply a [key] like
-  ///      `PENDING_REVIEWS` or `UNASSIGNED_EMPLOYEES`; map those to the
-  ///      best-fit `AppRoutes` constant.
-  ///
-  /// If neither resolves, surface a snackbar rather than fail silently —
-  /// the user clicked something and expects feedback.
-  /// Base paths actually registered in the router. A deep-link is only
-  /// followed when it matches one of these — older code navigated to any
-  /// `/hr/` or `/employee/` link, so a backend pointer at an unbuilt
-  /// screen (e.g. `/hr/feeds/...`) dead-ended on the router error page.
-  static const List<String> _navigablePrefixes = [
-    AppRoutes.hrHome,
-    AppRoutes.hrEmployees,
-    AppRoutes.hrTemplates,
-    AppRoutes.hrAssign,
-    AppRoutes.hrReviews,
-    AppRoutes.hrReports,
-    AppRoutes.hrLocations,
-    AppRoutes.hrBulkSetup,
-    AppRoutes.hrAuditLog,
-    AppRoutes.employeeHome,
-    AppRoutes.employeeSelfRate,
-    AppRoutes.employeeHistory,
-    AppRoutes.employeeProfile,
-  ];
-
-  bool _isNavigableDeepLink(String link) {
-    final path = link.split('?').first;
-    return _navigablePrefixes.any((p) => path == p || path.startsWith('$p/'));
-  }
-
-  void _openActionItem(BuildContext context, HrActionItem item) {
-    final link = item.deepLink ?? '';
-    if (_isNavigableDeepLink(link)) {
-      context.go(link);
-      return;
-    }
-    final fallback = routeForActionKey(item.key);
-    if (fallback != null) {
-      context.go(fallback);
-      return;
-    }
-    // Truly unmapped — log so we can grow `_routeForKey` next time, and
-    // surface a snackbar so the tap isn't perceived as a frozen UI.
-    assert(() {
-      debugPrint(
-        'hr action-item: unmapped key="${item.key}" '
-        'deepLink="${item.deepLink}" headline="${item.headline}"',
-      );
-      return true;
-    }());
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'No screen for this action yet — ${item.headline}',
-        ),
-      ),
-    );
-  }
-}
-
 /// Maps a dashboard action-item `key` to the best-fit registered HR route.
 ///
 /// Top-level (rather than a private method on the widget) so the mapping
 /// can be unit-tested directly — see `hr_action_item_routing_test.dart`.
+/// Retained for the audit-log / action routing helpers even though the
+/// dashboard's cycle-scoped action-items panel has been removed.
 ///
 /// Backend ships SCREAMING_SNAKE and snake_case interchangeably — the live
 /// `/hr/dashboard/action-items` response uses `hr_feed_missing` /
@@ -663,10 +284,9 @@ class _ActionItemsSection extends ConsumerWidget {
 /// normalise to UPPER then match.
 String? routeForActionKey(String key) {
   switch (key.toUpperCase()) {
-    // Cycle-scoped work (feeds, stuck reviews, scoring overdue, etc.)
-    // all lands on the cycles list — the umbrella entry-point for any
-    // mid-cycle remediation. There's no per-state review filter screen
-    // yet; cycles is the deepest existing surface.
+    // Review-remediation work (feeds, stuck reviews, scoring overdue, etc.)
+    // all lands on the reviews surface — the umbrella entry-point for any
+    // mid-review remediation.
     case 'PENDING_REVIEWS':
     case 'OVERDUE_REVIEWS':
     case 'UNFINALIZED_REVIEWS':
@@ -687,89 +307,6 @@ String? routeForActionKey(String key) {
       return AppRoutes.hrAuditLog;
     default:
       return null;
-  }
-}
-
-// ── Pipeline ──
-
-class _PipelineSection extends ConsumerWidget {
-  final String cycleId;
-  const _PipelineSection({required this.cycleId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pipelineAsync = ref.watch(hrPipelineProvider(cycleId));
-
-    return pipelineAsync.when(
-      loading: () => const ShimmerBox(height: 120, borderRadius: 14),
-      error: (e, _) => _ErrorPanel(
-        message: e.toString(),
-        onRetry: () => ref.invalidate(hrPipelineProvider(cycleId)),
-      ),
-      data: (items) {
-        if (items.isEmpty) {
-          return const Text('No pipeline data.',
-              style: TextStyle(color: AppColors.textMuted));
-        }
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Column(
-            children: items.map((p) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        p.displayLabel,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 1,
-                      child: Text(
-                        p.count.toString(),
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    if (p.stuck > 0)
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          '${p.stuck} stuck',
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.error,
-                          ),
-                        ),
-                      )
-                    else
-                      const Spacer(flex: 1),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
   }
 }
 

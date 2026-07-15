@@ -23,7 +23,10 @@ class ApiEmployeeRepository implements EmployeeRepository {
         ApiConstants.employees,
         queryParameters: {
           'page': page,
-          'pageSize': pageSize,
+          // Backend honours `limit`, not `pageSize` — sending pageSize was
+          // silently ignored (defaulted to 50), capping the list past 50
+          // employees. Matches the manager/locations/audit repos.
+          'limit': pageSize,
           if (search != null && search.isNotEmpty) 'search': search,
           if (role != null && role.isNotEmpty) 'role': role,
           if (isActive != null) 'isActive': isActive,
