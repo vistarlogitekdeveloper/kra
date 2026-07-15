@@ -6,6 +6,7 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../core/widgets/workspace_switcher.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../data/models/employee_dashboard.dart';
@@ -81,19 +82,21 @@ class EmployeeHomeScreen extends ConsumerWidget {
       ),
     );
 
-    // Manager/HR roles land on their own KRA too; give them a one-tap hop to
-    // their extra workspace(s). Plain employees (only My KRA) get no button.
+    // Manager/HR roles land on their own KRA too; give them a "☰" menu to
+    // hop to their extra workspace(s). Plain employees (only My KRA) get no
+    // menu — the home Scaffold's drawer is null, so no hamburger shows.
+    final hasWorkspaceMenu =
+        user != null && WorkspaceSwitcher.hasExtras(user.role);
     final header = GreetingHeader(
       name: _firstName(fullName),
       employeeCode: employeeCode,
       roleLabel: roleLabel,
-      trailing: (user != null && WorkspaceSwitcher.hasExtras(user.role))
-          ? _WorkspaceSwitchButton(onTap: () => WorkspaceSwitcher.show(context, ref))
-          : null,
+      leading: hasWorkspaceMenu ? const _WorkspaceMenuButton() : null,
     );
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: workspaceDrawerFor(ref),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -126,31 +129,21 @@ class EmployeeHomeScreen extends ConsumerWidget {
   }
 }
 
-/// Top-right pill button in the greeting header that opens the workspace
-/// switcher. Only rendered for roles with more than one workspace.
-class _WorkspaceSwitchButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _WorkspaceSwitchButton({required this.onTap});
+/// The "☰" workspace-menu button in the greeting header. The home screen has
+/// no AppBar, so it opens the Scaffold's drawer manually. The [Builder] gives
+/// a context beneath the home Scaffold so `Scaffold.of` finds the drawer.
+/// Only rendered for roles with more than one workspace.
+class _WorkspaceMenuButton extends StatelessWidget {
+  const _WorkspaceMenuButton();
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: AppStrings.workspaceSwitchTooltip,
-      child: Material(
-        color: AppColors.primaryPurple.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: const Padding(
-            padding: EdgeInsets.all(9),
-            child: Icon(
-              Icons.grid_view_rounded,
-              color: AppColors.primaryPurple,
-              size: 20,
-            ),
-          ),
-        ),
+    return Builder(
+      builder: (ctx) => IconButton(
+        icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
+        tooltip: AppStrings.workspaceSwitchTooltip,
+        visualDensity: VisualDensity.compact,
+        onPressed: () => Scaffold.of(ctx).openDrawer(),
       ),
     );
   }

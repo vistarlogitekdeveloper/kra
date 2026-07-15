@@ -6,6 +6,7 @@ import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/shimmer_box.dart';
+import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../auth/data/models/user.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_review.dart';
@@ -166,6 +167,9 @@ class _QuarterlyKraSheetScreenState
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Left "☰" workspace menu — shows for manager/HR viewing their own sheet;
+      // null (no menu) for a plain employee, who has only My KRA.
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
         title: const Text(AppStrings.quarterlySheetTitle),
         backgroundColor: AppColors.surface,

@@ -6,6 +6,7 @@ import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
 import '../../../../../../core/widgets/paged_list_view.dart';
+import '../../../../../../core/widgets/workspace_drawer.dart';
 import '../../../providers/team_history_providers.dart';
 import 'widgets/history_review_tile.dart';
 
@@ -37,6 +38,7 @@ class _TeamHistoryScreenState extends ConsumerState<TeamHistoryScreen> {
     final list = ref.watch(teamHistoryListProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
         title: const Text(
           AppStrings.managerHistoryTitle,

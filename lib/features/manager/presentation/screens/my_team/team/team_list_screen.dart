@@ -6,6 +6,7 @@ import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
 import '../../../../../../core/widgets/paged_list_view.dart';
+import '../../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../employee/data/models/enums.dart' as employee_enums;
 import '../../../../../hr/presentation/widgets/search_bar_filter.dart';
 import '../../../../data/models/enums.dart';
@@ -29,9 +30,21 @@ class TeamListScreen extends ConsumerWidget {
     // A manager with zero direct reports gets a friendly empty state (with a
     // jump into their own KRA), never a raw 403.
     if (list.noReports) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(child: NoReportsEmptyState()),
+        // Keep the "☰" workspace menu here too, so a manager with no reports
+        // can hop back to My KRA instead of being stranded.
+        drawer: workspaceDrawerFor(ref),
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          title: const Text(
+            AppStrings.managerTeamTitle,
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        body: const SafeArea(child: NoReportsEmptyState()),
       );
     }
 
@@ -61,6 +74,9 @@ class TeamListScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Left "☰" workspace menu (auto ☰ on the normal app bar). The bulk-select
+      // app bar sets its own leading, so the menu only shows in normal mode.
+      drawer: list.isSelectionMode ? null : workspaceDrawerFor(ref),
       appBar: appBar,
       body: Column(
         children: [

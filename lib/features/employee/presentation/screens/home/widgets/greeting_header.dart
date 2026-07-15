@@ -31,8 +31,11 @@ class GreetingHeader extends StatelessWidget {
   /// nothing and the widget reads `DateTime.now()`.
   final DateTime? now;
 
-  /// Optional top-right action (e.g. the workspace switcher for
-  /// manager/HR roles). Null for plain employees.
+  /// Optional top-left action — the "☰" workspace menu button for
+  /// manager/HR roles. Null for plain employees (nothing to switch to).
+  final Widget? leading;
+
+  /// Optional top-right action. Kept for flexibility; currently unused.
   final Widget? trailing;
 
   const GreetingHeader({
@@ -41,6 +44,7 @@ class GreetingHeader extends StatelessWidget {
     required this.employeeCode,
     required this.roleLabel,
     this.now,
+    this.leading,
     this.trailing,
   });
 
@@ -60,8 +64,12 @@ class GreetingHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: Text(
                   '${_greeting(clock.hour)}, $name',

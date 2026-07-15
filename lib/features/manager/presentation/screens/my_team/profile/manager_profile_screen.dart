@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
+import '../../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../../employee/presentation/screens/profile/widgets/profile_header.dart';
 import '../../../../../employee/presentation/screens/profile/widgets/profile_field_row.dart';
@@ -41,6 +42,7 @@ class ManagerProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
         title: const Text(
           AppStrings.managerProfileTitle,

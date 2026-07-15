@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
+import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../auth/data/models/user.dart';
 import '../../../manager/presentation/screens/my_team/dashboard/widgets/no_reports_empty_state.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
@@ -45,6 +46,9 @@ class MonthlyReviewDashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Left "☰" workspace menu — auto-rendered by the AppBar when a drawer is
+      // present. Null (no menu) for plain employees who have only My KRA.
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
         title: Text(_title(role)),
         backgroundColor: AppColors.surface,
