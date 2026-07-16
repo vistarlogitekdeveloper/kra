@@ -18,12 +18,22 @@ wrangler login             # authorise against your Cloudflare account
 ## Build
 ```bash
 flutter pub get
-flutter build web --release
+flutter build web --release --pwa-strategy=none
 ```
-Output goes to `build/web/`. The monthly-review backend is gated on a build
-flag (default off); once that backend is deployed, build with:
+Output goes to `build/web/`.
+
+> **Always pass `--pwa-strategy=none`.** It disables Flutter's service worker.
+> The service worker aggressively caches the app shell, and on a static host a
+> redeploy can leave returning browsers stuck serving a *stale/partial* cached
+> bundle — which shows as a **blank white screen** that survives normal
+> refreshes. Disabling it (the app is online-only, so offline PWA caching isn't
+> needed) makes every deploy load fresh. If you ever change this, expect
+> blank-screen reports after deploys.
+
+The monthly-review backend is gated on a build flag (default off); once that
+backend is deployed, build with:
 ```bash
-flutter build web --release --dart-define=MONTHLY_BACKEND=true
+flutter build web --release --pwa-strategy=none --dart-define=MONTHLY_BACKEND=true
 ```
 (Optional) if you ever serve the app under a sub-path instead of the domain
 root, add `--base-href /your-subpath/` (must start and end with `/`).
@@ -43,7 +53,7 @@ SPA routing is handled by `not_found_handling = "single-page-application"`.
 Connect the repo in the dashboard (Workers & Pages) and set:
 - **Build command:**
   ```
-  git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$HOME/flutter" && git config --global --add safe.directory "$HOME/flutter" && export PATH="$HOME/flutter/bin:$PATH" && flutter config --no-analytics && flutter pub get && flutter build web --release
+  git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$HOME/flutter" && git config --global --add safe.directory "$HOME/flutter" && export PATH="$HOME/flutter/bin:$PATH" && flutter config --no-analytics && flutter pub get && flutter build web --release --pwa-strategy=none
   ```
 - **Deploy command:** `npx wrangler deploy`  (the default)
 - **Build output / assets directory:** `build/web` (already in wrangler.toml)
