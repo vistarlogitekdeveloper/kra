@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Cloudflare Wrangler local state + build artifacts (deploy-only, not source)
+/.wrangler/
+
 # Symbolication related
 app.*.symbols
 
