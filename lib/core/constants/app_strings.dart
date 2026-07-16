@@ -21,6 +21,28 @@ class AppStrings {
   static const String quarterlyPayoutTitle = 'Quarter payout';
   static const String quarterlyPayoutAmount = 'Payout this quarter';
 
+  // Per-rating reason + proof captured in the sheet's rating dialog (applies
+  // to both the Self and the Reporting-Manager rating of each KRA).
+  static const String ratingAchievementLabel = 'Achievement %';
+  static const String ratingAchievementHint = '0 – 100';
+  static const String ratingReasonLabel = 'Reason for this rating';
+  static const String ratingReasonHint =
+      'Briefly justify the score (what was achieved / missed).';
+  static const String ratingProofNoteLabel = 'Proof (link or note)';
+  static const String ratingProofNoteHint =
+      'Paste an evidence link, or note where the proof lives.';
+  static const String ratingProofFileLabel = 'Proof file';
+  static const String ratingProofFileAdd = 'Attach proof file';
+  static const String ratingProofFileReplace = 'Replace';
+  static const String ratingProofFileRemove = 'Remove';
+  static const String ratingProofFileLocalNote =
+      'Kept on this device for now — file upload isn\'t wired to the server yet.';
+  static const String ratingViewTitle = 'Rating details';
+  static const String ratingNoReason = 'No reason given.';
+  static const String ratingNoProof = 'No proof provided.';
+  static const String ratingSelf = 'Self';
+  static const String ratingManager = 'Manager';
+
   // ───── App ─────
   static const String appName = 'Vistar';
   static const String appTagline = 'KRA Review & Incentive Management';

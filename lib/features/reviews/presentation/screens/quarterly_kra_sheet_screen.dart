@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,6 +43,23 @@ class _QuarterlyKraSheetScreenState
   ReviewPeriod? _anchor;
   bool _saving = false;
 
+  /// Locally-attached proof files, keyed by "reviewId|rowId|stage". Kept only
+  /// for this session — there's no upload endpoint yet, so the file itself
+  /// doesn't survive a reload. The Reason and the Proof *note* DO persist
+  /// (they ride on the saved score).
+  final Map<String, ({String name, String path})> _proofFiles = {};
+
+  String _cellKey(String reviewId, String rowId, ReviewStage stage) =>
+      '$reviewId|$rowId|${stage.toApiString()}';
+
+  RowScore? _currentScore(
+      MonthlyReview review, String rowId, ReviewStage stage) {
+    for (final row in review.rows) {
+      if (row.id == rowId) return row.scoreFor(stage);
+    }
+    return null;
+  }
+
   double? _pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
     for (final row in r.rows) {
@@ -72,6 +90,10 @@ class _QuarterlyKraSheetScreenState
     return isManagerRole && r.managerId != null && r.managerId == scope.userId;
   }
 
+  String _stageLabel(ReviewStage stage) => stage == ReviewStage.selfRating
+      ? AppStrings.ratingSelf
+      : AppStrings.ratingManager;
+
   Future<void> _editCell({
     required MonthlyReview review,
     required String rowId,
@@ -81,62 +103,47 @@ class _QuarterlyKraSheetScreenState
     required String kraName,
     required String monthLabel,
   }) async {
-    final controller = TextEditingController(
-      text: currentPct == null ? '' : currentPct.round().toString(),
-    );
-    final result = await showDialog<double>(
+    final current = _currentScore(review, rowId, stage);
+    final key = _cellKey(review.id, rowId, stage);
+
+    final result = await showDialog<_RatingResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('$monthLabel · ${stage == ReviewStage.selfRating ? 'Self' : 'Manager'}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(kraName,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Achievement %',
-                hintText: '0 – 100',
-                suffixText: '%',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final v = double.tryParse(controller.text.trim());
-              Navigator.of(ctx).pop(v == null ? -1 : v.clamp(0, 100).toDouble());
-            },
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (ctx) => _RatingEditDialog(
+        title: '$monthLabel · ${_stageLabel(stage)}',
+        kraName: kraName,
+        initialPct: currentPct,
+        initialReason: current?.remark ?? '',
+        initialProofNote: current?.proofNote ?? '',
+        initialFile: _proofFiles[key],
       ),
     );
-    if (result == null || result < 0) return;
+    if (result == null) return; // cancelled
 
     setState(() => _saving = true);
     try {
-      final value = result / 100 * maxScore;
+      // Empty % leaves the existing score untouched — so you can add a reason
+      // or proof without re-entering the number.
+      final newValue =
+          result.pct != null ? result.pct! / 100 * maxScore : current?.value;
       await ref.read(monthlyReviewRepositoryProvider).saveStageScores(
         review.id,
         stage,
-        rowScores: {rowId: RowScore(value: value)},
+        rowScores: {
+          rowId: RowScore(
+            value: newValue,
+            remark: result.reason.trim().isEmpty ? null : result.reason.trim(),
+            proofNote: result.proofNote.trim().isEmpty
+                ? null
+                : result.proofNote.trim(),
+          ),
+        },
       );
+      // The proof file is kept locally only (no upload endpoint yet).
+      if (result.file != null) {
+        _proofFiles[key] = result.file!;
+      } else {
+        _proofFiles.remove(key);
+      }
       // Refresh every quarterly-sheet query for this employee.
       ref.invalidate(quarterlySheetProvider);
     } catch (e) {
@@ -147,6 +154,27 @@ class _QuarterlyKraSheetScreenState
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Read-only reason + proof view for a cell the current user can't edit
+  /// (e.g. a manager looking at the employee's self-rating justification).
+  void _viewCell({
+    required MonthlyReview review,
+    required String rowId,
+    required ReviewStage stage,
+    required String kraName,
+    required String monthLabel,
+  }) {
+    final current = _currentScore(review, rowId, stage);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _RatingViewDialog(
+        title: '$monthLabel · ${_stageLabel(stage)}',
+        kraName: kraName,
+        reason: current?.remark ?? '',
+        proofNote: current?.proofNote ?? '',
+      ),
+    );
   }
 
   @override
@@ -203,6 +231,7 @@ class _QuarterlyKraSheetScreenState
           canEditSelf: (r) => _canEditSelf(r, scope),
           canEditManager: (r) => _canEditManager(r, scope),
           onEdit: _editCell,
+          onView: _viewCell,
         ),
       ),
     );
@@ -245,6 +274,13 @@ class _Sheet extends StatelessWidget {
     required String kraName,
     required String monthLabel,
   }) onEdit;
+  final void Function({
+    required MonthlyReview review,
+    required String rowId,
+    required ReviewStage stage,
+    required String kraName,
+    required String monthLabel,
+  }) onView;
 
   const _Sheet({
     required this.months,
@@ -256,6 +292,7 @@ class _Sheet extends StatelessWidget {
     required this.canEditSelf,
     required this.canEditManager,
     required this.onEdit,
+    required this.onView,
   });
 
   MonthlyReview? get _any => reviews.firstWhere((r) => r != null, orElse: () => null);
@@ -361,6 +398,7 @@ class _Sheet extends StatelessWidget {
             canEditSelf: canEditSelf,
             canEditManager: canEditManager,
             onEdit: onEdit,
+            onView: onView,
             monthTotal: monthTotal,
             qAvg: qAvg,
           ),
@@ -472,6 +510,13 @@ class _Grid extends StatelessWidget {
     required String kraName,
     required String monthLabel,
   }) onEdit;
+  final void Function({
+    required MonthlyReview review,
+    required String rowId,
+    required ReviewStage stage,
+    required String kraName,
+    required String monthLabel,
+  }) onView;
   final double Function(int, ReviewStage) monthTotal;
   final double Function(ReviewStage) qAvg;
 
@@ -483,11 +528,21 @@ class _Grid extends StatelessWidget {
     required this.canEditSelf,
     required this.canEditManager,
     required this.onEdit,
+    required this.onView,
     required this.monthTotal,
     required this.qAvg,
   });
 
   String _fmt(double? p) => p == null ? '—' : '${p.round()}%';
+
+  /// The stored score for a (month, row, stage) — used to detect whether a
+  /// cell carries a reason/proof note (drives the small indicator).
+  RowScore? _scoreOf(MonthlyReview review, String rowId, ReviewStage stage) {
+    for (final row in review.rows) {
+      if (row.id == rowId) return row.scoreFor(stage);
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -589,38 +644,74 @@ class _Grid extends StatelessWidget {
         (stage == ReviewStage.selfRating
             ? canEditSelf(review)
             : canEditManager(review));
+    // Does this cell carry a written reason / proof note? Drives the small
+    // sticky-note indicator (and makes read-only cells tappable to view it).
+    final hasNote = review != null &&
+        (_scoreOf(review, rowId, stage)?.hasJustification ?? false);
     final text = Text(_fmt(p),
         style: TextStyle(
           fontWeight: FontWeight.w600,
           color: editable ? AppColors.primaryPurple : AppColors.textSecondary,
         ));
-    if (!editable) return text;
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: () => onEdit(
-        review: review,
-        rowId: rowId,
-        maxScore: maxScore,
-        stage: stage,
-        currentPct: p,
-        kraName: name,
-        monthLabel: _shortMonth(months[monthIdx]),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-              color: AppColors.primaryPurple.withValues(alpha: 0.35)),
+
+    if (editable) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () => onEdit(
+          review: review,
+          rowId: rowId,
+          maxScore: maxScore,
+          stage: stage,
+          currentPct: p,
+          kraName: name,
+          monthLabel: _shortMonth(months[monthIdx]),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          text,
-          const SizedBox(width: 3),
-          Icon(Icons.edit_rounded,
-              size: 11, color: AppColors.primaryPurple.withValues(alpha: 0.7)),
-        ]),
-      ),
-    );
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+                color: AppColors.primaryPurple.withValues(alpha: 0.35)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            text,
+            if (hasNote) ...[
+              const SizedBox(width: 3),
+              const Icon(Icons.sticky_note_2_rounded,
+                  size: 11, color: AppColors.accentOrange),
+            ],
+            const SizedBox(width: 3),
+            Icon(Icons.edit_rounded,
+                size: 11, color: AppColors.primaryPurple.withValues(alpha: 0.7)),
+          ]),
+        ),
+      );
+    }
+
+    // Not editable but has a reason/proof → tap to view it read-only.
+    if (hasNote) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () => onView(
+          review: review,
+          rowId: rowId,
+          stage: stage,
+          kraName: name,
+          monthLabel: _shortMonth(months[monthIdx]),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            text,
+            const SizedBox(width: 3),
+            const Icon(Icons.sticky_note_2_outlined,
+                size: 11, color: AppColors.textMuted),
+          ]),
+        ),
+      );
+    }
+
+    return text;
   }
 
   DataRow _totalsRow() {
@@ -780,6 +871,320 @@ class _Skeleton extends StatelessWidget {
         ShimmerBox(height: 260, borderRadius: 12),
         SizedBox(height: 16),
         ShimmerBox(height: 160, borderRadius: 16),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Rating edit dialog — achievement %, reason, proof note + proof file
+// ─────────────────────────────────────────────────────────────────────
+
+/// What the edit dialog returns on Save. [pct] is null when the % field was
+/// left blank — the caller then keeps the existing score, so a user can add a
+/// reason / proof without re-typing the number.
+class _RatingResult {
+  final double? pct;
+  final String reason;
+  final String proofNote;
+  final ({String name, String path})? file;
+  const _RatingResult({
+    required this.pct,
+    required this.reason,
+    required this.proofNote,
+    required this.file,
+  });
+}
+
+class _RatingEditDialog extends StatefulWidget {
+  final String title;
+  final String kraName;
+  final double? initialPct;
+  final String initialReason;
+  final String initialProofNote;
+  final ({String name, String path})? initialFile;
+
+  const _RatingEditDialog({
+    required this.title,
+    required this.kraName,
+    required this.initialPct,
+    required this.initialReason,
+    required this.initialProofNote,
+    required this.initialFile,
+  });
+
+  @override
+  State<_RatingEditDialog> createState() => _RatingEditDialogState();
+}
+
+class _RatingEditDialogState extends State<_RatingEditDialog> {
+  late final TextEditingController _pct;
+  late final TextEditingController _reason;
+  late final TextEditingController _proofNote;
+  ({String name, String path})? _file;
+
+  @override
+  void initState() {
+    super.initState();
+    _pct = TextEditingController(
+      text: widget.initialPct == null
+          ? ''
+          : widget.initialPct!.round().toString(),
+    );
+    _reason = TextEditingController(text: widget.initialReason);
+    _proofNote = TextEditingController(text: widget.initialProofNote);
+    _file = widget.initialFile;
+  }
+
+  @override
+  void dispose() {
+    _pct.dispose();
+    _reason.dispose();
+    _proofNote.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    final res = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+    );
+    if (res == null || res.files.isEmpty) return;
+    final f = res.files.single;
+    final path = f.path;
+    if (path == null) return;
+    setState(() => _file = (name: f.name, path: path));
+  }
+
+  void _save() {
+    final v = double.tryParse(_pct.text.trim());
+    Navigator.of(context).pop(_RatingResult(
+      pct: v?.clamp(0, 100).toDouble(),
+      reason: _reason.text,
+      proofNote: _proofNote.text,
+      file: _file,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.kraName,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _pct,
+              autofocus: true,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: AppStrings.ratingAchievementLabel,
+                hintText: AppStrings.ratingAchievementHint,
+                suffixText: '%',
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _reason,
+              minLines: 2,
+              maxLines: 4,
+              maxLength: 300,
+              decoration: const InputDecoration(
+                labelText: AppStrings.ratingReasonLabel,
+                hintText: AppStrings.ratingReasonHint,
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _proofNote,
+              minLines: 1,
+              maxLines: 2,
+              maxLength: 300,
+              decoration: const InputDecoration(
+                labelText: AppStrings.ratingProofNoteLabel,
+                hintText: AppStrings.ratingProofNoteHint,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _FilePickRow(
+              file: _file,
+              onPick: _pickFile,
+              onRemove: () => setState(() => _file = null),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(AppStrings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// The "Attach proof file" control — an add button, or the picked-file chip
+/// with replace/remove and a note that the file is local-only for now.
+class _FilePickRow extends StatelessWidget {
+  final ({String name, String path})? file;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  const _FilePickRow({
+    required this.file,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (file == null) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: onPick,
+          icon: const Icon(Icons.attach_file_rounded, size: 18),
+          label: const Text(AppStrings.ratingProofFileAdd),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primaryPurple,
+            side: const BorderSide(color: AppColors.divider),
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+          decoration: BoxDecoration(
+            color: AppColors.primaryPurple.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: AppColors.primaryPurple.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.insert_drive_file_outlined,
+                  size: 18, color: AppColors.primaryPurple),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  file!.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary),
+                ),
+              ),
+              TextButton(
+                onPressed: onPick,
+                child: const Text(AppStrings.ratingProofFileReplace),
+              ),
+              IconButton(
+                onPressed: onRemove,
+                tooltip: AppStrings.ratingProofFileRemove,
+                icon: const Icon(Icons.close_rounded,
+                    size: 18, color: AppColors.textMuted),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          AppStrings.ratingProofFileLocalNote,
+          style: TextStyle(
+              fontSize: 10.5, color: AppColors.textMuted, height: 1.3),
+        ),
+      ],
+    );
+  }
+}
+
+/// Read-only reason + proof note, shown when tapping a cell you can't edit.
+class _RatingViewDialog extends StatelessWidget {
+  final String title;
+  final String kraName;
+  final String reason;
+  final String proofNote;
+
+  const _RatingViewDialog({
+    required this.title,
+    required this.kraName,
+    required this.reason,
+    required this.proofNote,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(kraName,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          const SizedBox(height: 14),
+          _labelled(
+            AppStrings.ratingReasonLabel,
+            reason.trim().isEmpty ? AppStrings.ratingNoReason : reason.trim(),
+            muted: reason.trim().isEmpty,
+          ),
+          const SizedBox(height: 12),
+          _labelled(
+            AppStrings.ratingProofNoteLabel,
+            proofNote.trim().isEmpty
+                ? AppStrings.ratingNoProof
+                : proofNote.trim(),
+            muted: proofNote.trim().isEmpty,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Widget _labelled(String label, String value, {required bool muted}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(),
+            style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textMuted,
+                letterSpacing: 0.6)),
+        const SizedBox(height: 3),
+        Text(value,
+            style: TextStyle(
+                fontSize: 13.5,
+                height: 1.4,
+                color: muted ? AppColors.textMuted : AppColors.textPrimary)),
       ],
     );
   }
