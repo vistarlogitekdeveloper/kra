@@ -71,4 +71,32 @@ abstract class MonthlyReviewRepository {
     ReviewStage stage, {
     required Map<String, RowScore> rowScores,
   });
+
+  /// Fetches one row's stored proof attachment on demand.
+  ///
+  /// The bytes are deliberately NOT carried on the review payload (a sheet
+  /// pulls 3 reviews x N rows), so a viewer asks for exactly the one they want
+  /// to open. The backend gates this with the same rule as reading the review
+  /// itself, so the employee, their reporting manager — whatever that manager's
+  /// role — and org-wide/management roles can all fetch it. Returns null when
+  /// the row has no attachment.
+  Future<ProofFileDownload?> fetchProofFile(
+    String reviewId,
+    String rowId,
+    ReviewStage stage,
+  );
+}
+
+/// A stored proof attachment retrieved for viewing.
+class ProofFileDownload {
+  final String name;
+  final String mime;
+
+  /// Raw base64 as stored — decode to bytes to open/save it.
+  final String base64Data;
+  const ProofFileDownload({
+    required this.name,
+    required this.mime,
+    required this.base64Data,
+  });
 }

@@ -1,5 +1,28 @@
 import '../../../../core/api/json_parse.dart';
 
+/// A proof attachment being written with a score.
+///
+/// Write-only: the bytes travel up as base64 once, on save. They never come
+/// back down with the review — the server returns only the file's name/mime and
+/// serves the bytes on demand (a sheet pulls 3 reviews x N rows, so inlining
+/// attachments would make every fetch enormous).
+class ProofFileUpload {
+  final String name;
+  final String mime;
+
+  /// Raw base64 — no `data:` URI prefix.
+  final String base64Data;
+
+  const ProofFileUpload({
+    required this.name,
+    required this.mime,
+    required this.base64Data,
+  });
+
+  Map<String, dynamic> toJson() =>
+      {'name': name, 'mime': mime, 'data': base64Data};
+}
+
 /// A single actor's score for a single KRA row.
 ///
 /// Attached to a `MonthlyKraRow`'s `stageScores` map, keyed by
@@ -17,21 +40,43 @@ class RowScore {
   /// My KRA quarterly sheet's rating dialog.
   final String? remark;
 
-  /// Optional **proof** the actor cites for this score — a link or short note
-  /// (evidence). Persisted alongside the score. The quarterly sheet's rating
-  /// dialog also allows attaching a proof *file*, but that stays local-only
-  /// (not carried on this model) until a backend upload endpoint exists.
+  /// Legacy free-text proof note. Superseded by the proof *file* below; kept so
+  /// existing rows keep rendering.
   final String? proofNote;
 
-  const RowScore({this.value, this.remark, this.proofNote});
+  /// Server-side name/mime of the stored proof attachment (bytes excluded —
+  /// see [ProofFileUpload]). Non-null means "an attachment exists", which is
+  /// what lets a reporting manager / management see that evidence was filed.
+  final String? proofFileName;
+  final String? proofFileMime;
+
+  /// Write-only. The backend keys off the PRESENCE of `proofFile`:
+  ///   * neither field set → key omitted → server PRESERVES the stored file.
+  ///     This matters: editing a % re-sends the row, and we must not make the
+  ///     client re-upload the attachment every time (nor silently wipe it).
+  ///   * [clearProofFile]  → sends `null` → server REMOVES it.
+  ///   * [proofFile]       → sends the object → server REPLACES it.
+  final ProofFileUpload? proofFile;
+  final bool clearProofFile;
+
+  const RowScore({
+    this.value,
+    this.remark,
+    this.proofNote,
+    this.proofFileName,
+    this.proofFileMime,
+    this.proofFile,
+    this.clearProofFile = false,
+  });
 
   bool get isNA => value == null;
 
-  /// True when the actor attached any written justification (reason or proof
-  /// note) to this score — drives the small indicator on the sheet cell.
+  /// True when the actor filed any justification for this score — a reason, a
+  /// legacy note, or an attachment. Drives the indicator on the sheet cell.
   bool get hasJustification =>
       (remark?.trim().isNotEmpty ?? false) ||
-      (proofNote?.trim().isNotEmpty ?? false);
+      (proofNote?.trim().isNotEmpty ?? false) ||
+      (proofFileName?.trim().isNotEmpty ?? false);
 
   factory RowScore.fromJson(Map<String, dynamic> json) => RowScore(
         value: JsonParse.parseDouble(json['value']),
@@ -39,23 +84,34 @@ class RowScore {
         // Tolerate a couple of likely backend key spellings.
         proofNote: JsonParse.parseString(json['proofNote']) ??
             JsonParse.parseString(json['proof']),
+        proofFileName: JsonParse.parseString(json['proofFileName']),
+        proofFileMime: JsonParse.parseString(json['proofFileMime']),
       );
 
   Map<String, dynamic> toJson() => {
         'value': value,
         'remark': remark,
         'proofNote': proofNote,
+        // Presence is the signal — only send the key when we mean to change it.
+        if (proofFile != null)
+          'proofFile': proofFile!.toJson()
+        else if (clearProofFile)
+          'proofFile': null,
       };
 
   RowScore copyWith({
     Object? value = _sentinel,
     String? remark,
     String? proofNote,
+    String? proofFileName,
+    String? proofFileMime,
   }) {
     return RowScore(
       value: identical(value, _sentinel) ? this.value : value as double?,
       remark: remark ?? this.remark,
       proofNote: proofNote ?? this.proofNote,
+      proofFileName: proofFileName ?? this.proofFileName,
+      proofFileMime: proofFileMime ?? this.proofFileMime,
     );
   }
 

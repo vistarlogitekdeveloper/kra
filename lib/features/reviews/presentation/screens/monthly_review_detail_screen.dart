@@ -65,11 +65,12 @@ class _MonthlyReviewDetailScreenState
     );
   }
 
-  // Mock phase: gate purely on role — the list is already scoped to what
-  // this user can see (own review / team / org), and the real backend will
-  // enforce per-record ownership (own review, own direct report) in Phase 4.
+  // Relationship-aware: self-rating belongs to the review's owner and
+  // reporting-manager rating to its `managerId` — whatever either party's role
+  // is — while org-level stages stay role-gated. The backend enforces the same
+  // rule (assertCanAct), so this only decides what we surface.
   bool _canAct(MonthlyReview review, ReviewScope scope) =>
-      review.isActionableBy(scope.role);
+      review.isActionableBy(scope.role, userId: scope.userId);
 
   @override
   Widget build(BuildContext context) {

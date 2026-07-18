@@ -127,4 +127,32 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
       rethrowAsApiError(e, st);
     }
   }
+
+  @override
+  Future<ProofFileDownload?> fetchProofFile(
+    String reviewId,
+    String rowId,
+    ReviewStage stage,
+  ) async {
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.monthlyReviews}/$reviewId/proof',
+        queryParameters: {'rowId': rowId, 'stage': stage.toApiString()},
+      );
+      final json = unwrapObject(response);
+      final data = json['data'] as String?;
+      if (data == null || data.isEmpty) return null;
+      return ProofFileDownload(
+        name: (json['name'] as String?) ?? 'proof',
+        mime: (json['mime'] as String?) ?? 'application/octet-stream',
+        base64Data: data,
+      );
+    } on DioException catch (e, st) {
+      // "No attachment on this row" is a normal answer, not a failure.
+      if (e.response?.statusCode == 404) return null;
+      rethrowAsApiError(e, st);
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
 }

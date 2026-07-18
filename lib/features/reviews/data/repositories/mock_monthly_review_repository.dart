@@ -317,4 +317,14 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
     _byId[reviewId] = updated;
     return updated;
   }
+
+  /// Mock store: attachments are only persisted by the real backend, so there
+  /// is nothing to serve here.
+  @override
+  Future<ProofFileDownload?> fetchProofFile(
+    String reviewId,
+    String rowId,
+    ReviewStage stage,
+  ) async =>
+      null;
 }

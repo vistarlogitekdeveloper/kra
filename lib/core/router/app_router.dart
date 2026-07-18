@@ -162,18 +162,15 @@ class AppRoutes {
 
   /// True if [role] may access any `/manager/*` route. Drives the
   /// router's role-guard redirect.
-  static bool canAccessManager(UserRole role) {
+  static bool canAccessManager(UserRole role, {bool hasReports = false}) {
+    if (role == UserRole.hrAdmin || role == UserRole.admin) return true;
+    if (hasReports) return true;
     switch (role) {
       case UserRole.manager:
-      case UserRole.hrAdmin:
-      case UserRole.admin:
       case UserRole.bdManager:
       case UserRole.warehouseMgr:
         return true;
-      case UserRole.employee:
-      case UserRole.ops:
-      case UserRole.finance:
-      case UserRole.hr:
+      default:
         return false;
     }
   }
@@ -239,17 +236,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           return AppRoutes.hrHome;
         }
         // Manager role guard — MANAGER / BD_MANAGER / WAREHOUSE_MGR /
-        // HR_ADMIN / ADMIN. Other roles deep-linking to /manager/* get
-        // bounced to their own dashboard.
+        // HR_ADMIN / ADMIN / any user with reports. Other roles deep-linking
+        // to /manager/* get bounced to their own dashboard.
         if (goingToManagerArea &&
-            !AppRoutes.canAccessManager(authState.user.role)) {
+            !AppRoutes.canAccessManager(
+              authState.user.role,
+              hasReports: authState.user.hasReports,
+            )) {
           return AppRoutes.dashboardForRole(authState.user.role);
         }
         // Bare /manager → /manager/team/dashboard for manager-capable
         // roles. Wraps the Step-3 placeholder behaviour now that the
         // real manager surface exists.
         if (state.matchedLocation == AppRoutes.managerDashboard &&
-            AppRoutes.canAccessManager(authState.user.role)) {
+            AppRoutes.canAccessManager(
+              authState.user.role,
+              hasReports: authState.user.hasReports,
+            )) {
           return AppRoutes.managerTeamDashboard;
         }
         // Bare /employee → /employee/home (the StatefulShellRoute

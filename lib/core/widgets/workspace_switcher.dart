@@ -17,14 +17,15 @@ import '../../features/auth/data/models/user.dart';
 class WorkspaceSwitcher {
   const WorkspaceSwitcher._();
 
-  /// True when [role] has at least one workspace beyond My KRA — i.e. the
+  /// True when [user] has at least one workspace beyond My KRA — i.e. the
   /// "☰" menu is worth surfacing. Pure employees (and ops/finance) have only
   /// their own KRA, so callers hide the menu for them entirely.
-  static bool hasExtras(UserRole role) =>
-      AppRoutes.canAccessManager(role) || AppRoutes.canAccessHr(role);
+  static bool hasExtras(User user) =>
+      AppRoutes.canAccessManager(user.role, hasReports: user.hasReports) ||
+      AppRoutes.canAccessHr(user.role);
 
-  /// The ordered workspaces available to [role]. My KRA is always first.
-  static List<Workspace> workspacesFor(UserRole role) {
+  /// The ordered workspaces available to [user]. My KRA is always first.
+  static List<Workspace> workspacesFor(User user) {
     return [
       const Workspace(
         label: AppStrings.workspaceMyKra,
@@ -33,7 +34,7 @@ class WorkspaceSwitcher {
         route: AppRoutes.employeeHome,
         areaPrefix: AppRoutes.employeeDashboard, // '/employee'
       ),
-      if (AppRoutes.canAccessManager(role))
+      if (AppRoutes.canAccessManager(user.role, hasReports: user.hasReports))
         const Workspace(
           label: AppStrings.workspaceMyTeam,
           subtitle: AppStrings.workspaceMyTeamSubtitle,
@@ -41,7 +42,7 @@ class WorkspaceSwitcher {
           route: AppRoutes.managerTeamDashboard,
           areaPrefix: AppRoutes.managerDashboard, // '/manager'
         ),
-      if (AppRoutes.canAccessHr(role))
+      if (AppRoutes.canAccessHr(user.role))
         const Workspace(
           label: AppStrings.workspaceHrAdmin,
           subtitle: AppStrings.workspaceHrAdminSubtitle,

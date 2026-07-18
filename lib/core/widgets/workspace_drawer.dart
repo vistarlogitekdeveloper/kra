@@ -23,7 +23,7 @@ import 'workspace_switcher.dart';
 Widget? workspaceDrawerFor(WidgetRef ref) {
   final auth = ref.watch(authStateProvider);
   if (auth is! AuthAuthenticated) return null;
-  if (!WorkspaceSwitcher.hasExtras(auth.user.role)) return null;
+  if (!WorkspaceSwitcher.hasExtras(auth.user)) return null;
   return const WorkspaceDrawer();
 }
 
@@ -36,7 +36,7 @@ class WorkspaceDrawer extends ConsumerWidget {
     final user = auth is AuthAuthenticated ? auth.user : null;
     final workspaces = user == null
         ? const <Workspace>[]
-        : WorkspaceSwitcher.workspacesFor(user.role);
+        : WorkspaceSwitcher.workspacesFor(user);
     final currentLocation = GoRouterState.of(context).matchedLocation;
 
     return Drawer(

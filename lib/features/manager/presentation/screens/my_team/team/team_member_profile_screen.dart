@@ -509,27 +509,19 @@ class _CurrentReviewTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reviewId = profile.currentReviewId;
-    if (reviewId == null || reviewId.isEmpty) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              AppStrings.managerProfileNoCurrentReview,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13.5,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+    // Reviews live in the MONTHLY pipeline (`kra.monthly_reviews`), which the
+    // quarterly KRA sheet renders — that's where a rating actually happens and
+    // where "96% · Completed" on the Monthly Reviews dashboard comes from.
+    //
+    // This tab used to gate on `profile.currentReviewId` and, when set, open the
+    // LEGACY per-cycle review (`kra.reviews`). Two things were wrong with that:
+    //   1. `GET /manager/team/:id` never returns `currentReviewId` at all, so it
+    //      was ALWAYS null and every employee — however far along their review
+    //      actually was — got "No review assigned for the active cycle".
+    //   2. Even when populated, the legacy table isn't what the monthly
+    //      generate/rating flow writes to, so it would still under-report.
+    // Linking straight to the employee's sheet keeps this tab honest for
+    // everyone and needs no field the backend doesn't send.
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
@@ -555,8 +547,8 @@ class _CurrentReviewTab extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: () =>
-                    context.push(AppRoutes.managerReviewDetail(reviewId)),
+                onPressed: () => context
+                    .push(AppRoutes.reviewsQuarterlyFor(profile.employeeId)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryPurple,
                   foregroundColor: Colors.white,
@@ -585,12 +577,42 @@ class _CurrentReviewTab extends StatelessWidget {
 // History tab — embedded paginated list (no AppBar)
 // ─────────────────────────────────────────────────────────────────────
 
-class _HistoryTab extends ConsumerWidget {
+class _HistoryTab extends ConsumerStatefulWidget {
   final String employeeId;
   const _HistoryTab({required this.employeeId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends ConsumerState<_HistoryTab> {
+  @override
+  void initState() {
+    super.initState();
+    // Point the shared history filter at THIS employee.
+    //
+    // The tab was handed an [employeeId] but never used it: it watched the
+    // global teamHistoryListProvider, whose filter nobody had set. So the list
+    // stayed empty and every team member's History tab rendered the "Open a
+    // team member from the Team tab…" prompt — even though you had just opened
+    // one. Set after the first frame: a provider must not be mutated during
+    // build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(teamHistoryFilterProvider.notifier).setEmployee(widget.employeeId);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _HistoryTab old) {
+    super.didUpdateWidget(old);
+    if (old.employeeId != widget.employeeId) {
+      ref.read(teamHistoryFilterProvider.notifier).setEmployee(widget.employeeId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final list = ref.watch(teamHistoryListProvider);
     return PagedListView(
       items: list.reviews,

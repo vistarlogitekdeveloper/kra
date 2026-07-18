@@ -372,7 +372,9 @@ class SelfRateNotifier extends StateNotifier<SelfRateState> {
 
   /// Attaches a locally-picked proof file to a cell. Stored in the
   /// draft only — there is no server upload endpoint yet.
-  void setAttachment(String monthlyScoreId, String name, String path) {
+  /// [path] is null on web — browsers expose no filesystem path. The name is
+  /// what marks the entry as attached ([KraScoreEntry.hasAttachment]).
+  void setAttachment(String monthlyScoreId, String name, String? path) {
     final updated = [
       for (final e in state.entries)
         if (e.monthlyScoreId == monthlyScoreId)

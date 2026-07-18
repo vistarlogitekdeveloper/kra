@@ -198,5 +198,24 @@ enum ReviewStage {
   static const int pipelineLength = 5;
 
   /// True when [role] is one of [actorRoles].
+  ///
+  /// NOTE: this is only the authority for the ORG-LEVEL stages. For the two
+  /// relationship stages ([isRelationshipStage]) the caller's role is NOT the
+  /// gate — see [MonthlyReview.isActionableBy], which resolves them from the
+  /// review's `employeeId` / `managerId` instead.
   bool isActionableBy(UserRole role) => actorRoles.contains(role);
+
+  /// True for the stages decided by WHO the caller is to a given review rather
+  /// than by their role:
+  ///   * [selfRating] — the review's owner, whatever their role. Every employee
+  ///     has their own KRA, managers and HR admins included.
+  ///   * [reportingManagerRating] — the review's reporting manager, whatever
+  ///     THEIR role. Managers report to senior managers and HR admins report to
+  ///     someone too, so the rater is not necessarily a manager-tier role.
+  ///
+  /// The remaining stages (account/HR rating, management review, incentive
+  /// payout) are org-level responsibilities and stay keyed on [actorRoles].
+  bool get isRelationshipStage =>
+      this == ReviewStage.selfRating ||
+      this == ReviewStage.reportingManagerRating;
 }

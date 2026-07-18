@@ -17,6 +17,10 @@ class MonthlyReviewSummary {
   final String employeeCode;
   final String? employeeGrade;
 
+  /// The employee's reporting manager. [managerId] is what decides whether the
+  /// caller may rate this review (a relationship, not a role) — see
+  /// [needsActionBy]. Null when nobody is mapped as their manager.
+  final String? managerId;
   final String? managerName;
 
   final int year;
@@ -38,6 +42,7 @@ class MonthlyReviewSummary {
     required this.employeeName,
     required this.employeeCode,
     this.employeeGrade,
+    this.managerId,
     this.managerName,
     required this.year,
     required this.month,
@@ -63,6 +68,7 @@ class MonthlyReviewSummary {
         employeeName: JsonParse.parseString(json['employeeName']) ?? '',
         employeeCode: JsonParse.parseString(json['employeeCode']) ?? '',
         employeeGrade: JsonParse.parseString(json['employeeGrade']),
+        managerId: JsonParse.parseString(json['managerId']),
         managerName: JsonParse.parseString(json['managerName']),
         year: JsonParse.parseInt(json['year']) ?? 0,
         month: JsonParse.parseInt(json['month']) ?? 1,
@@ -87,6 +93,7 @@ class MonthlyReviewSummary {
         employeeName: r.employeeName,
         employeeCode: r.employeeCode,
         employeeGrade: r.grade,
+        managerId: r.managerId,
         managerName: r.managerName,
         year: r.period.year,
         month: r.period.month,
@@ -99,11 +106,22 @@ class MonthlyReviewSummary {
         incentiveEligibleAmount: r.eligibleAmount,
       );
 
-  /// True when [role] can act on the current stage — i.e. the caller's
-  /// dashboard should badge this row as "needs my action".
-  bool needsActionBy(UserRole role) {
+  /// True when the caller can act on the current stage — i.e. their dashboard
+  /// should badge this row as "needs my action".
+  ///
+  /// The rating stages that involve a person are relationships, not roles, so
+  /// [userId] resolves them against this row: self-rating belongs to
+  /// [employeeId], reporting-manager rating to [managerId] — whatever either
+  /// party's role happens to be. Org-level stages stay role-gated.
+  bool needsActionBy(UserRole role, {String? userId}) {
     if (currentStage.isTerminal) return false;
     if (currentStageStatus == StageStatus.submitted) return false;
+    if (currentStage == ReviewStage.selfRating) {
+      return userId != null && userId == employeeId;
+    }
+    if (currentStage == ReviewStage.reportingManagerRating) {
+      return userId != null && managerId != null && userId == managerId;
+    }
     return currentStage.isActionableBy(role);
   }
 

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
+import '../../../../../../core/widgets/adaptive_leading.dart';
 import '../../../../../../core/widgets/paged_list_view.dart';
 import '../../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../employee/data/models/enums.dart' as employee_enums;
@@ -36,6 +37,7 @@ class TeamListScreen extends ConsumerWidget {
         // can hop back to My KRA instead of being stranded.
         drawer: workspaceDrawerFor(ref),
         appBar: AppBar(
+          leading: adaptiveLeading(context),
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,

@@ -290,4 +290,14 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
     _store[reviewId] = updated;
     return updated;
   }
+
+  /// In-memory pipeline: attachments are only persisted by the real backend, so
+  /// there is nothing to serve here.
+  @override
+  Future<ProofFileDownload?> fetchProofFile(
+    String reviewId,
+    String rowId,
+    ReviewStage stage,
+  ) async =>
+      null;
 }

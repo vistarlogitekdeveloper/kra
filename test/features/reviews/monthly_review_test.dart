@@ -19,11 +19,13 @@ void main() {
     List<MonthlyKraRow>? rows,
     Map<ReviewStage, StageRecord>? records,
     IncentiveSnapshot? incentive,
+    String? managerId,
   }) {
     return MonthlyReview(
       id: 'r1',
       employeeId: 'emp1',
       employeeName: 'Asha',
+      managerId: managerId,
       period: const ReviewPeriod(2026, 6),
       currentStage: stage,
       stageRecords: records ?? const {},
@@ -73,21 +75,70 @@ void main() {
     });
   });
 
-  group('MonthlyReview.isActionableBy', () {
-    test('true when the role can act on the current stage', () {
-      final r = reviewAt(ReviewStage.reportingManagerRating);
-      expect(r.isActionableBy(UserRole.manager), isTrue);
+  // The two person-shaped rating stages are RELATIONSHIPS, not roles. EVERY
+  // employee has a reporting manager — managers report to senior managers and
+  // HR admins report to someone too — so who may act is decided by the review's
+  // employeeId / managerId, never by the caller's role.
+  group('MonthlyReview.isActionableBy — reporting-manager rating', () {
+    test('the reporting manager can act whatever their OWN role is', () {
+      final r = reviewAt(ReviewStage.reportingManagerRating, managerId: 'mgr1');
+      expect(r.isActionableBy(UserRole.manager, userId: 'mgr1'), isTrue);
+      // The case the old role gate wrongly rejected: an HR_ADMIN (or any other
+      // role) who IS this employee's reporting manager.
+      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'mgr1'), isTrue);
+      expect(r.isActionableBy(UserRole.employee, userId: 'mgr1'), isTrue);
     });
 
-    test('false for a role outside the current stage\'s actor set', () {
-      final r = reviewAt(ReviewStage.reportingManagerRating);
-      expect(r.isActionableBy(UserRole.employee), isFalse);
+    test('a manager who is NOT this employee\'s reporting manager cannot act',
+        () {
+      final r = reviewAt(ReviewStage.reportingManagerRating, managerId: 'mgr1');
+      expect(r.isActionableBy(UserRole.manager, userId: 'other-mgr'), isFalse);
+    });
+
+    test('fails closed when the employee has no manager mapped', () {
+      final r = reviewAt(ReviewStage.reportingManagerRating); // managerId null
+      expect(r.isActionableBy(UserRole.manager, userId: 'mgr1'), isFalse);
+      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'mgr1'), isFalse);
+    });
+
+    test('unresolvable without a userId', () {
+      final r = reviewAt(ReviewStage.reportingManagerRating, managerId: 'mgr1');
+      expect(r.isActionableBy(UserRole.manager), isFalse);
+    });
+  });
+
+  group('MonthlyReview.isActionableBy — self rating', () {
+    test('belongs to the review owner whatever their role', () {
+      final r = reviewAt(ReviewStage.selfRating); // employeeId: emp1
+      expect(r.isActionableBy(UserRole.employee, userId: 'emp1'), isTrue);
+      // Managers and HR admins have their own KRA to self-rate; the old
+      // {employee, ops} role gate locked them out of their own sheet.
+      expect(r.isActionableBy(UserRole.manager, userId: 'emp1'), isTrue);
+      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'emp1'), isTrue);
+    });
+
+    test('nobody else can self-rate on your behalf', () {
+      final r = reviewAt(ReviewStage.selfRating);
+      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'someone-else'),
+          isFalse);
+    });
+  });
+
+  group('MonthlyReview.isActionableBy — org-level stages stay role-gated', () {
+    test('management review is for admin/HR-admin, not a relationship', () {
+      final r = reviewAt(ReviewStage.managementReview, managerId: 'mgr1');
+      expect(r.isActionableBy(UserRole.admin, userId: 'anyone'), isTrue);
+      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'anyone'), isTrue);
+      // Being the reporting manager does NOT grant management review.
+      expect(r.isActionableBy(UserRole.manager, userId: 'mgr1'), isFalse);
     });
 
     test('false on the terminal completed stage (no actor)', () {
-      final r = reviewAt(ReviewStage.completed);
+      final r = reviewAt(ReviewStage.completed, managerId: 'mgr1');
       for (final role in UserRole.values) {
-        expect(r.isActionableBy(role), isFalse,
+        expect(r.isActionableBy(role, userId: 'emp1'), isFalse,
+            reason: '$role should not be able to act on a completed review');
+        expect(r.isActionableBy(role, userId: 'mgr1'), isFalse,
             reason: '$role should not be able to act on a completed review');
       }
     });

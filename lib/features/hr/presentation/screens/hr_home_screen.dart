@@ -17,6 +17,7 @@ import '../widgets/_formatters.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/overview_stat_card.dart';
 import '../widgets/quick_action_button.dart';
+import 'hr_shell_screen.dart';
 
 /// HR home screen. Progressive loading — each panel fetches its own data.
 class HrHomeScreen extends ConsumerWidget {
@@ -24,8 +25,15 @@ class HrHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final user = authState is AuthAuthenticated ? authState.user : null;
     return Scaffold(
       backgroundColor: AppColors.background,
+      // The drawer must live on THIS Scaffold. HrShellScreen also mounts one,
+      // but this inner Scaffold shadows it, so the "☰" below resolved to a
+      // drawer-less Scaffold and silently did nothing — leaving HR admins with
+      // no way to switch back to My KRA / My Team.
+      drawer: HrDrawer(user: user, ref: ref),
       // App bar stays as a solid dark surface above the scrolling content.
       // Letting the body scroll behind it (extendBodyBehindAppBar: true)
       // caused the 'HR Dashboard' title to visually overlap whatever card

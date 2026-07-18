@@ -4,9 +4,9 @@ import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../widgets/_formatters.dart';
 
-/// Top-of-home greeting strip. No card / no background — sits flat on
-/// the scaffold and acts as the visual anchor for the rest of the home
-/// stack.
+/// Top-of-home greeting hero. A rounded purple gradient card that anchors
+/// the home stack — initials avatar, time-aware salutation, the date +
+/// employee code, and a role pill.
 ///
 /// Time-aware salutation:
 ///   - before 12:00 → "Good morning"
@@ -55,85 +55,198 @@ class GreetingHeader extends StatelessWidget {
     return AppStrings.greetingNight;
   }
 
+  String _initial() {
+    final n = name.trim();
+    return n.isEmpty ? '?' : n.characters.first.toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final clock = now ?? DateTime.now();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primaryPurpleDark,
+            AppColors.primaryPurple,
+            AppColors.primaryPurpleLight,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryPurple.withValues(alpha: 0.35),
+            blurRadius: 30,
+            spreadRadius: -14,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Stack(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (leading != null) ...[
-                leading!,
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: Text(
-                  '${_greeting(clock.hour)}, $name',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.4,
-                  ),
-                ),
+          // Soft depth: a faint glow disc bleeding off the top-right corner,
+          // clipped to the card's rounded rect. Kept subtle and pushed further
+          // out — at higher opacity it read as a shape behind the logout icon
+          // rather than as lighting.
+          Positioned(
+            right: -46,
+            top: -52,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 8),
-                trailing!,
-              ],
-            ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  EmployeeFormatters.today(clock),
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Control bar — actions live on their own row so they never
+                // collide with the avatar / name below.
+                if (leading != null || trailing != null)
+                  Row(
+                    children: [
+                      if (leading != null) leading!,
+                      const Spacer(),
+                      if (trailing != null) trailing!,
+                    ],
                   ),
+                if (leading != null || trailing != null)
+                  const SizedBox(height: 2),
+                // Avatar sits LEFT of the greeting: the top-right corner belongs
+                // to the logout action alone. Stacking the two in the same
+                // corner made them read as one overlapping blob.
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _Avatar(initial: _initial()),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _greeting(clock.hour),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.85),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 25,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              if (employeeCode.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                _DotSeparator(),
-                const SizedBox(width: 8),
-                Text(
-                  employeeCode,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
-                  ),
+                const SizedBox(height: 15),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded,
+                        size: 12, color: Colors.white.withValues(alpha: 0.75)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        EmployeeFormatters.today(clock),
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.white.withValues(alpha: 0.80),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (employeeCode.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      const _DotSeparator(),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          employeeCode,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+                if (roleLabel.isNotEmpty) ...[
+                  const SizedBox(height: 13),
+                  _RolePill(label: roleLabel),
+                ],
               ],
-            ],
+            ),
           ),
-          const SizedBox(height: 10),
-          _RolePill(label: roleLabel),
         ],
       ),
     );
   }
 }
 
+/// Initials disc — translucent white on the purple hero.
+class _Avatar extends StatelessWidget {
+  final String initial;
+  const _Avatar({required this.initial});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        initial,
+        style: const TextStyle(
+          fontSize: 19,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
 class _DotSeparator extends StatelessWidget {
+  const _DotSeparator();
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 3,
       height: 3,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.textMuted,
+        color: Colors.white.withValues(alpha: 0.5),
       ),
     );
   }
@@ -146,19 +259,38 @@ class _RolePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.primaryPurple.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: AppColors.primaryPurple,
-          letterSpacing: 0.4,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

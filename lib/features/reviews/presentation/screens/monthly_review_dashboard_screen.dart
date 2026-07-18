@@ -6,6 +6,7 @@ import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/widgets/adaptive_leading.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../auth/data/models/user.dart';
@@ -40,7 +41,9 @@ class MonthlyReviewDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final role = ref.watch(currentReviewScopeProvider)?.role;
+    final scope = ref.watch(currentReviewScopeProvider);
+    final role = scope?.role;
+    final userId = scope?.userId;
     final periods = ref.watch(availablePeriodsProvider);
     final selected = ref.watch(selectedPeriodProvider) ?? periods.first;
 
@@ -50,6 +53,7 @@ class MonthlyReviewDashboardScreen extends ConsumerWidget {
       // present. Null (no menu) for plain employees who have only My KRA.
       drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
+        leading: adaptiveLeading(context),
         title: Text(_title(role)),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
@@ -64,7 +68,9 @@ class MonthlyReviewDashboardScreen extends ConsumerWidget {
                 ref.read(selectedPeriodProvider.notifier).state = p,
           ),
           const Divider(height: 1, color: AppColors.divider),
-          Expanded(child: _ReviewList(period: selected, role: role)),
+          Expanded(
+              child:
+                  _ReviewList(period: selected, role: role, userId: userId)),
         ],
       ),
     );
@@ -74,7 +80,15 @@ class MonthlyReviewDashboardScreen extends ConsumerWidget {
 class _ReviewList extends ConsumerWidget {
   final ReviewPeriod period;
   final UserRole? role;
-  const _ReviewList({required this.period, required this.role});
+
+  /// Signed-in user id — resolves the relationship rating stages (own review /
+  /// reviews I'm the reporting manager of) for the "needs you" badge.
+  final String? userId;
+  const _ReviewList({
+    required this.period,
+    required this.role,
+    required this.userId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -117,7 +131,8 @@ class _ReviewList extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (_, i) => _ReviewTile(summary: items[i], role: role),
+            itemBuilder: (_, i) =>
+                _ReviewTile(summary: items[i], role: role, userId: userId),
           );
         },
       ),
@@ -128,11 +143,17 @@ class _ReviewList extends ConsumerWidget {
 class _ReviewTile extends StatelessWidget {
   final MonthlyReviewSummary summary;
   final UserRole? role;
-  const _ReviewTile({required this.summary, required this.role});
+  final String? userId;
+  const _ReviewTile({
+    required this.summary,
+    required this.role,
+    required this.userId,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final needsYou = role != null && summary.needsActionBy(role!);
+    final needsYou =
+        role != null && summary.needsActionBy(role!, userId: userId);
     final completed = summary.currentStage.isTerminal;
     return Material(
       color: AppColors.surface,
