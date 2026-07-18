@@ -1,4 +1,5 @@
 import 'kra_assignment.dart';
+import 'review_generation.dart';
 
 /// Result of `POST /kra-assignments/bulk`. The backend is idempotent —
 /// re-assigning a template to an employee who already has it for the same
@@ -12,15 +13,26 @@ import 'kra_assignment.dart';
 /// caused the confirm step to throw BAD_RESPONSE even on a 201 success.
 class BulkAssignResult {
   final int createdCount;
+
+  /// Employees who already had a KRA this cycle and whose assignment was
+  /// REPLACED with the newly-picked template (re-assign). The backend upserts
+  /// rather than silently skipping, so a "different KRA" actually takes effect.
+  final int updatedCount;
   final int skippedCount;
   final List<String> skippedEmployeeIds;
   final List<KraAssignment> created;
 
+  /// Outcome of the auto review generation the backend runs after assigning.
+  /// Null when the response doesn't carry a `reviewGeneration` block.
+  final ReviewGeneration? reviewGeneration;
+
   const BulkAssignResult({
     required this.createdCount,
+    this.updatedCount = 0,
     required this.skippedCount,
     required this.skippedEmployeeIds,
     required this.created,
+    this.reviewGeneration,
   });
 
   factory BulkAssignResult.fromJson(Map<String, dynamic> json) {
@@ -35,11 +47,16 @@ class BulkAssignResult {
     final skippedList = rawSkipped is List
         ? rawSkipped.whereType<String>().toList()
         : const <String>[];
+    final rawReviewGen = json['reviewGeneration'];
     return BulkAssignResult(
       createdCount: _asInt(json['createdCount']) ?? createdList.length,
+      updatedCount: _asInt(json['updatedCount']) ?? 0,
       skippedCount: _asInt(json['skippedCount']) ?? skippedList.length,
       skippedEmployeeIds: skippedList,
       created: createdList,
+      reviewGeneration: rawReviewGen is Map<String, dynamic>
+          ? ReviewGeneration.fromJson(rawReviewGen)
+          : null,
     );
   }
 

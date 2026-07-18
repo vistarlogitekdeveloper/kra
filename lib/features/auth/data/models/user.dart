@@ -101,6 +101,7 @@ class User {
   final UserRole role;
   final String organizationId;
   final String? projectLocationId;
+  final bool hasReports;
 
   const User({
     required this.id,
@@ -109,6 +110,7 @@ class User {
     required this.role,
     required this.organizationId,
     this.projectLocationId,
+    this.hasReports = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -127,6 +129,7 @@ class User {
       role: UserRole.fromApi(JsonParse.parseString(json['role']) ?? 'EMPLOYEE'),
       organizationId: JsonParse.parseString(json['organizationId']) ?? '',
       projectLocationId: JsonParse.parseString(json['projectLocationId']),
+      hasReports: json['hasReports'] as bool? ?? false,
     );
   }
 
@@ -137,6 +140,7 @@ class User {
         'role': role.toApiString(),
         'organizationId': organizationId,
         'projectLocationId': projectLocationId,
+        'hasReports': hasReports,
       };
 
   User copyWith({
@@ -146,6 +150,7 @@ class User {
     UserRole? role,
     String? organizationId,
     String? projectLocationId,
+    bool? hasReports,
   }) {
     return User(
       id: id ?? this.id,
@@ -154,6 +159,7 @@ class User {
       role: role ?? this.role,
       organizationId: organizationId ?? this.organizationId,
       projectLocationId: projectLocationId ?? this.projectLocationId,
+      hasReports: hasReports ?? this.hasReports,
     );
   }
 }

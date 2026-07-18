@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/widgets/adaptive_leading.dart';
 import '../../../../core/widgets/shimmer_box.dart';
+import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../auth/data/models/user.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_review_summary.dart';
@@ -28,14 +30,20 @@ class _AdminReviewDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    final role = ref.watch(currentReviewScopeProvider)?.role;
+    final scope = ref.watch(currentReviewScopeProvider);
+    final role = scope?.role;
+    final userId = scope?.userId;
     final periods = ref.watch(availablePeriodsProvider);
     final selected = ref.watch(selectedPeriodProvider) ?? periods.first;
     final listAsync = ref.watch(monthlyReviewListProvider(selected));
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Workspace switcher so an admin isn't stranded here — the ☰ opens the
+      // drawer to hop back to My KRA (review) / My Team / HR Admin.
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
+        leading: adaptiveLeading(context),
         title: const Text(AppStrings.adminDashTitle),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
@@ -50,6 +58,7 @@ class _AdminReviewDashboardScreenState
         data: (items) => _Content(
           items: items,
           role: role,
+          userId: userId,
           search: _search,
           onSearch: (v) => setState(() => _search = v),
         ),
@@ -61,11 +70,16 @@ class _AdminReviewDashboardScreenState
 class _Content extends StatelessWidget {
   final List<MonthlyReviewSummary> items;
   final UserRole? role;
+
+  /// Signed-in user id — resolves the relationship rating stages (own review /
+  /// reviews I'm the reporting manager of) for the "needs review" flag.
+  final String? userId;
   final String search;
   final ValueChanged<String> onSearch;
   const _Content({
     required this.items,
     required this.role,
+    required this.userId,
     required this.search,
     required this.onSearch,
   });
@@ -117,7 +131,8 @@ class _Content extends StatelessWidget {
                   scrollDirection: Axis.vertical,
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    child: _ReviewTable(items: visible, role: role),
+                    child: _ReviewTable(
+                        items: visible, role: role, userId: userId),
                   ),
                 ),
         ),
@@ -129,7 +144,12 @@ class _Content extends StatelessWidget {
 class _ReviewTable extends StatelessWidget {
   final List<MonthlyReviewSummary> items;
   final UserRole? role;
-  const _ReviewTable({required this.items, required this.role});
+  final String? userId;
+  const _ReviewTable({
+    required this.items,
+    required this.role,
+    required this.userId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +169,7 @@ class _ReviewTable extends StatelessWidget {
       rows: [
         for (final s in items)
           DataRow(
-            selected: role != null && s.needsActionBy(role!),
+            selected: role != null && s.needsActionBy(role!, userId: userId),
             onSelectChanged: (_) => context.push(
               s.opensReviewDetail
                   ? AppRoutes.monthlyReviewDetail(s.id)
@@ -158,7 +178,7 @@ class _ReviewTable extends StatelessWidget {
             cells: [
               DataCell(_EmployeeCell(
                 summary: s,
-                needsReview: role != null && s.needsActionBy(role!),
+                needsReview: role != null && s.needsActionBy(role!, userId: userId),
               )),
               DataCell(Text(s.employeeGrade ?? '—')),
               DataCell(StagePill(

@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
+import '../../../../../core/widgets/adaptive_leading.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../hr/presentation/widgets/confirm_action_dialog.dart';
 import '../../../data/models/employee_profile.dart';
@@ -41,7 +43,9 @@ class MyProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
+        leading: adaptiveLeading(context),
         title: const Text(
           AppStrings.profileTitle,
           style: TextStyle(fontWeight: FontWeight.w800),

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
+import '../../../../../../core/widgets/adaptive_leading.dart';
+import '../../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../../employee/presentation/screens/profile/widgets/profile_header.dart';
 import '../../../../../employee/presentation/screens/profile/widgets/profile_field_row.dart';
@@ -41,7 +43,9 @@ class ManagerProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
+        leading: adaptiveLeading(context),
         title: const Text(
           AppStrings.managerProfileTitle,
           style: TextStyle(fontWeight: FontWeight.w800),
@@ -192,8 +196,19 @@ class _LinksSection extends StatelessWidget {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () =>
-                  context.go(AppRoutes.employeeProfile),
+              onTap: () => context.go(AppRoutes.employeeHome),
+              child: const ProfileFieldRow(
+                label: AppStrings.workspaceMyKra,
+                value: AppStrings.workspaceMyKraSubtitle,
+                icon: Icons.assignment_ind_rounded,
+                isLast: false,
+              ),
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.go(AppRoutes.employeeProfile),
               child: const ProfileFieldRow(
                 label: 'View as Employee',
                 value: 'Open the employee profile (self-rate / history)',

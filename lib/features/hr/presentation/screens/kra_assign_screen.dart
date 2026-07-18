@@ -274,8 +274,15 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
       if (!mounted) return;
       // Backend is idempotent: employees who already have this template
       // come back under `skippedEmployeeIds`. Surface that honestly
-      // instead of pretending we created N rows.
-      final msg = _formatBulkResultMessage(result);
+      // instead of pretending we created N rows. When the backend also
+      // reports on the review it auto-generates (reviewGeneration.message),
+      // append that so HR sees whether the employee's review was created —
+      // or why it wasn't (e.g. one already exists).
+      final base = _formatBulkResultMessage(result);
+      final reviewNote = result.reviewGeneration;
+      final msg = (reviewNote != null && reviewNote.hasMessage)
+          ? '$base\n${reviewNote.message}'
+          : base;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg)),
       );
@@ -291,20 +298,34 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
 
   String _formatBulkResultMessage(BulkAssignResult result) {
     final created = result.createdCount;
-    final skipped = result.skippedCount;
-    if (created == 0 && skipped > 0) {
+    final updated = result.updatedCount;
+    final skipped = result.skippedCount; // now only locked assignments
+
+    // Nothing changed — everyone we targeted has a locked assignment.
+    if (created == 0 && updated == 0 && skipped > 0) {
       return skipped == 1
-          ? 'This employee already has this template.'
-          : 'All $skipped employees already had this template.';
+          ? 'This employee\'s KRA is locked and can\'t be changed.'
+          : 'All $skipped employees have a locked KRA that can\'t be changed.';
     }
-    if (skipped == 0) {
-      return created == 1
+
+    final parts = <String>[];
+    if (created > 0) {
+      parts.add(created == 1
           ? AppStrings.kraAssignSuccessOne
           : AppStrings.kraAssignSuccessMany
-              .replaceAll('{count}', created.toString());
+              .replaceAll('{count}', created.toString()));
     }
-    return 'Assigned to $created employee${created == 1 ? '' : 's'} '
-        '($skipped already had it).';
+    if (updated > 0) {
+      parts.add(updated == 1
+          ? 'Replaced 1 employee\'s KRA with this template.'
+          : 'Replaced the KRA for $updated employees.');
+    }
+    if (skipped > 0) {
+      parts.add(skipped == 1
+          ? '1 skipped (locked).'
+          : '$skipped skipped (locked).');
+    }
+    return parts.join(' ');
   }
 }
 

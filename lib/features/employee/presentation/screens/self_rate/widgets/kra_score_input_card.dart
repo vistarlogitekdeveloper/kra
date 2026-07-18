@@ -27,7 +27,9 @@ class KraScoreInputCard extends StatefulWidget {
 
   /// Called when the user picks a proof file — carries the display
   /// [name] and the on-device [path].
-  final void Function(String name, String path) onAttach;
+  /// [path] is null on web (browsers expose no filesystem path); the name is
+  /// what marks the entry as attached.
+  final void Function(String name, String? path) onAttach;
   final VoidCallback onRemoveAttachment;
 
   const KraScoreInputCard({
@@ -257,15 +259,28 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
   }
 
   Future<void> _pickAttachment() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    final path = file.path;
-    if (path == null) return;
-    widget.onAttach(file.name, path);
+    // A browser never exposes a filesystem path, so `PlatformFile.path` is
+    // ALWAYS null on the web build — the old `if (path == null) return;` made
+    // this button silently do nothing there. The NAME is what marks the entry as
+    // attached (see KraScoreEntry.hasAttachment) and `attachmentPath` is already
+    // nullable, so pass the path through as-is and let web supply null.
+    // Failures used to be indistinguishable from a dead button; say so instead.
+    try {
+      // Any file type — Excel, Word, PowerPoint, images, PDF, whatever the
+      // evidence happens to be. Restricting extensions only blocked valid proof.
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return; // cancelled — normal
+      final file = result.files.single;
+      widget.onAttach(file.name, file.path);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open the file picker: $e')),
+      );
+    }
   }
 }
 

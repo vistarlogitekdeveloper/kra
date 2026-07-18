@@ -5,12 +5,15 @@ import 'package:go_router/go_router.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
+import '../../../../../../core/widgets/adaptive_leading.dart';
 import '../../../../../../core/widgets/paged_list_view.dart';
+import '../../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../employee/data/models/enums.dart' as employee_enums;
 import '../../../../../hr/presentation/widgets/search_bar_filter.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/team_member.dart';
 import '../../../providers/manager_team_providers.dart';
+import '../dashboard/widgets/no_reports_empty_state.dart';
 import 'widgets/bulk_select_app_bar.dart';
 import 'widgets/team_filter_chips.dart';
 import 'widgets/team_member_tile.dart';
@@ -24,6 +27,28 @@ class TeamListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(managerTeamFilterProvider);
     final list = ref.watch(managerTeamListProvider);
+
+    // A manager with zero direct reports gets a friendly empty state (with a
+    // jump into their own KRA), never a raw 403.
+    if (list.noReports) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        // Keep the "☰" workspace menu here too, so a manager with no reports
+        // can hop back to My KRA instead of being stranded.
+        drawer: workspaceDrawerFor(ref),
+        appBar: AppBar(
+          leading: adaptiveLeading(context),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          title: const Text(
+            AppStrings.managerTeamTitle,
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        body: const SafeArea(child: NoReportsEmptyState()),
+      );
+    }
 
     final approveTargets = list.selectedReviewIds.toList();
 
@@ -51,6 +76,9 @@ class TeamListScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Left "☰" workspace menu (auto ☰ on the normal app bar). The bulk-select
+      // app bar sets its own leading, so the menu only shows in normal mode.
+      drawer: list.isSelectionMode ? null : workspaceDrawerFor(ref),
       appBar: appBar,
       body: Column(
         children: [

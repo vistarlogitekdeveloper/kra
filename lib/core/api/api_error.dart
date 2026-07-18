@@ -56,6 +56,26 @@ class ApiError implements Exception {
     return lines.isEmpty ? message : lines.join('\n');
   }
 
+  /// True when this is the backend's "you manage no one" 403 — sent when a
+  /// manager-scoped endpoint (e.g. `/manager/dashboard`, `/manager/team`) is
+  /// hit by a user with zero direct reports, or by a non-manager.
+  ///
+  /// This is a normal *data state*, not a failure: the UI must empty-state
+  /// the Team area (never a raw 403 / logout). The sentinel arrives
+  /// inconsistently across backends — sometimes in `error.code`, sometimes
+  /// in `error.message` — and a 403 has no dedicated [ApiError] branch, so
+  /// the code often collapses to `VALIDATION_ERROR` with the real marker
+  /// landing in [message] / [technicalMessage]. Match all three so a single
+  /// backend wording change can't silently reintroduce a raw-403 screen.
+  bool get isNoDirectReports {
+    if (statusCode != 403) return false;
+    const markers = ['NO_DIRECT_REPORTS', 'NOT_A_MANAGER'];
+    final haystack = [code, message, technicalMessage ?? '']
+        .map((s) => s.toUpperCase())
+        .join(' ');
+    return markers.any(haystack.contains);
+  }
+
   @override
   String toString() =>
       'ApiError($type, code=$code, status=$statusCode, msg="$message")';

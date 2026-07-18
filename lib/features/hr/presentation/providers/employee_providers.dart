@@ -335,13 +335,21 @@ final allEmployeesProvider =
 /// Active employees whose role is MANAGER — feeds the "Reporting manager"
 /// dropdown on the employee create/edit form. Filtered server-side so we
 /// don't ship 500 rows to the client just to drop them on the floor.
-final allManagersProvider =
+/// Everyone who could be somebody's reporting manager — i.e. every active
+/// employee.
+///
+/// Being a reporting manager is a RELATIONSHIP, not a role: every employee has
+/// one, and managers report to senior managers while HR admins report to
+/// someone too. Filtering this list to `role: 'MANAGER'` made those lines
+/// impossible to express — you couldn't give a manager a manager, or report to
+/// an HR admin. The form excludes the employee being edited so nobody can be
+/// set as their own manager; the backend additionally rejects cycles.
+final managerCandidatesProvider =
     FutureProvider.autoDispose<List<Employee>>((ref) async {
   final repo = ref.watch(employeeRepositoryProvider);
   final page = await repo.list(
     page: 1,
-    pageSize: 200,
-    role: 'MANAGER',
+    pageSize: 200, // backend max; org is well under this today
     isActive: true,
   );
   return page.employees;

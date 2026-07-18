@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../storage/secure_storage_service.dart';
 import 'api_constants.dart';
@@ -32,24 +33,37 @@ class AuthInterceptor extends Interceptor {
     final skipAuth = options.extra['skipAuth'] == true ||
         ApiConstants.noAuthEndpoints.contains(options.path);
 
-    if (!skipAuth) {
-      final sessionAlive = await _refresher.ensureFreshAccessToken();
-      if (!sessionAlive) {
-        // Refresh token is gone — RefreshInterceptor has already wiped
-        // storage and fired ForcedLogoutBus. Abort the outgoing request
-        // so we don't burn a 401 in DevTools per concurrent caller while
-        // the router redirects to /login.
-        return handler.reject(
-          DioException(
-            requestOptions: options,
-            type: DioExceptionType.cancel,
-            message: 'Session ended',
-          ),
-        );
+    try {
+      if (!skipAuth) {
+        final sessionAlive = await _refresher.ensureFreshAccessToken();
+        if (!sessionAlive) {
+          // Refresh token is gone — RefreshInterceptor has already wiped
+          // storage and fired ForcedLogoutBus. Abort the outgoing request
+          // so we don't burn a 401 in DevTools per concurrent caller while
+          // the router redirects to /login.
+          return handler.reject(
+            DioException(
+              requestOptions: options,
+              type: DioExceptionType.cancel,
+              message: 'Session ended',
+            ),
+          );
+        }
+        final token = await _storage.readAccessToken();
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
       }
-      final token = await _storage.readAccessToken();
-      if (token != null && token.isNotEmpty) {
-        options.headers['Authorization'] = 'Bearer $token';
+    } catch (e, st) {
+      // CRITICAL: this interceptor is `async`, so anything that throws here
+      // (e.g. a secure-storage decrypt error) would escape WITHOUT calling
+      // handler.next/resolve/reject — leaving the Dio request future pending
+      // forever. That reads as an endless loading shimmer with no network
+      // call ever made. Never let that happen: log, then send the request
+      // through unauthenticated and let the reactive 401 path recover.
+      if (kDebugMode) {
+        debugPrint('AuthInterceptor.onRequest failed for ${options.path}: $e');
+        debugPrintStack(stackTrace: st);
       }
     }
 

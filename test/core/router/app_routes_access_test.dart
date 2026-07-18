@@ -14,59 +14,36 @@ import 'package:vistar_app/features/auth/data/models/user.dart';
 /// the redirect logic, an HR-allowed role.
 void main() {
   group('AppRoutes.dashboardForRole', () {
-    test('HR-tier roles (ADMIN / HR_ADMIN / HR) land on /hr/home', () {
-      expect(AppRoutes.dashboardForRole(UserRole.admin), AppRoutes.hrHome);
-      expect(AppRoutes.dashboardForRole(UserRole.hrAdmin), AppRoutes.hrHome);
-      expect(AppRoutes.dashboardForRole(UserRole.hr), AppRoutes.hrHome);
-    });
-
-    test('Manager-tier roles land on the team dashboard', () {
-      expect(
-        AppRoutes.dashboardForRole(UserRole.manager),
-        AppRoutes.managerTeamDashboard,
-      );
-      expect(
-        AppRoutes.dashboardForRole(UserRole.bdManager),
-        AppRoutes.managerTeamDashboard,
-      );
-      expect(
-        AppRoutes.dashboardForRole(UserRole.warehouseMgr),
-        AppRoutes.managerTeamDashboard,
-      );
-    });
-
-    test('Everyone else lands on /employee/home', () {
-      expect(
-        AppRoutes.dashboardForRole(UserRole.employee),
-        AppRoutes.employeeHome,
-      );
-      expect(
-        AppRoutes.dashboardForRole(UserRole.ops),
-        AppRoutes.employeeHome,
-      );
-      expect(
-        AppRoutes.dashboardForRole(UserRole.finance),
-        AppRoutes.employeeHome,
-      );
-    });
-
-    test('every enum case is handled (no unreachable role)', () {
-      // Dart's switch enforces exhaustiveness at compile time; this
-      // extra assert is documentary: if we ever add a new UserRole
-      // and forget to map it, the iteration here would surface a
-      // missing case to the dev rather than the user.
+    test('EVERY role lands on the employee self-view (My KRA)', () {
+      // The employee self-view is a user\'s OWN KRA/review and lives only
+      // under /employee/*; it must be the default landing for every role so
+      // that e.g. a manager with zero direct reports still sees their own
+      // KRA instead of a blank/403 team screen. Role only ADDS extra areas
+      // (Team / HR admin) on top — it never replaces the self-view.
       for (final r in UserRole.values) {
-        final dest = AppRoutes.dashboardForRole(r);
         expect(
-          [
-            AppRoutes.hrHome,
-            AppRoutes.managerTeamDashboard,
-            AppRoutes.employeeHome,
-          ],
-          contains(dest),
-          reason: 'unexpected landing route for $r: $dest',
+          AppRoutes.dashboardForRole(r),
+          AppRoutes.employeeHome,
+          reason: 'role $r must land on the employee self-view',
         );
       }
+    });
+  });
+
+  group('AppRoutes.canAccessHr', () {
+    test('HR-tier roles (HR / HR_ADMIN / ADMIN) can access /hr/*', () {
+      expect(AppRoutes.canAccessHr(UserRole.hr), isTrue);
+      expect(AppRoutes.canAccessHr(UserRole.hrAdmin), isTrue);
+      expect(AppRoutes.canAccessHr(UserRole.admin), isTrue);
+    });
+
+    test('non-HR roles are walled off from /hr/*', () {
+      expect(AppRoutes.canAccessHr(UserRole.manager), isFalse);
+      expect(AppRoutes.canAccessHr(UserRole.bdManager), isFalse);
+      expect(AppRoutes.canAccessHr(UserRole.warehouseMgr), isFalse);
+      expect(AppRoutes.canAccessHr(UserRole.employee), isFalse);
+      expect(AppRoutes.canAccessHr(UserRole.ops), isFalse);
+      expect(AppRoutes.canAccessHr(UserRole.finance), isFalse);
     });
   });
 

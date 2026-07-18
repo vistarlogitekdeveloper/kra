@@ -62,7 +62,7 @@ class HrShellScreen extends ConsumerWidget {
     return ConnectivityWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
-        drawer: _HrDrawer(user: user, ref: ref),
+        drawer: HrDrawer(user: user, ref: ref),
         body: navigationShell,
         bottomNavigationBar: _BrandedBottomNav(
           tabs: _tabs,
@@ -78,10 +78,20 @@ class HrShellScreen extends ConsumerWidget {
 // Drawer
 // ─────────────────────────────────────────────────────────
 
-class _HrDrawer extends StatelessWidget {
+/// The HR area's menu — HR management links plus the workspace switches
+/// ("My KRA", "Switch to Manager") and logout.
+///
+/// PUBLIC on purpose. It used to hang only off [HrShellScreen]'s Scaffold, but
+/// every HR tab builds its OWN Scaffold inside that shell's `body`, and an inner
+/// Scaffold shadows the outer one — so `Scaffold.of(context).openDrawer()` from
+/// an HR screen resolved to its own drawer-less Scaffold and silently did
+/// NOTHING. The "☰" looked live but opened nothing, stranding HR admins with no
+/// way back to My KRA / My Team. HR screens now mount this on their own Scaffold
+/// so their "☰" has a drawer to open.
+class HrDrawer extends StatelessWidget {
   final dynamic user;
   final WidgetRef ref;
-  const _HrDrawer({required this.user, required this.ref});
+  const HrDrawer({super.key, required this.user, required this.ref});
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +181,19 @@ class _HrDrawer extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
+                  // Every role — HR included — owns a KRA/review. Keep the
+                  // self-view one tap away so HR can rate themselves without
+                  // leaving the admin surface behind.
+                  const _DrawerSectionLabel(title: 'Workspace'),
+                  _DrawerItem(
+                    icon: Icons.assignment_ind_rounded,
+                    label: AppStrings.workspaceMyKra,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.go(AppRoutes.employeeHome);
+                    },
+                  ),
+                  const Divider(color: AppColors.divider, height: 24),
                   const _DrawerSectionLabel(title: 'Management'),
                   _DrawerItem(
                     icon: Icons.location_on_rounded,
@@ -200,7 +223,11 @@ class _HrDrawer extends StatelessWidget {
                   // actually reach it. The router enforces access
                   // again, but a hidden link is cleaner than a
                   // bounce-back for users who never see it.
-                  if (user != null && AppRoutes.canAccessManager(user.role))
+                  if (user != null &&
+                      AppRoutes.canAccessManager(
+                        user.role,
+                        hasReports: user.hasReports,
+                      ))
                     _DrawerItem(
                       icon: Icons.swap_horiz_rounded,
                       label: AppStrings.hrDrawerSwitchToManager,

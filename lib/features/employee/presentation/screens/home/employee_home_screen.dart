@@ -6,10 +6,14 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../../core/widgets/workspace_drawer.dart';
+import '../../../../../core/widgets/workspace_switcher.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../hr/presentation/widgets/confirm_action_dialog.dart';
 import '../../../data/models/employee_dashboard.dart';
 import '../../providers/employee_dashboard_providers.dart';
 import '../../providers/my_profile_providers.dart';
+import '../../widgets/empty_my_dashboard.dart';
 import 'widgets/current_month_card.dart';
 import 'widgets/deadline_banner.dart';
 import 'widgets/greeting_header.dart';
@@ -64,31 +68,65 @@ class EmployeeHomeScreen extends ConsumerWidget {
     );
     final roleLabel = user?.role.displayName ?? '';
 
+    // Empty self-view is a normal state, not an error: when the signed-in
+    // user has no active cycle (`/employee/dashboard` returns 200 with a null
+    // cycle), show a clear "No active KRA yet" empty state instead of the
+    // populated sections. Only a SUCCESSFUL null-cycle payload triggers this —
+    // loading still shows shimmers and a real network error still shows the
+    // per-section retry card (see the sections below).
+    final showEmptyKra = ref.watch(
+      employeeDashboardProvider.select(
+        (a) => a.maybeWhen(
+          data: (d) => !d.hasActiveCycle,
+          orElse: () => false,
+        ),
+      ),
+    );
+
+    // The "☰" workspace switcher is HR-admin only. HR admins genuinely span
+    // every area (My KRA / My Team / HR Admin), so they need a picker. Everyone
+    // else has at most one place to go back to, which the back button already
+    // handles (a manager's back returns them to My Team) — a menu there was
+    // just a second, redundant way to do the same thing.
+    final hasWorkspaceMenu = user != null && AppRoutes.canAccessHr(user.role);
+    final header = GreetingHeader(
+      name: _firstName(fullName),
+      employeeCode: employeeCode,
+      roleLabel: roleLabel,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const _HomeBackButton(),
+          if (hasWorkspaceMenu) const _WorkspaceMenuButton(),
+        ],
+      ),
+      trailing: const _HomeLogoutButton(),
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: workspaceDrawerFor(ref),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
           color: AppColors.primaryPurple,
           onRefresh: () => _refresh(ref),
-          child: ListView(
-            // Always-scrollable so RefreshIndicator works even when the
-            // body would otherwise be too short to overscroll.
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 32),
-            children: [
-              GreetingHeader(
-                name: _firstName(fullName),
-                employeeCode: employeeCode,
-                roleLabel: roleLabel,
-              ),
-              const _DeadlineBannerSection(),
-              const _CurrentMonthSection(),
-              const _MyKrasSection(),
-              const _HistoryStripSection(),
-              const _IncentiveSection(),
-            ],
-          ),
+          child: showEmptyKra
+              ? _EmptyKraBody(header: header, onRetry: () => _refresh(ref))
+              : ListView(
+                  // Always-scrollable so RefreshIndicator works even when the
+                  // body would otherwise be too short to overscroll.
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 32),
+                  children: [
+                    header,
+                    const _DeadlineBannerSection(),
+                    const _CurrentMonthSection(),
+                    const _MyKrasSection(),
+                    const _HistoryStripSection(),
+                    const _IncentiveSection(),
+                  ],
+                ),
         ),
       ),
     );
@@ -97,6 +135,138 @@ class EmployeeHomeScreen extends ConsumerWidget {
   String _firstName(String fullName) {
     if (fullName.trim().isEmpty) return 'there';
     return fullName.trim().split(' ').first;
+  }
+}
+
+/// The "☰" workspace-menu button in the greeting header. The home screen has
+/// no AppBar, so it opens the Scaffold's drawer manually. The [Builder] gives
+/// a context beneath the home Scaffold so `Scaffold.of` finds the drawer.
+/// Only rendered for roles with more than one workspace.
+class _WorkspaceMenuButton extends StatelessWidget {
+  const _WorkspaceMenuButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (ctx) => IconButton(
+        icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
+        tooltip: AppStrings.workspaceSwitchTooltip,
+        visualDensity: VisualDensity.compact,
+        onPressed: () => Scaffold.of(ctx).openDrawer(),
+      ),
+    );
+  }
+}
+
+/// Top-left back button on the home hero.
+///
+/// Home (My KRA) is a bottom-nav root, so "back" only means something when
+/// there's actually somewhere to return to:
+///   * drilled in from another route → pop it;
+///   * a manager/HR who switched into My KRA → return to their own workspace
+///     (My Team / HR Admin);
+///   * a plain employee, whose only workspace IS My KRA → nothing to go back
+///     to, so no dead button is rendered.
+class _HomeBackButton extends ConsumerWidget {
+  const _HomeBackButton();
+
+  Widget _btn({required String tooltip, required VoidCallback onTap}) =>
+      IconButton(
+        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+        tooltip: tooltip,
+        visualDensity: VisualDensity.compact,
+        onPressed: onTap,
+      );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (context.canPop()) {
+      return _btn(tooltip: AppStrings.commonBack, onTap: () => context.pop());
+    }
+    final authState = ref.watch(authStateProvider);
+    final user = authState is AuthAuthenticated ? authState.user : null;
+    if (user == null) return const SizedBox.shrink();
+    // Everything past index 0 is a workspace beyond My KRA; the last one is the
+    // user's most specific area (HR Admin for admins, My Team for managers).
+    final extras = WorkspaceSwitcher.workspacesFor(user).skip(1).toList();
+    if (extras.isEmpty) return const SizedBox.shrink();
+    final target = extras.last;
+    return _btn(
+      tooltip: '${AppStrings.commonBack} · ${target.label}',
+      onTap: () => context.go(target.route),
+    );
+  }
+}
+
+/// Top-right "log out" button on the home hero. White to read on the purple
+/// gradient; confirms before ending the session.
+class _HomeLogoutButton extends ConsumerWidget {
+  const _HomeLogoutButton();
+
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.profileLogoutConfirmTitle,
+      message: AppStrings.profileLogoutConfirmMessage,
+      confirmLabel: AppStrings.profileLogout,
+      cancelLabel: AppStrings.commonCancel,
+      icon: Icons.logout_rounded,
+      accentColor: AppColors.error,
+    );
+    if (ok == true) {
+      ref.read(authStateProvider.notifier).logout();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return IconButton(
+      icon: const Icon(Icons.logout_rounded, color: Colors.white),
+      tooltip: AppStrings.dashboardLogoutTooltip,
+      visualDensity: VisualDensity.compact,
+      onPressed: () => _confirmLogout(context, ref),
+    );
+  }
+}
+
+/// Full-height, pull-to-refreshable body shown when the user has no active
+/// KRA. Keeps the greeting header on top and centres [EmptyMyDashboard] in
+/// the remaining space.
+class _EmptyKraBody extends StatelessWidget {
+  final Widget header;
+  final VoidCallback onRetry;
+  const _EmptyKraBody({required this.header, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    // ConstrainedBox(minHeight) + IntrinsicHeight is the scroll-safe idiom for
+    // "header on top, empty state centred in the space below": on a tall
+    // viewport the Expanded fills and centres; on a short one (landscape /
+    // split-screen) the content keeps its intrinsic height and the whole body
+    // scrolls instead of overflowing. A fixed SizedBox(height: maxHeight)
+    // would clamp and overflow the empty card on short viewports.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: IntrinsicHeight(
+            child: Column(
+              children: [
+                header,
+                Expanded(
+                  child: EmptyMyDashboard(
+                    title: AppStrings.myKraEmptyTitle,
+                    message: AppStrings.myKraEmptyMessage,
+                    onRetry: onRetry,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

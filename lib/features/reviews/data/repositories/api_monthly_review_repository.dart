@@ -24,6 +24,7 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
   Future<List<MonthlyReviewSummary>> listMonthlyReviews({
     required int year,
     required int month,
+    bool mine = false,
     UserRole? scopeRole,
     String? scopeEmployeeId,
     String? scopeManagerId,
@@ -35,6 +36,10 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
         queryParameters: {
           'year': year,
           'month': month,
+          // `mine=true` forces the caller's OWN monthly review for every role
+          // (the "My KRA / self-rating" sheet). Without it the backend scopes
+          // by JWT and a manager would get their direct reports instead.
+          if (mine) 'mine': true,
           if (currentStage != null) 'currentStage': currentStage.toApiString(),
         },
       );
@@ -118,6 +123,34 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
         },
       );
       return MonthlyReview.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
+  Future<ProofFileDownload?> fetchProofFile(
+    String reviewId,
+    String rowId,
+    ReviewStage stage,
+  ) async {
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.monthlyReviews}/$reviewId/proof',
+        queryParameters: {'rowId': rowId, 'stage': stage.toApiString()},
+      );
+      final json = unwrapObject(response);
+      final data = json['data'] as String?;
+      if (data == null || data.isEmpty) return null;
+      return ProofFileDownload(
+        name: (json['name'] as String?) ?? 'proof',
+        mime: (json['mime'] as String?) ?? 'application/octet-stream',
+        base64Data: data,
+      );
+    } on DioException catch (e, st) {
+      // "No attachment on this row" is a normal answer, not a failure.
+      if (e.response?.statusCode == 404) return null;
+      rethrowAsApiError(e, st);
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }

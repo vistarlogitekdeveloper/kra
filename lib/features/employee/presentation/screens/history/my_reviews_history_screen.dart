@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
+import '../../../../../core/widgets/adaptive_leading.dart';
 import '../../../../../core/widgets/paged_list_view.dart';
+import '../../../../../core/widgets/workspace_drawer.dart';
 import '../../providers/my_review_providers.dart';
 import 'widgets/review_history_card.dart';
 
@@ -26,7 +28,9 @@ class MyReviewsHistoryScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: workspaceDrawerFor(ref),
       appBar: AppBar(
+        leading: adaptiveLeading(context),
         title: const Text(
           AppStrings.historyTitle,
           style: TextStyle(fontWeight: FontWeight.w800),

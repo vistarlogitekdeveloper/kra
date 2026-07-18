@@ -9,14 +9,22 @@ class ApiConstants {
 
   // ───── Environment selection ─────
   //
-  // There is only one backend today — the Render-hosted test env.
-  // When staging / prod ship, restore the per-env map and read the
-  // active key via `String.fromEnvironment('ENV')`. Until then,
-  // pretending to switch envs via `--dart-define=ENV=...` is a no-op
-  // and a footgun (callers assume something happens), so the switch
-  // is collapsed to a single constant.
-  static const String baseUrl = 'https://vistar-crm.onrender.com/api/v1/kra/';
-  static const String environment = 'test';
+  // Defaults to the Render-hosted test env. Override it to point the app at a
+  // backend you're running yourself:
+  //
+  //   flutter run -d chrome --dart-define=API_BASE=http://localhost:3000/api/v1/kra/
+  //
+  // This matters more than it looks: running the APP locally does NOT make the
+  // backend local — without an override, a locally-run app still talks to the
+  // deployed Render server. So server-side work (new columns, new routes) is
+  // invisible to local testing until it's either deployed OR pointed at here.
+  // Trailing slash included; Dio joins relative endpoint paths onto it.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE',
+    defaultValue: 'https://vistar-crm.onrender.com/api/v1/kra/',
+  );
+  static const String environment =
+      String.fromEnvironment('ENV', defaultValue: 'test');
 
   // ───── Endpoint paths (relative to baseUrl) ─────
   static const String authLogin = '/auth/login';

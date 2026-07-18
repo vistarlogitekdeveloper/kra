@@ -138,47 +138,39 @@ class AppRoutes {
   static String managerRatePartial(String reviewId) =>
       '/manager/team/reviews/$reviewId/rate/partial';
 
-  /// Maps a [UserRole] to its landing route after login.
+  /// The post-login landing route — the "My KRA / My Review" employee
+  /// self-view, for EVERY role.
   ///
-  /// Per the Step 4 spec:
-  ///   - ADMIN / HR_ADMIN / HR  → `/hr/home` (their primary surface)
-  ///   - MANAGER / BD_MANAGER / WAREHOUSE_MGR → `/manager/team/dashboard`
-  ///   - Everyone else → `/employee/home`
+  /// A user's own KRA/review lives only under the `/employee/*` self-view
+  /// endpoints, so that surface is the one screen every authenticated user
+  /// must be able to see and fill — regardless of role. Role only ADDS
+  /// extra areas on top (Team for managers, HR admin for HR); it never
+  /// replaces the self-view. Those extra areas are reached additively via
+  /// the workspace switcher (see [WorkspaceSwitcher]) and the role drawers,
+  /// not by landing there.
   ///
-  /// Manager-capable roles can deep-link to `/employee/home` to
-  /// self-rate (the My Review mode); HR_ADMIN has a drawer entry to
-  /// switch to manager view for escalations.
-  static String dashboardForRole(UserRole role) {
-    switch (role) {
-      case UserRole.admin:
-      case UserRole.hrAdmin:
-      case UserRole.hr:
-        return hrHome;
-      case UserRole.manager:
-      case UserRole.bdManager:
-      case UserRole.warehouseMgr:
-        return managerTeamDashboard;
-      case UserRole.employee:
-      case UserRole.ops:
-      case UserRole.finance:
-        return employeeHome;
-    }
-  }
+  /// This also doubles as the guard bounce-back target: a role deep-linking
+  /// into an area it can't access (`/hr/*`, `/manager/*`) is sent here — to
+  /// its own KRA — rather than to a raw 403.
+  static String dashboardForRole(UserRole role) => employeeHome;
+
+  /// True if [role] may access the HR module (`/hr/*`). Mirrors the
+  /// router's `_canAccessHr` guard so UI (e.g. the workspace switcher)
+  /// can offer the HR area to exactly the roles the router lets in.
+  static bool canAccessHr(UserRole role) =>
+      role == UserRole.hr || role == UserRole.hrAdmin || role == UserRole.admin;
 
   /// True if [role] may access any `/manager/*` route. Drives the
   /// router's role-guard redirect.
-  static bool canAccessManager(UserRole role) {
+  static bool canAccessManager(UserRole role, {bool hasReports = false}) {
+    if (role == UserRole.hrAdmin || role == UserRole.admin) return true;
+    if (hasReports) return true;
     switch (role) {
       case UserRole.manager:
-      case UserRole.hrAdmin:
-      case UserRole.admin:
       case UserRole.bdManager:
       case UserRole.warehouseMgr:
         return true;
-      case UserRole.employee:
-      case UserRole.ops:
-      case UserRole.finance:
-      case UserRole.hr:
+      default:
         return false;
     }
   }
@@ -244,17 +236,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           return AppRoutes.hrHome;
         }
         // Manager role guard — MANAGER / BD_MANAGER / WAREHOUSE_MGR /
-        // HR_ADMIN / ADMIN. Other roles deep-linking to /manager/* get
-        // bounced to their own dashboard.
+        // HR_ADMIN / ADMIN / any user with reports. Other roles deep-linking
+        // to /manager/* get bounced to their own dashboard.
         if (goingToManagerArea &&
-            !AppRoutes.canAccessManager(authState.user.role)) {
+            !AppRoutes.canAccessManager(
+              authState.user.role,
+              hasReports: authState.user.hasReports,
+            )) {
           return AppRoutes.dashboardForRole(authState.user.role);
         }
         // Bare /manager → /manager/team/dashboard for manager-capable
         // roles. Wraps the Step-3 placeholder behaviour now that the
         // real manager surface exists.
         if (state.matchedLocation == AppRoutes.managerDashboard &&
-            AppRoutes.canAccessManager(authState.user.role)) {
+            AppRoutes.canAccessManager(
+              authState.user.role,
+              hasReports: authState.user.hasReports,
+            )) {
           return AppRoutes.managerTeamDashboard;
         }
         // Bare /employee → /employee/home (the StatefulShellRoute
@@ -631,8 +629,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
 /// The HR module is locked down to HR + HR_ADMIN + ADMIN.
 /// Other roles deep-linking to `/hr/*` get redirected to their own dashboard.
-bool _canAccessHr(UserRole role) =>
-    role == UserRole.hr || role == UserRole.hrAdmin || role == UserRole.admin;
+bool _canAccessHr(UserRole role) => AppRoutes.canAccessHr(role);
 
 /// Bridges Riverpod auth state changes into GoRouter's refresh
 /// mechanism so the redirect rules re-run on login / logout / forced-logout.

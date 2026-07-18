@@ -111,10 +111,32 @@ class MonthlyReview {
     return StageStatus.pending;
   }
 
-  /// Coarse role gate: the review sits on [currentStage] and [role] can
-  /// act on it. Ownership/manager scoping is applied by the repository.
-  bool isActionableBy(UserRole role) =>
-      !currentStage.isTerminal && currentStage.actorRoles.contains(role);
+  /// Whether the caller can act on this review's [currentStage] right now.
+  ///
+  /// The two rating stages that involve a person are RELATIONSHIPS, not roles,
+  /// and are resolved against this review when [userId] is supplied:
+  ///   * self-rating → the owner ([employeeId]), whatever their role — managers
+  ///     and HR admins have their own KRA to rate too;
+  ///   * reporting-manager rating → this review's [managerId], whatever THEIR
+  ///     role — every employee has a reporting manager, and that manager may
+  ///     well be an HR admin or a senior manager rather than a manager-tier
+  ///     role. Fails closed when [managerId] is null (no manager mapped).
+  ///
+  /// The org-level stages (account/HR rating, management review, incentive
+  /// payout) remain role-gated via [ReviewStage.actorRoles].
+  ///
+  /// [userId] is optional only for backwards compatibility; omitting it makes
+  /// the relationship stages unresolvable and therefore not actionable.
+  bool isActionableBy(UserRole role, {String? userId}) {
+    if (currentStage.isTerminal) return false;
+    if (currentStage == ReviewStage.selfRating) {
+      return userId != null && userId == employeeId;
+    }
+    if (currentStage == ReviewStage.reportingManagerRating) {
+      return userId != null && managerId != null && userId == managerId;
+    }
+    return currentStage.actorRoles.contains(role);
+  }
 
   bool get isComplete => currentStage.isTerminal;
 

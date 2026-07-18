@@ -12,6 +12,11 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
 
+  # Browser APIs for the web build — used to download a proof attachment
+  # (Blob + object URL) so a reporting manager can open the employee's evidence.
+  # Already present transitively; declared directly because we import it.
+  web: ^1.1.1
+
   # State management
   flutter_riverpod: ^2.4.9
 

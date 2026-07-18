@@ -179,12 +179,13 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     final monthlyIncentive =
         incentiveText.isEmpty ? null : double.tryParse(incentiveText);
     try {
-      // ManagerId is only meaningful when the role is EMPLOYEE — other
-      // roles report through the org chart differently or sit at the top.
-      // Send `null` from non-EMPLOYEE submissions so an admin changing
-      // someone's role to MANAGER also clears their stale reporting line.
-      final managerIdForPayload =
-          _role == 'EMPLOYEE' ? _managerId : null;
+      // EVERY employee has a reporting manager, whatever their role — managers
+      // report to senior managers and HR admins report to someone too. This
+      // used to force `null` for any non-EMPLOYEE role, which silently wiped a
+      // manager's reporting line on every edit and made "manager of a manager"
+      // impossible to express. The mapping now drives who may rate whom, so it
+      // is sent as selected regardless of role.
+      final managerIdForPayload = _managerId;
       final passwordText = _passwordController.text;
       if (widget.isEdit) {
         final grade =
@@ -463,26 +464,24 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             value: _role,
             roles: _roles,
             onChanged: (v) => setState(() {
+              // The reporting line is independent of the role — changing
+              // someone to MANAGER must NOT clear who they report to.
               _role = v;
-              // A non-EMPLOYEE role doesn't have a reporting manager
-              // here, so clear any stale selection so the payload
-              // doesn't carry it back to the server.
-              if (v != 'EMPLOYEE') _managerId = null;
               _isDirty = true;
             }),
           ),
-          // Manager picker only appears for normal employees — managers
-          // and HR roles don't report through this surface.
-          if (_role == 'EMPLOYEE') ...[
-            const SizedBox(height: 14),
-            _ManagerDropdown(
-              value: _managerId,
-              onChanged: (id) => setState(() {
-                _managerId = id;
-                _isDirty = true;
-              }),
-            ),
-          ],
+          // Shown for every role: managers report to senior managers and HR
+          // admins report to someone too. Whoever is selected here is the one
+          // who rates this person.
+          const SizedBox(height: 14),
+          _ManagerDropdown(
+            value: _managerId,
+            excludeEmployeeId: widget.employeeId,
+            onChanged: (id) => setState(() {
+              _managerId = id;
+              _isDirty = true;
+            }),
+          ),
           const SizedBox(height: 14),
           _DepartmentDropdown(
             value: _department,
@@ -938,18 +937,32 @@ class _DepartmentDropdown extends StatelessWidget {
 }
 
 /// "Reporting manager" picker — mirrors the [_LocationDropdown] pattern.
-/// Only rendered when the employee's role is EMPLOYEE (managers don't
-/// report through this surface). If the saved manager isn't in the
-/// active list (e.g. they left the org and were deactivated) we surface
-/// it as an orphan item so the dropdown can render without asserting.
+///
+/// Rendered for EVERY role: being a reporting manager is a relationship, not a
+/// role, so a manager can report to a senior manager and an HR admin reports to
+/// someone too. The candidate list is therefore every active employee, minus
+/// [excludeEmployeeId] (the person being edited) so nobody can be set as their
+/// own manager — the backend rejects that, and cycles, as well.
+///
+/// If the saved manager isn't in the active list (e.g. they left the org and
+/// were deactivated) we surface it as an orphan item so the dropdown can render
+/// without asserting.
 class _ManagerDropdown extends ConsumerWidget {
   final String? value;
+
+  /// The employee being edited — filtered out of the candidate list so they
+  /// can't be picked as their own reporting manager. Null in create mode.
+  final String? excludeEmployeeId;
   final ValueChanged<String?> onChanged;
-  const _ManagerDropdown({required this.value, required this.onChanged});
+  const _ManagerDropdown({
+    required this.value,
+    required this.excludeEmployeeId,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final managersAsync = ref.watch(allManagersProvider);
+    final managersAsync = ref.watch(managerCandidatesProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -972,7 +985,11 @@ class _ManagerDropdown extends ConsumerWidget {
               style: TextStyle(fontSize: 14, color: AppColors.error),
             ),
           ),
-          data: (managers) {
+          data: (all) {
+            // You cannot report to yourself.
+            final managers = excludeEmployeeId == null
+                ? all
+                : all.where((m) => m.id != excludeEmployeeId).toList();
             final hasOrphan =
                 value != null && !managers.any((m) => m.id == value);
             return InputDecorator(
