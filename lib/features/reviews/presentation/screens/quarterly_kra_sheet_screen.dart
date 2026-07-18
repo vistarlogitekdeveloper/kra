@@ -9,6 +9,7 @@ import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_gradients.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/utils/proof_file_saver.dart';
 import '../../../../core/widgets/adaptive_leading.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/workspace_drawer.dart';
@@ -1750,11 +1751,31 @@ class _FilePickRow extends StatelessWidget {
   }
 }
 
-/// Shows a fetched proof attachment. Images render inline; anything else (PDF)
-/// is acknowledged by name — enough for the reviewer to confirm evidence exists.
+/// Shows a fetched proof attachment to whoever may view the review — the
+/// employee, their reporting manager (whatever that manager's role), and
+/// management.
+///
+/// Images preview inline, but EVERY type gets a Download button. Showing only a
+/// filename and mime type meant a manager could see that a PDF/Excel/Word proof
+/// existed yet had no way to actually open it — which is not "access to the
+/// proof" at all.
 class _ProofFileViewer extends StatelessWidget {
   final ProofFileDownload file;
   const _ProofFileViewer({required this.file});
+
+  Future<void> _download(BuildContext context, Uint8List bytes) async {
+    final ok = await saveProofFile(
+      bytes: bytes,
+      fileName: file.name,
+      mime: file.mime,
+    );
+    if (!context.mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Downloading is only supported in the web app.'),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1810,6 +1831,16 @@ class _ProofFileViewer extends StatelessWidget {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Close'),
+        ),
+        // Present for EVERY file type — this is what actually gives the
+        // reporting manager / management access to the evidence.
+        FilledButton.icon(
+          onPressed: bytes == null ? null : () => _download(context, bytes!),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primaryPurple,
+          ),
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: const Text('Download'),
         ),
       ],
     );
