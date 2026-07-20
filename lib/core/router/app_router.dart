@@ -138,21 +138,26 @@ class AppRoutes {
   static String managerRatePartial(String reviewId) =>
       '/manager/team/reviews/$reviewId/rate/partial';
 
-  /// The post-login landing route — the "My KRA / My Review" employee
-  /// self-view, for EVERY role.
+  /// The post-login landing route.
   ///
-  /// A user's own KRA/review lives only under the `/employee/*` self-view
-  /// endpoints, so that surface is the one screen every authenticated user
-  /// must be able to see and fill — regardless of role. Role only ADDS
-  /// extra areas on top (Team for managers, HR admin for HR); it never
-  /// replaces the self-view. Those extra areas are reached additively via
-  /// the workspace switcher (see [WorkspaceSwitcher]) and the role drawers,
-  /// not by landing there.
+  /// HR-tier roles (HR / HR_ADMIN / ADMIN) land in the **HR admin area** — that
+  /// is the workspace they actually run day to day, so dropping them on their
+  /// own KRA every login meant a detour through the switcher before any real
+  /// work. Every other role lands on the "My KRA / My Review" self-view.
   ///
-  /// This also doubles as the guard bounce-back target: a role deep-linking
-  /// into an area it can't access (`/hr/*`, `/manager/*`) is sent here — to
-  /// its own KRA — rather than to a raw 403.
-  static String dashboardForRole(UserRole role) => employeeHome;
+  /// This changes only where a session STARTS. A user's own KRA/review lives
+  /// under the `/employee/*` self-view, and that surface is still available to
+  /// EVERY role — HR included — reached additively via the workspace switcher
+  /// (see [WorkspaceSwitcher]) and the role drawers. Role still only ADDS areas;
+  /// it never removes the self-view.
+  ///
+  /// This also doubles as the guard bounce-back target: a role deep-linking into
+  /// an area it can't access (`/hr/*`, `/manager/*`) is sent here rather than to
+  /// a raw 403. That makes the [canAccessHr] gate load-bearing — returning
+  /// [hrHome] for a role the HR guard would reject would bounce it straight back
+  /// here and spin in a redirect loop, so the two must stay in agreement.
+  static String dashboardForRole(UserRole role) =>
+      canAccessHr(role) ? hrHome : employeeHome;
 
   /// True if [role] may access the HR module (`/hr/*`). Mirrors the
   /// router's `_canAccessHr` guard so UI (e.g. the workspace switcher)

@@ -10,7 +10,10 @@ import '../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../core/widgets/workspace_switcher.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../hr/presentation/widgets/confirm_action_dialog.dart';
+import '../../../../reviews/data/models/monthly_review.dart';
+import '../../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../../data/models/employee_dashboard.dart';
+import '../../../data/models/enums.dart';
 import '../../providers/employee_dashboard_providers.dart';
 import '../../providers/my_profile_providers.dart';
 import '../../widgets/empty_my_dashboard.dart';
@@ -286,8 +289,16 @@ class _DeadlineBannerSection extends ConsumerWidget {
       data: (dashboard) {
         // Don't nag once the employee has already submitted everything for
         // the cycle — the monthly deadline only matters while work is open.
+        // Same legacy-vs-monthly mismatch as the current-month card: without
+        // the monthly cross-check this nags "Self-rating overdue — submit now"
+        // at someone who has already rated every KRA.
+        final selfDone = ref
+                .watch(myMonthlyReviewProvider(
+                    _CurrentMonthSection._periodFor(dashboard)))
+                .maybeWhen(data: (r) => r?.selfRatingSubmitted, orElse: () => null) ??
+            false;
         final submittedAll =
-            dashboard.scorecard?.state.hasSubmittedAll ?? false;
+            selfDone || (dashboard.scorecard?.state.hasSubmittedAll ?? false);
         final days = dashboard.selfRatingDaysRemaining;
         final showBanner = !submittedAll &&
             days != null &&
@@ -323,13 +334,34 @@ class _CurrentMonthSection extends ConsumerWidget {
         message: e.toString(),
         onRetry: () => ref.invalidate(employeeDashboardProvider),
       ),
-      data: (dashboard) => CurrentMonthCard(
-        cycle: dashboard.cycle,
-        currentMonth: dashboard.currentMonth,
-        scorecard: dashboard.scorecard,
-        onPrimaryAction: () => _onCurrentMonthAction(context, dashboard),
-      ),
+      data: (dashboard) {
+        // `/employee/dashboard` derives its state from the LEGACY kra.reviews
+        // table, which a monthly self-rating never updates — so a fully-rated
+        // month still reports DRAFT and the card reads "Self-rating pending".
+        // Cross-check against the monthly review the KRA sheet actually writes
+        // to, and promote the state when the self-rating really is in.
+        final period = _periodFor(dashboard);
+        final selfDone = ref
+                .watch(myMonthlyReviewProvider(period))
+                .maybeWhen(data: (r) => r?.selfRatingSubmitted, orElse: () => null) ??
+            false;
+        final legacyState = dashboard.scorecard?.state ?? ReviewState.draft;
+        final promote = selfDone && !legacyState.hasSubmittedAll;
+        return CurrentMonthCard(
+          cycle: dashboard.cycle,
+          currentMonth: dashboard.currentMonth,
+          scorecard: dashboard.scorecard,
+          stateOverride: promote ? ReviewState.employeeSubmittedAll : null,
+          onPrimaryAction: () => _onCurrentMonthAction(context, dashboard),
+        );
+      },
     );
+  }
+
+  /// The month this dashboard is showing, as a [ReviewPeriod].
+  static ReviewPeriod _periodFor(EmployeeDashboard dashboard) {
+    final d = dashboard.currentMonth?.monthDate ?? DateTime.now();
+    return ReviewPeriod(d.year, d.month);
   }
 
   /// Routes the current-month CTA to whichever screen makes sense for

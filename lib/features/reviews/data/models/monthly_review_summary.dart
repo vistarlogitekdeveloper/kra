@@ -106,6 +106,24 @@ class MonthlyReviewSummary {
         incentiveEligibleAmount: r.eligibleAmount,
       );
 
+  /// True when the employee's self-rating for this month has actually been
+  /// filled in.
+  ///
+  /// [currentStage] here is the backend's `displayStage` — derived from the
+  /// scores that really exist, not the pipeline cursor (in-place `save-scores`
+  /// never advances that cursor). So self-rating counts as done when the review
+  /// has moved past it, or it IS the display stage and carries scores.
+  ///
+  /// The home dashboard needs this because its card/banner state comes from the
+  /// LEGACY `kra.reviews` table, which a monthly self-rating never updates.
+  bool get selfRatingSubmitted {
+    if (currentStage.isTerminal) return true;
+    if (currentStage == ReviewStage.selfRating) {
+      return currentStageStatus == StageStatus.submitted;
+    }
+    return currentStage.index > ReviewStage.selfRating.index;
+  }
+
   /// True when the caller can act on the current stage — i.e. their dashboard
   /// should badge this row as "needs my action".
   ///
