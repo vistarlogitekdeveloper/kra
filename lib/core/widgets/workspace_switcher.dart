@@ -6,10 +6,14 @@ import '../../features/auth/data/models/user.dart';
 
 /// Access-control source of truth for cross-role workspace navigation.
 ///
-/// Every authenticated user's home is **My KRA** — the employee self-view —
-/// regardless of role (see [AppRoutes.dashboardForRole]). Role only ADDS extra
-/// workspaces on top: a manager also gets **My Team**, HR/admin also get
-/// **HR Admin**. [WorkspaceDrawer] renders the left "☰" menu from this list.
+/// Every authenticated user HAS **My KRA** — the employee self-view — whatever
+/// their role, and it is always first in this list. Role only ADDS workspaces on
+/// top: a manager also gets **My Team**, HR/admin also get **HR Admin**.
+/// [WorkspaceDrawer] renders the left "☰" menu from this list.
+///
+/// Note this is about what a role can REACH, not where it starts: HR-tier roles
+/// land in the HR area on login (see [AppRoutes.dashboardForRole]) and come back
+/// to My KRA through this switcher.
 ///
 /// The list is derived from the same predicates the router's guards use
 /// ([AppRoutes.canAccessManager] / [AppRoutes.canAccessHr]), so the menu can

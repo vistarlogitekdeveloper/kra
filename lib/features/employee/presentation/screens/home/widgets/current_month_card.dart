@@ -24,19 +24,29 @@ class CurrentMonthCard extends StatelessWidget {
   /// kicks off self-rate, opens submission, opens detail).
   final VoidCallback onPrimaryAction;
 
+  /// Wins over [scorecard]'s state when supplied.
+  ///
+  /// [scorecard] comes from `/employee/dashboard`, which derives its state from
+  /// the LEGACY `kra.reviews` table — but self-ratings are written to
+  /// `kra.monthly_reviews`, which never updates it. So a completed self-rating
+  /// still reported DRAFT and this card sat on "Self-rating pending". The home
+  /// screen passes the state derived from the monthly review here instead.
+  final ReviewState? stateOverride;
+
   const CurrentMonthCard({
     super.key,
     required this.cycle,
     required this.currentMonth,
     required this.scorecard,
     required this.onPrimaryAction,
+    this.stateOverride,
   });
 
   @override
   Widget build(BuildContext context) {
     if (cycle == null) return const _NoActiveCycle();
 
-    final state = scorecard?.state ?? ReviewState.draft;
+    final state = stateOverride ?? scorecard?.state ?? ReviewState.draft;
     final monthLabel = currentMonth?.monthLabel ??
         EmployeeFormatters.monthYear(
           currentMonth?.monthDate ?? DateTime.now(),

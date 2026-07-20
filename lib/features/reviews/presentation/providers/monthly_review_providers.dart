@@ -220,6 +220,34 @@ final monthlyReviewListProvider = FutureProvider.autoDispose
       );
 });
 
+/// The signed-in user's OWN monthly review summary for [period], or null when
+/// none has been generated.
+///
+/// Exists because the home dashboard's current-month card reads its state from
+/// `/employee/dashboard`, which is computed from the LEGACY `kra.reviews` table
+/// — while ratings are actually written to `kra.monthly_reviews` by the KRA
+/// sheet. Saving a self-rating therefore never moved the legacy state, and the
+/// card sat on "Self-rating pending" forever. This gives the card the same
+/// source of truth the sheet writes to.
+///
+/// `mine: true` is essential: the backend otherwise scopes a manager to their
+/// direct reports, so their own review would be invisible here.
+final myMonthlyReviewProvider = FutureProvider.autoDispose
+    .family<MonthlyReviewSummary?, ReviewPeriod>((ref, period) async {
+  final scope = ref.watch(currentReviewScopeProvider);
+  if (scope == null) return null;
+  final list = await ref.read(monthlyReviewRepositoryProvider).listMonthlyReviews(
+        year: period.year,
+        month: period.month,
+        mine: true,
+        scopeRole: scope.role,
+      );
+  for (final s in list) {
+    if (s.employeeId == scope.userId) return s;
+  }
+  return list.isEmpty ? null : list.first;
+});
+
 /// Full review for the detail / stage screen.
 final monthlyReviewDetailProvider =
     FutureProvider.autoDispose.family<MonthlyReview, String>((ref, id) async {
