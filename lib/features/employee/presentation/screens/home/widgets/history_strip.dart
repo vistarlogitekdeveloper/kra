@@ -44,8 +44,8 @@ class HistoryStrip extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               AppStrings.homeHistoryStripTitle,
               style: TextStyle(
@@ -103,7 +103,7 @@ class HistoryStrip extends ConsumerWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.divider),
       ),
-      child: const Text(
+      child: Text(
         AppStrings.historyEmptyTitle,
         style: TextStyle(
           color: AppColors.textSecondary,
@@ -189,7 +189,7 @@ class _HistoryChip extends StatelessWidget {
                 cycleLabel,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,

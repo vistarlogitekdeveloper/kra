@@ -107,7 +107,7 @@ class ManagerTotalFooter extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
+                    Text(
                       AppStrings.managerRateTotalLabel,
                       style: TextStyle(
                         fontSize: 11.5,
@@ -121,7 +121,7 @@ class ManagerTotalFooter extends ConsumerWidget {
                       children: [
                         Text(
                           EmployeeFormatters.percent(weightedTotalPct),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.3,

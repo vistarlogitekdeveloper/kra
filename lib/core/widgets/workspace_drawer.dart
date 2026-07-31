@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_strings.dart';
+import 'theme_toggle_button.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import 'workspace_switcher.dart';
 
@@ -61,13 +62,20 @@ class WorkspaceDrawer extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    user?.fullName ?? '',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          user?.fullName ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const ThemeToggleButton(color: Colors.white),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Container(
@@ -94,7 +102,7 @@ class WorkspaceDrawer extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
               child: Text(
                 AppStrings.workspaceSwitchTitle.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textMuted,
@@ -183,7 +191,7 @@ class _WorkspaceDrawerItem extends StatelessWidget {
                     children: [
                       Text(
                         workspace.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
@@ -192,7 +200,7 @@ class _WorkspaceDrawerItem extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         workspace.subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           color: AppColors.textSecondary,
                         ),

@@ -129,8 +129,8 @@ class ScoreSlider extends StatelessWidget {
             onChangeEnd: (disabled || maxScore <= 0) ? null : onChangeEnd,
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

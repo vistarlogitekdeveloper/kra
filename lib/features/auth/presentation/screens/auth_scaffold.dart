@@ -57,7 +57,7 @@ class AuthScaffold extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
@@ -68,7 +68,7 @@ class AuthScaffold extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             subtitle!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13.5,
                               color: AppColors.textSecondary,
                               height: 1.4,

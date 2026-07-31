@@ -72,7 +72,7 @@ class MyManagerCard extends StatelessWidget {
                       manager.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
@@ -81,7 +81,7 @@ class MyManagerCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       role ?? AppStrings.profileFieldManager,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
@@ -91,7 +91,7 @@ class MyManagerCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.textMuted,
               ),

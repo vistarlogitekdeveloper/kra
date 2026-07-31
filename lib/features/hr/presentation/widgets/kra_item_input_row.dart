@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/enums/kra_reviewer.dart';
 import '../../data/models/kra_template_item.dart';
 
 /// One editable KRA item inside the template form.
@@ -82,8 +83,8 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
             children: [
               ReorderableDragStartListener(
                 index: widget.index,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Icon(
                     Icons.drag_indicator_rounded,
                     color: AppColors.textMuted,
@@ -95,7 +96,7 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
                 child: TextField(
                   controller: widget.nameController,
                   onChanged: (_) => _emitChange(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -126,16 +127,16 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
                       RegExp(r'^\d{0,3}(\.\d{0,2})?'),
                     ),
                   ],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                   decoration: InputDecoration(
                     hintText: '0',
                     suffixText: '%',
-                    suffixStyle: const TextStyle(
+                    suffixStyle: TextStyle(
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w700,
                     ),
@@ -176,7 +177,9 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          _reviewerSelector(),
+          const SizedBox(height: 2),
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(8),
@@ -255,10 +258,93 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
     );
   }
 
+  // Always-visible "Reviewed by" picker — every KRA is owned by exactly one of
+  // the three Review-cycle reviewers, so this is a required, up-front choice
+  // (not buried under "Add details"). The value rides on the item model, so no
+  // extra TextEditingController is needed.
+  Widget _reviewerSelector() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.how_to_reg_rounded,
+                  size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 5),
+              Text(
+                AppStrings.kraTemplateFormItemReviewer,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final r in KraReviewer.values) _reviewerChip(r),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reviewerChip(KraReviewer reviewer) {
+    final selected = widget.item.reviewerGroup == reviewer;
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () =>
+          widget.onChanged(widget.item.copyWith(reviewerGroup: reviewer)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primaryPurple.withValues(alpha: 0.14)
+              : AppColors.background,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.primaryPurple : AppColors.divider,
+            width: selected ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
+              size: 14,
+              color: selected ? AppColors.primaryPurple : AppColors.textMuted,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              reviewer.label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                color:
+                    selected ? AppColors.primaryPurple : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   InputDecoration _denseDecoration({String? hint}) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(
+      hintStyle: TextStyle(
         color: AppColors.textMuted,
         fontSize: 13,
       ),
@@ -300,7 +386,7 @@ class _LabeledField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w600,
             color: AppColors.textSecondary,

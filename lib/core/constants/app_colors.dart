@@ -52,21 +52,41 @@ class AppColors {
   static const Color accentOrange = orange;
   static const Color accentYellow = amber;
 
+  /// Active theme brightness. The surface / text / divider tokens below are
+  /// getters that resolve against it, so flipping this (via [setBrightness]) and
+  /// rebuilding repaints the whole app light or dark. Brand + semantic colours
+  /// are identical in both themes and stay `const`.
+  static Brightness _brightness = Brightness.dark;
+  static Brightness get brightness => _brightness;
+  static bool get isLight => _brightness == Brightness.light;
+  static void setBrightness(Brightness b) => _brightness = b;
+  static Color _t(Color dark, Color light) => isLight ? light : dark;
+
   // ───── Surfaces ─────
-  static const Color background = Color(0xFF070611);
-  static const Color backgroundDeep = Color(0xFF0B0A18);
-  static const Color surface = Color(0xFF110F1E);
-  static const Color surfaceElevated = Color(0xFF16142A);
-  static const Color surfaceOverlay = Color(0xFF1D1A33);
+  static Color get background =>
+      _t(const Color(0xFF070611), const Color(0xFFF5F4FA));
+  static Color get backgroundDeep =>
+      _t(const Color(0xFF0B0A18), const Color(0xFFFFFFFF));
+  static Color get surface =>
+      _t(const Color(0xFF110F1E), const Color(0xFFFFFFFF));
+  static Color get surfaceElevated =>
+      _t(const Color(0xFF16142A), const Color(0xFFF0EEF8));
+  static Color get surfaceOverlay =>
+      _t(const Color(0xFF1D1A33), const Color(0xFFEAE7F4));
 
   // ───── Text ─────
-  static const Color textPrimary = Color(0xFFF2EEFB);
-  static const Color textSecondary = Color(0xFFB9B2D6);
-  static const Color textMuted = Color(0xFF7E769B);
+  static Color get textPrimary =>
+      _t(const Color(0xFFF2EEFB), const Color(0xFF181425));
+  static Color get textSecondary =>
+      _t(const Color(0xFFB9B2D6), const Color(0xFF565073));
+  static Color get textMuted =>
+      _t(const Color(0xFF7E769B), const Color(0xFF8C86A2));
 
   // ───── Lines / dividers ─────
-  static const Color divider = Color(0x14FFFFFF); // rgba(255,255,255,.08)
-  static const Color dividerStrong = Color(0x21FFFFFF); // rgba(255,255,255,.13)
+  static Color get divider =>
+      _t(const Color(0x14FFFFFF), const Color(0x14000000));
+  static Color get dividerStrong =>
+      _t(const Color(0x21FFFFFF), const Color(0x1F000000));
 
   // ───── Semantic ─────
   static const Color success = Color(0xFF34D399);
@@ -77,7 +97,7 @@ class AppColors {
   /// Pale-purple tinted surface for status pills + KPI fills. Pre-comped
   /// over the dark canvas so it can stay `const`. (Was a pale lavender on
   /// the light theme; remapped to the elevated surface for parity.)
-  static const Color primaryPurpleSurface = surfaceElevated;
+  static Color get primaryPurpleSurface => surfaceElevated;
 
   /// Subtle dark gradient used on splash + auth backgrounds. The bright
   /// signature treatment is [AppGradients.ribbon] — this gradient is the

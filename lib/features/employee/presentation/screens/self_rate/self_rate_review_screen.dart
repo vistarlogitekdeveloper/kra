@@ -203,7 +203,7 @@ class _ReviewRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         entry.itemName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
@@ -214,7 +214,7 @@ class _ReviewRow extends StatelessWidget {
                     Text(
                       EmployeeFormatters.weightagePercent(
                           entry.weightagePercent),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary,
@@ -229,7 +229,7 @@ class _ReviewRow extends StatelessWidget {
                       small: true,
                     ),
                     const SizedBox(width: 6),
-                    const Icon(
+                    Icon(
                       Icons.chevron_right_rounded,
                       size: 18,
                       color: AppColors.textMuted,
@@ -237,8 +237,8 @@ class _ReviewRow extends StatelessWidget {
                   ],
                 ),
                 if (entry.isNotApplicable)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       'Marked N/A',
                       style: TextStyle(
@@ -263,7 +263,7 @@ class _ReviewRow extends StatelessWidget {
                         Expanded(
                           child: Text(
                             entry.selfRemark,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12.5,
                               color: AppColors.textSecondary,
                               height: 1.45,
@@ -289,7 +289,7 @@ class _ReviewRow extends StatelessWidget {
                             entry.attachmentName!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textSecondary,
@@ -382,7 +382,7 @@ class _ReviewSubmitBar extends StatelessWidget {
                   onPressed: isSubmitting ? null : onBackToEdit,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.divider),
+                    side: BorderSide(color: AppColors.divider),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

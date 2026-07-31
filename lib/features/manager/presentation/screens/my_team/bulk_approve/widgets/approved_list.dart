@@ -54,7 +54,7 @@ class ApprovedList extends StatelessWidget {
               for (int i = 0; i < items.length; i++) ...[
                 _Tile(item: items[i]),
                 if (i != items.length - 1)
-                  const Divider(
+                  Divider(
                     color: AppColors.divider,
                     height: 1,
                     indent: 16,
@@ -109,7 +109,7 @@ class _Tile extends StatelessWidget {
                       item.employeeName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
@@ -119,7 +119,7 @@ class _Tile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         item.employeeCode!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary,
@@ -142,7 +142,7 @@ class _Tile extends StatelessWidget {
                 ),
               ],
               const SizedBox(width: 4),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.textMuted,
                 size: 20,

@@ -1,32 +1,38 @@
 import '../../../auth/data/models/user.dart';
 
-/// Ordered stages of a single monthly review.
+/// Stages of a single monthly review.
 ///
-/// Every calendar month, every employee runs through this pipeline in
-/// order. Only the roles in [actorRoles] can advance a stage, and only
-/// when the review's `currentStage` equals that stage. Submitting a
-/// stage moves the review to [next]; the terminal [completed] stage has
-/// no actor and loops to itself.
+/// Conceptually the review runs in FOUR cycles (see [reviewCycle]):
+///   1. **Self** — the employee rates every KRA.
+///   2. **Review** — three INDEPENDENT ratings entered in parallel by the
+///      reporting manager, HR and Finance. Their per-KRA average is the
+///      Review score (see [MonthlyReview.reviewAvgPct]).
+///   3. **Management** — HR either approves (the Review average stands) or, on
+///      rework, enters a rating that OVERRIDES it and becomes final.
+///   4. **Payout** — Finance/HR mark the incentive paid.
 ///
-/// Deadlines are fixed to the same day of every month — see
-/// [deadlineDay] and `MonthlyDeadlines.forStage`.
+/// The three Review-cycle raters are separate enum values so each stores its
+/// own per-KRA score, but they belong to the same cycle and are surfaced as a
+/// single "Review" column on the sheet.
 enum ReviewStage {
-  /// Employee scores every KRA row on their own review — the 10th.
+  /// Cycle 1 — the employee scores every KRA on their own review.
   selfRating,
 
-  /// HR + Finance/Account provide a first-pass numerical check on the
-  /// self scores — the 12th.
-  accountHrRating,
-
-  /// The employee's reporting manager writes the final per-row scores
-  /// and comments — the 13th.
+  /// Cycle 2 — the employee's reporting manager scores each KRA (relationship,
+  /// whatever the manager's role).
   reportingManagerRating,
 
-  /// Admin / HR-Admin approves or returns the manager's rating with a
-  /// comment — the 15th.
+  /// Cycle 2 — HR scores each KRA.
+  accountHrRating,
+
+  /// Cycle 2 — Finance / Accounts scores each KRA.
+  financeRating,
+
+  /// Cycle 3 — management (HR) approves the Review average, or overrides it
+  /// per KRA on rework. That override is the final score.
   managementReview,
 
-  /// Finance / HR mark the computed incentive as paid — the 20th.
+  /// Cycle 4 — Finance / HR mark the computed incentive as paid.
   incentivePayout,
 
   /// Terminal state. No actor, no deadline, loops to itself as [next].
@@ -38,10 +44,14 @@ enum ReviewStage {
     switch (raw.toUpperCase().replaceAll('-', '_')) {
       case 'SELF_RATING':
         return ReviewStage.selfRating;
-      case 'ACCOUNT_HR_RATING':
-        return ReviewStage.accountHrRating;
       case 'REPORTING_MANAGER_RATING':
         return ReviewStage.reportingManagerRating;
+      case 'ACCOUNT_HR_RATING':
+      case 'HR_RATING':
+        return ReviewStage.accountHrRating;
+      case 'FINANCE_RATING':
+      case 'ACCOUNTS_RATING':
+        return ReviewStage.financeRating;
       case 'MANAGEMENT_REVIEW':
         return ReviewStage.managementReview;
       case 'INCENTIVE_PAYOUT':
@@ -63,10 +73,12 @@ enum ReviewStage {
     switch (this) {
       case ReviewStage.selfRating:
         return 'SELF_RATING';
-      case ReviewStage.accountHrRating:
-        return 'ACCOUNT_HR_RATING';
       case ReviewStage.reportingManagerRating:
         return 'REPORTING_MANAGER_RATING';
+      case ReviewStage.accountHrRating:
+        return 'ACCOUNT_HR_RATING';
+      case ReviewStage.financeRating:
+        return 'FINANCE_RATING';
       case ReviewStage.managementReview:
         return 'MANAGEMENT_REVIEW';
       case ReviewStage.incentivePayout:
@@ -81,10 +93,12 @@ enum ReviewStage {
     switch (this) {
       case ReviewStage.selfRating:
         return 'Self-Rating';
-      case ReviewStage.accountHrRating:
-        return 'Account & HR Rating';
       case ReviewStage.reportingManagerRating:
-        return 'Reporting Manager Rating';
+        return 'Reporting Manager';
+      case ReviewStage.accountHrRating:
+        return 'HR';
+      case ReviewStage.financeRating:
+        return 'Finance';
       case ReviewStage.managementReview:
         return 'Management Review';
       case ReviewStage.incentivePayout:
@@ -94,15 +108,69 @@ enum ReviewStage {
     }
   }
 
-  /// Day of the reference month the stage is due. `null` for the
-  /// terminal [completed] stage. See `MonthlyDeadlines.forStage`.
+  /// Dashboard PHASE label — collapses the three Review-cycle raters (Reporting
+  /// Manager / HR / Finance) into a single "Review", so a status badge reflects
+  /// the conceptual Self → Review → Management → Payout pipeline rather than
+  /// whichever individual rater happens to be furthest along. The rating flows
+  /// keep [label] (the specific rater) for clarity.
+  String get phaseLabel {
+    switch (this) {
+      case ReviewStage.selfRating:
+        return 'Self-Rating';
+      case ReviewStage.reportingManagerRating:
+      case ReviewStage.accountHrRating:
+      case ReviewStage.financeRating:
+        return 'Review';
+      case ReviewStage.managementReview:
+        return 'Management Review';
+      case ReviewStage.incentivePayout:
+        return 'Incentive Payout';
+      case ReviewStage.completed:
+        return 'Completed';
+    }
+  }
+
+  /// Which of the four conceptual review cycles this stage belongs to
+  /// (1 = Self, 2 = Review, 3 = Management, 4 = Payout). Drives the sheet's
+  /// column grouping. [completed] returns 4 so a finished review sorts last.
+  int get reviewCycle {
+    switch (this) {
+      case ReviewStage.selfRating:
+        return 1;
+      case ReviewStage.reportingManagerRating:
+      case ReviewStage.accountHrRating:
+      case ReviewStage.financeRating:
+        return 2;
+      case ReviewStage.managementReview:
+        return 3;
+      case ReviewStage.incentivePayout:
+      case ReviewStage.completed:
+        return 4;
+    }
+  }
+
+  /// The three raters that make up the Review cycle (cycle 2). Their per-KRA
+  /// scores are averaged into the Review score.
+  static const Set<ReviewStage> reviewRaters = {
+    ReviewStage.reportingManagerRating,
+    ReviewStage.accountHrRating,
+    ReviewStage.financeRating,
+  };
+
+  /// True for a Review-cycle rater (RM / HR / Finance).
+  bool get isReviewRater => reviewRaters.contains(this);
+
+  /// Day of the reference month the stage is due. `null` for the terminal
+  /// [completed] stage. See `MonthlyDeadlines.forStage`.
   int? get deadlineDay {
     switch (this) {
       case ReviewStage.selfRating:
         return 10;
-      case ReviewStage.accountHrRating:
-        return 12;
       case ReviewStage.reportingManagerRating:
+        return 13;
+      case ReviewStage.accountHrRating:
+        return 13;
+      case ReviewStage.financeRating:
         return 13;
       case ReviewStage.managementReview:
         return 15;
@@ -113,49 +181,54 @@ enum ReviewStage {
     }
   }
 
-  /// Roles that can advance this stage. A stage is actionable by a role
-  /// only when the review's current stage equals this stage AND the
-  /// caller's role is in this set.
+  /// Roles that can advance/act on this stage BY ROLE.
+  ///
+  /// The two RELATIONSHIP stages ([isRelationshipStage]) are NOT gated here —
+  /// [MonthlyReview.isActionableBy] resolves them from the review's
+  /// `employeeId` / `managerId` instead. The rest are org-level responsibilities
+  /// keyed on role.
   Set<UserRole> get actorRoles {
     switch (this) {
       case ReviewStage.selfRating:
-        // Owner-scoped: anyone who has their own review self-rates it. The
-        // roster layer treats ops as a self-scope participant, so ops must
-        // be able to submit their own self-rating too.
+        // Relationship stage (the owner) — role set is a fallback only.
         return const {UserRole.employee, UserRole.ops};
-      case ReviewStage.accountHrRating:
-        // HR_ADMIN is the live HR persona (UserRole.fromApi maps HR_ADMIN →
-        // hrAdmin), so it must be able to act here or the pipeline stalls
-        // at stage 2. Matches docs/BACKEND_HANDOFF.md (HR_ADMIN, FINANCE).
-        return const {UserRole.hr, UserRole.hrAdmin, UserRole.finance};
       case ReviewStage.reportingManagerRating:
-        // Any manager-tier role gets a team roster from the provider, so
-        // BD / warehouse managers must be able to rate their reports too.
+        // Relationship stage (the reporting manager, whatever their role) —
+        // role set is a fallback only.
         return const {
           UserRole.manager,
           UserRole.bdManager,
           UserRole.warehouseMgr,
         };
+      case ReviewStage.accountHrRating:
+        // The HR rater in the Review cycle.
+        return const {UserRole.hr, UserRole.hrAdmin};
+      case ReviewStage.financeRating:
+        // The Finance / Accounts rater in the Review cycle.
+        return const {UserRole.finance};
       case ReviewStage.managementReview:
-        return const {UserRole.admin, UserRole.hrAdmin};
+        // Management review is done by HR (approve, or override on rework).
+        return const {UserRole.hrAdmin, UserRole.admin};
       case ReviewStage.incentivePayout:
-        // HR_ADMIN again — same reason as accountHrRating (stall at stage 5
-        // otherwise). Matches docs/BACKEND_HANDOFF.md (FINANCE, HR_ADMIN).
         return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.completed:
         return const {};
     }
   }
 
-  /// Next stage in the pipeline. [completed] loops to itself so callers
-  /// never have to null-check the terminal edge.
+  /// Next stage in the pipeline. [completed] loops to itself so callers never
+  /// have to null-check the terminal edge. The Review-cycle raters are entered
+  /// in parallel in practice (edit-in-place), so this linear order only matters
+  /// to the formal submit-stage cursor.
   ReviewStage get next {
     switch (this) {
       case ReviewStage.selfRating:
-        return ReviewStage.accountHrRating;
-      case ReviewStage.accountHrRating:
         return ReviewStage.reportingManagerRating;
       case ReviewStage.reportingManagerRating:
+        return ReviewStage.accountHrRating;
+      case ReviewStage.accountHrRating:
+        return ReviewStage.financeRating;
+      case ReviewStage.financeRating:
         return ReviewStage.managementReview;
       case ReviewStage.managementReview:
         return ReviewStage.incentivePayout;
@@ -168,53 +241,48 @@ enum ReviewStage {
 
   bool get isTerminal => this == ReviewStage.completed;
 
-  /// The three stages that capture per-row scores (self, account/HR,
-  /// reporting manager). Management review and incentive payout don't.
+  /// The stages that capture per-KRA scores: self, the three Review raters, and
+  /// management (its rework override is a per-KRA score too). Incentive payout
+  /// does not.
   bool get isRatingStage =>
       this == ReviewStage.selfRating ||
-      this == ReviewStage.accountHrRating ||
-      this == ReviewStage.reportingManagerRating;
+      isReviewRater ||
+      this == ReviewStage.managementReview;
 
-  /// 1-based position in the pipeline for the UI's "Step N / 5" chip.
-  /// [completed] returns 6 so a finished review still sorts last.
+  /// 1-based position in the pipeline for ordering. [completed] returns 7 so a
+  /// finished review still sorts last.
   int get pipelineIndex {
     switch (this) {
       case ReviewStage.selfRating:
         return 1;
-      case ReviewStage.accountHrRating:
-        return 2;
       case ReviewStage.reportingManagerRating:
+        return 2;
+      case ReviewStage.accountHrRating:
         return 3;
-      case ReviewStage.managementReview:
+      case ReviewStage.financeRating:
         return 4;
-      case ReviewStage.incentivePayout:
+      case ReviewStage.managementReview:
         return 5;
-      case ReviewStage.completed:
+      case ReviewStage.incentivePayout:
         return 6;
+      case ReviewStage.completed:
+        return 7;
     }
   }
 
   /// Total pipeline length (excluding [completed]).
-  static const int pipelineLength = 5;
+  static const int pipelineLength = 6;
 
   /// True when [role] is one of [actorRoles].
   ///
-  /// NOTE: this is only the authority for the ORG-LEVEL stages. For the two
-  /// relationship stages ([isRelationshipStage]) the caller's role is NOT the
-  /// gate — see [MonthlyReview.isActionableBy], which resolves them from the
-  /// review's `employeeId` / `managerId` instead.
+  /// Authority for the ORG-LEVEL stages only. For the relationship stages
+  /// ([isRelationshipStage]) see [MonthlyReview.isActionableBy].
   bool isActionableBy(UserRole role) => actorRoles.contains(role);
 
-  /// True for the stages decided by WHO the caller is to a given review rather
-  /// than by their role:
-  ///   * [selfRating] — the review's owner, whatever their role. Every employee
-  ///     has their own KRA, managers and HR admins included.
+  /// Stages decided by WHO the caller is to a review rather than by role:
+  ///   * [selfRating] — the review's owner, whatever their role.
   ///   * [reportingManagerRating] — the review's reporting manager, whatever
-  ///     THEIR role. Managers report to senior managers and HR admins report to
-  ///     someone too, so the rater is not necessarily a manager-tier role.
-  ///
-  /// The remaining stages (account/HR rating, management review, incentive
-  /// payout) are org-level responsibilities and stay keyed on [actorRoles].
+  ///     THEIR role.
   bool get isRelationshipStage =>
       this == ReviewStage.selfRating ||
       this == ReviewStage.reportingManagerRating;

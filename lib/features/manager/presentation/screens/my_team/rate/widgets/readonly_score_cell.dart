@@ -63,7 +63,7 @@ class ReadonlyScoreCell extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 reason,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textMuted,

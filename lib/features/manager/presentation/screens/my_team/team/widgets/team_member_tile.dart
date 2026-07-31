@@ -79,7 +79,7 @@ class TeamMemberTile extends StatelessWidget {
                         member.fullName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
@@ -131,7 +131,7 @@ class _MetaRow extends StatelessWidget {
       fragments.join(' • '),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11.5,
         color: AppColors.textSecondary,
         fontWeight: FontWeight.w600,

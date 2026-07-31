@@ -36,7 +36,7 @@ class AmbientBackground extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // Canvas
-        const ColoredBox(color: AppColors.background),
+        ColoredBox(color: AppColors.background),
 
         // Aurora glows — three soft radials per the CSS spec.
         const Positioned.fill(

@@ -28,7 +28,7 @@ class ProfileFieldRow extends StatelessWidget {
       decoration: BoxDecoration(
         border: isLast
             ? null
-            : const Border(
+            : Border(
                 bottom:
                     BorderSide(color: AppColors.divider, width: 0.6),
               ),
@@ -47,7 +47,7 @@ class ProfileFieldRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,

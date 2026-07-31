@@ -14,28 +14,27 @@ import 'package:vistar_app/features/auth/data/models/user.dart';
 /// the redirect logic, an HR-allowed role.
 void main() {
   group('AppRoutes.dashboardForRole', () {
-    test('HR-tier roles land in the HR admin area', () {
-      // HR/admin run the HR workspace day to day, so landing them on their own
-      // KRA forced a detour through the workspace switcher every login.
-      for (final r in [UserRole.hr, UserRole.hrAdmin, UserRole.admin]) {
+    test('HR_ADMIN / ADMIN boot straight into the HR console', () {
+      // Admins run the HR console day to day, so they keep landing there.
+      for (final r in [UserRole.hrAdmin, UserRole.admin]) {
         expect(
           AppRoutes.dashboardForRole(r),
           AppRoutes.hrHome,
-          reason: 'HR-tier role $r must land in the HR admin area',
+          reason: 'admin role $r must land in the HR admin area',
         );
       }
     });
 
-    test('every non-HR role lands on the employee self-view (My KRA)', () {
-      // The self-view is a user's OWN KRA/review and lives only under
-      // /employee/*. It stays the landing for everyone else so that e.g. a
-      // manager with zero direct reports still sees their own KRA rather than
-      // a blank/403 team screen.
+    test('every non-admin role lands on the shared My KRA self-view', () {
+      // One home for all non-admin logins — employee, manager, and the
+      // review-only HR / Accounts roles. Role only ADDS reachable areas
+      // (My Team / Reviews) via the "☰" switcher, so Accounts / HR get the
+      // same first-class home as everyone else, not a bare review dashboard.
       for (final r in UserRole.values.where((r) => !AppRoutes.canAccessHr(r))) {
         expect(
           AppRoutes.dashboardForRole(r),
           AppRoutes.employeeHome,
-          reason: 'role $r must land on the employee self-view',
+          reason: 'role $r must land on the shared My KRA self-view',
         );
       }
     });
@@ -59,19 +58,20 @@ void main() {
   });
 
   group('AppRoutes.canAccessHr', () {
-    test('HR-tier roles (HR / HR_ADMIN / ADMIN) can access /hr/*', () {
-      expect(AppRoutes.canAccessHr(UserRole.hr), isTrue);
+    test('only HR_ADMIN / ADMIN can access the /hr/* admin console', () {
       expect(AppRoutes.canAccessHr(UserRole.hrAdmin), isTrue);
       expect(AppRoutes.canAccessHr(UserRole.admin), isTrue);
     });
 
-    test('non-HR roles are walled off from /hr/*', () {
+    test('review + operational roles are walled off from /hr/*', () {
+      // Plain HR is review-only now — the admin console is HR_ADMIN / ADMIN.
+      expect(AppRoutes.canAccessHr(UserRole.hr), isFalse);
+      expect(AppRoutes.canAccessHr(UserRole.finance), isFalse);
       expect(AppRoutes.canAccessHr(UserRole.manager), isFalse);
       expect(AppRoutes.canAccessHr(UserRole.bdManager), isFalse);
       expect(AppRoutes.canAccessHr(UserRole.warehouseMgr), isFalse);
       expect(AppRoutes.canAccessHr(UserRole.employee), isFalse);
       expect(AppRoutes.canAccessHr(UserRole.ops), isFalse);
-      expect(AppRoutes.canAccessHr(UserRole.finance), isFalse);
     });
   });
 
@@ -96,6 +96,23 @@ void main() {
       expect(AppRoutes.canAccessManager(UserRole.employee), isFalse);
       expect(AppRoutes.canAccessManager(UserRole.ops), isFalse);
       expect(AppRoutes.canAccessManager(UserRole.finance), isFalse);
+    });
+  });
+
+  group('AppRoutes.canReview', () {
+    test('HR / Accounts / HR_ADMIN / ADMIN get the Reviews workspace', () {
+      expect(AppRoutes.canReview(UserRole.hr), isTrue);
+      expect(AppRoutes.canReview(UserRole.finance), isTrue);
+      expect(AppRoutes.canReview(UserRole.hrAdmin), isTrue);
+      expect(AppRoutes.canReview(UserRole.admin), isTrue);
+    });
+
+    test('employees / ops / plain managers do not (managers use My Team)', () {
+      expect(AppRoutes.canReview(UserRole.employee), isFalse);
+      expect(AppRoutes.canReview(UserRole.ops), isFalse);
+      expect(AppRoutes.canReview(UserRole.manager), isFalse);
+      expect(AppRoutes.canReview(UserRole.bdManager), isFalse);
+      expect(AppRoutes.canReview(UserRole.warehouseMgr), isFalse);
     });
   });
 

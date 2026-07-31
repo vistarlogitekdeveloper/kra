@@ -1,5 +1,6 @@
 import '../../../../core/api/json_parse.dart';
 import '../../../auth/data/models/user.dart';
+import 'incentive_snapshot.dart';
 import 'monthly_review.dart';
 import 'review_stage.dart';
 import 'stage_status.dart';
@@ -36,6 +37,23 @@ class MonthlyReviewSummary {
   /// The employee's configured monthly-incentive ceiling.
   final double? incentiveEligibleAmount;
 
+  /// Incentive payout lifecycle — PAID once Accounts/Finance has settled it.
+  final PayoutStatus payoutStatus;
+
+  /// The employee's project location (e.g. "Adept, Pune") — shown on the
+  /// review dashboard to mirror the performance-incentive report. Null when the
+  /// employee has no location mapped.
+  final String? projectLocation;
+
+  /// The self-rating weighted % for this month (0–100), or null when the
+  /// employee hasn't self-rated. Feeds the performance-incentive report.
+  final double? selfScorePct;
+
+  /// The management/review weighted % for this month (0–100) — the management
+  /// override if present, else the RM/HR/Accounts review average. Null until
+  /// the review has been rated. Feeds the performance-incentive report.
+  final double? managementReviewPct;
+
   const MonthlyReviewSummary({
     required this.id,
     required this.employeeId,
@@ -51,6 +69,10 @@ class MonthlyReviewSummary {
     required this.currentStageStatus,
     this.finalScorePct = 0,
     this.incentiveEligibleAmount,
+    this.payoutStatus = PayoutStatus.pending,
+    this.projectLocation,
+    this.selfScorePct,
+    this.managementReviewPct,
   });
 
   /// Wire form from the monthly-review backend's list endpoint.
@@ -82,6 +104,12 @@ class MonthlyReviewSummary {
         finalScorePct: JsonParse.parseDouble(json['finalScorePct']) ?? 0,
         incentiveEligibleAmount:
             JsonParse.parseDouble(json['incentiveEligibleAmount']),
+        payoutStatus:
+            PayoutStatus.fromApi(JsonParse.parseString(json['payoutStatus'])),
+        projectLocation: JsonParse.parseString(json['projectLocation']),
+        selfScorePct: JsonParse.parseDouble(json['selfScorePct']),
+        managementReviewPct:
+            JsonParse.parseDouble(json['managementReviewPct']),
       );
 
   /// Projection from a full review — used by the mock and any backend
@@ -104,6 +132,12 @@ class MonthlyReviewSummary {
         currentStageStatus: r.displayStatus,
         finalScorePct: r.finalScorePct,
         incentiveEligibleAmount: r.eligibleAmount,
+        payoutStatus: r.payoutStatus,
+        selfScorePct: r.weightedScorePct(ReviewStage.selfRating),
+        managementReviewPct:
+            r.weightedScorePct(ReviewStage.managementReview) > 0
+                ? r.weightedScorePct(ReviewStage.managementReview)
+                : r.reviewWeightedPct,
       );
 
   /// True when the employee's self-rating for this month has actually been
@@ -143,11 +177,36 @@ class MonthlyReviewSummary {
     return currentStage.isActionableBy(role);
   }
 
-  /// Management review (approve/return) and incentive payout (mark paid) are
-  /// non-rating actions performed on the single-review detail screen; the
-  /// rating stages are edited on the per-employee quarterly KRA sheet. This
-  /// picks the right destination so a tap lands where the action lives.
-  bool get opensReviewDetail =>
-      currentStage == ReviewStage.managementReview ||
-      currentStage == ReviewStage.incentivePayout;
+  /// The FIXED incentive for the whole quarter — the monthly eligible ceiling
+  /// × 3 months. The maximum the employee could earn across the quarter,
+  /// independent of performance.
+  double get quarterlyFixedIncentive => (incentiveEligibleAmount ?? 0) * 3;
+
+  /// The incentive actually PAYABLE for this month's review — the monthly
+  /// eligible ceiling scaled by the achieved score. What the employee earns
+  /// this month before the quarterly settlement.
+  double get payableIncentive =>
+      (incentiveEligibleAmount ?? 0) * finalScorePct / 100;
+
+  /// The incentive has been settled.
+  bool get payoutPaid => payoutStatus == PayoutStatus.paid;
+
+  /// The management review has been done (management scored, or the review has
+  /// already moved on to payout / completed) — so the incentive can be settled.
+  bool get managementReviewDone {
+    if (currentStage == ReviewStage.incentivePayout ||
+        currentStage == ReviewStage.completed) {
+      return true;
+    }
+    return currentStage == ReviewStage.managementReview &&
+        currentStageStatus == StageStatus.submitted;
+  }
+
+  /// Whether [role] may settle the incentive for THIS review right now — the
+  /// management review is done, it isn't already paid, and the role is a payout
+  /// actor (Accounts / HR / HR-admin). Drives the dashboard's "mark paid" check.
+  bool canMarkPaidBy(UserRole role) =>
+      managementReviewDone &&
+      !payoutPaid &&
+      ReviewStage.incentivePayout.actorRoles.contains(role);
 }

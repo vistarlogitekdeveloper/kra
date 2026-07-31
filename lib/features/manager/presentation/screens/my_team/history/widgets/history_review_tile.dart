@@ -49,7 +49,7 @@ class HistoryReviewTile extends StatelessWidget {
                         employeeName!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
@@ -95,7 +95,7 @@ class HistoryReviewTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.textMuted,
               ),

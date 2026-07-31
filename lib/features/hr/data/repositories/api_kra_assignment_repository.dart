@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/api/api_constants.dart';
-import '../../../../core/api/api_error.dart';
 import '../models/bulk_assign_result.dart';
 import '../models/kra_assignment.dart';
 import '../models/kra_template_item.dart';
@@ -40,7 +39,7 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
     List<KraTemplateItem>? items,
   }) async {
     try {
-      final cycleId = await _resolveActiveCycleId();
+      final cycleId = await _resolveOrCreateActiveCycleId();
       final response = await _dio.post(
         ApiConstants.kraAssignments,
         data: {
@@ -75,7 +74,7 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
     required String templateId,
   }) async {
     try {
-      final cycleId = await _resolveActiveCycleId();
+      final cycleId = await _resolveOrCreateActiveCycleId();
       final response = await _dio.post(
         ApiConstants.kraAssignmentsBulk,
         data: {
@@ -95,38 +94,84 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
     }
   }
 
-  /// The live backend scopes every KRA assignment to a review cycle
-  /// (`kra_assignments.cycle_id` is NOT NULL). The monthly UI has no cycle
-  /// picker, so resolve it here: the first ACTIVE review cycle, falling
-  /// back to the most recent one. Throws a clear error if none exists.
-  Future<String> _resolveActiveCycleId() async {
-    final response = await _dio.get(
+  // ── Automatic review-cycle resolution ────────────────────────────────────
+  // KRA reviews run monthly and pay out quarterly, and HR shouldn't have to
+  // open a cycle by hand. Every assignment needs a cycle (the live backend's
+  // `kra_assignments.cycle_id` is NOT NULL), so we resolve one automatically:
+  // use the ACTIVE cycle, else activate an existing one, else create + activate
+  // the CURRENT QUARTER's cycle — all silently, via the backend's own cycle
+  // endpoints. No dialog, no prompt.
+  Future<String> _resolveOrCreateActiveCycleId() async {
+    final listRes = await _dio.get(
       ApiConstants.reviewCycles,
-      // Backend honours `limit`, not `pageSize`.
       queryParameters: {'page': 1, 'limit': 50},
     );
     final cycles =
-        unwrapList(response).whereType<Map<String, dynamic>>().toList();
-    if (cycles.isEmpty) {
-      throw const ApiError(
-        type: ApiErrorType.validation,
-        code: 'NO_REVIEW_CYCLE',
-        message: 'No review cycle exists yet, so KRAs can’t be assigned. '
-            'Open a review cycle on the backend first.',
+        unwrapList(listRes).whereType<Map<String, dynamic>>().toList();
+    if (cycles.isNotEmpty) {
+      final active = cycles.firstWhere(
+        (c) => (c['status']?.toString().toUpperCase()) == 'ACTIVE',
+        orElse: () => cycles.first,
       );
+      final id = active['id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        // Make sure it's live before assigning into it.
+        if ((active['status']?.toString().toUpperCase()) != 'ACTIVE') {
+          await _activateCycle(id);
+        }
+        return id;
+      }
     }
-    final active = cycles.firstWhere(
-      (c) => c['status']?.toString().toUpperCase() == 'ACTIVE',
-      orElse: () => cycles.first,
+    return _createAndActivateCurrentQuarterCycle();
+  }
+
+  Future<void> _activateCycle(String id) async {
+    await _dio.post('${ApiConstants.reviewCycles}/$id/activate');
+  }
+
+  Future<String> _createAndActivateCurrentQuarterCycle() async {
+    final now = DateTime.now();
+    final y = now.year;
+    final m = now.month; // 1-12
+    final qStartMonth = ((m - 1) ~/ 3) * 3 + 1; // 1, 4, 7, 10
+    final startDate = DateTime(y, qStartMonth, 1);
+    final endDate = DateTime(y, qStartMonth + 3, 0); // last day of the quarter
+    // Indian financial year (starts in April); the calendar-quarter window
+    // aligns with a fiscal quarter, so number + label it by FY.
+    final fyStart = m >= 4 ? y : y - 1;
+    final fyLabel = 'FY $fyStart-'
+        '${((fyStart + 1) % 100).toString().padLeft(2, '0')}';
+    final quarterNum = ((m - 4 + 12) % 12) ~/ 3 + 1; // FY Q1 = Apr–Jun
+    // Deadlines cascade after the end date, in the order the backend enforces.
+    final self = endDate.add(const Duration(days: 5));
+    final manager = self.add(const Duration(days: 3));
+    final ops = manager.add(const Duration(days: 2));
+    final finance = ops.add(const Duration(days: 2));
+
+    final createRes = await _dio.post(
+      ApiConstants.reviewCycles,
+      data: {
+        'name': 'Q$quarterNum $fyLabel',
+        'fyLabel': fyLabel,
+        'quarterNum': quarterNum,
+        'startDate': _date(startDate),
+        'endDate': _date(endDate),
+        'selfRatingDeadline': _date(self),
+        'managerReviewDeadline': _date(manager),
+        'opsScoringDeadline': _date(ops),
+        'financeScoringDeadline': _date(finance),
+        'autoCreateOnActivate': true,
+      },
     );
-    final id = active['id']?.toString();
-    if (id == null || id.isEmpty) {
-      throw const ApiError(
-        type: ApiErrorType.validation,
-        code: 'NO_REVIEW_CYCLE',
-        message: 'Could not determine an active review cycle to assign into.',
-      );
-    }
+    final created = unwrapObject(createRes);
+    final id = created['id']?.toString() ?? '';
+    if (id.isNotEmpty) await _activateCycle(id);
     return id;
   }
+
+  // Date-only wire form (yyyy-MM-dd); a full local ISO timestamp can slip a day
+  // across the UTC boundary.
+  static String _date(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 }

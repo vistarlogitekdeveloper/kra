@@ -45,7 +45,7 @@ class SelectionSummary extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
                     AppStrings.managerBulkApproveSelected,
                     style: TextStyle(
@@ -59,7 +59,7 @@ class SelectionSummary extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(
+          Divider(
             color: AppColors.divider,
             height: 1,
             indent: 16,
@@ -71,7 +71,7 @@ class SelectionSummary extends StatelessWidget {
               shrinkWrap: true,
               padding: const EdgeInsets.symmetric(vertical: 6),
               itemCount: members.length,
-              separatorBuilder: (_, __) => const Divider(
+              separatorBuilder: (_, __) => Divider(
                 color: AppColors.divider,
                 height: 1,
                 indent: 16,
@@ -134,7 +134,7 @@ class _Tile extends StatelessWidget {
                   member.fullName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -142,7 +142,7 @@ class _Tile extends StatelessWidget {
                 ),
                 Text(
                   member.employeeCode,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,

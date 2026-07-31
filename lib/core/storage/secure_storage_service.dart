@@ -15,6 +15,7 @@ class SecureStorageService {
   static const _kUserJson = 'vistar.auth.user';
   static const _kAccessTokenExpiry = 'vistar.auth.accessTokenExpiry';
   static const _kRememberedEmail = 'vistar.auth.rememberedEmail';
+  static const _kThemeMode = 'vistar.pref.themeMode';
 
   final FlutterSecureStorage _storage;
 
@@ -127,6 +128,12 @@ class SecureStorageService {
 
   Future<void> clearRememberedEmail() =>
       _storage.delete(key: _kRememberedEmail);
+
+  // ───── Theme mode preference ('light' | 'dark' | 'system') ─────
+  Future<String?> readThemeMode() => _readRaw(_kThemeMode);
+
+  Future<void> writeThemeMode(String mode) =>
+      _storage.write(key: _kThemeMode, value: mode);
 
   // ───── Bulk write after a successful login/refresh ─────
   Future<void> writeAuthBundle({

@@ -221,8 +221,8 @@ class _DefaultEmpty extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
-        child: const Padding(
-          padding: EdgeInsets.all(32),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -231,7 +231,7 @@ class _DefaultEmpty extends StatelessWidget {
                 size: 52,
                 color: AppColors.textMuted,
               ),
-              SizedBox(height: 14),
+              const SizedBox(height: 14),
               Text(
                 'Nothing here yet',
                 textAlign: TextAlign.center,
@@ -266,7 +266,7 @@ class _ErrorView extends StatelessWidget {
           color: AppColors.error,
         ),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           AppStrings.errorGeneric,
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -279,7 +279,7 @@ class _ErrorView extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             color: AppColors.textSecondary,
           ),

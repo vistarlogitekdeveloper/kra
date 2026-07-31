@@ -326,7 +326,7 @@ class _ResumeDraftPrompt extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   AppStrings.selfRateResumeTitle,
                   style: TextStyle(
                     fontSize: 13.5,
@@ -337,7 +337,7 @@ class _ResumeDraftPrompt extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   'Last saved ${EmployeeFormatters.relativeTime(savedAt)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     color: AppColors.textSecondary,
                   ),
@@ -347,7 +347,7 @@ class _ResumeDraftPrompt extends StatelessWidget {
           ),
           TextButton(
             onPressed: onDiscard,
-            child: const Text(
+            child: Text(
               AppStrings.selfRateResumeStartFresh,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
@@ -401,7 +401,7 @@ class _LoadErrorView extends StatelessWidget {
                 color: AppColors.error,
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 AppStrings.errorGeneric,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -414,7 +414,7 @@ class _LoadErrorView extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   color: AppColors.textSecondary,
                 ),

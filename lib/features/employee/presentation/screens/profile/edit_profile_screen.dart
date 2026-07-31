@@ -152,7 +152,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   const SizedBox(height: 24),
 
                   // ── Phone field ──
-                  const Text(
+                  Text(
                     AppStrings.profileFieldPhone,
                     style: TextStyle(
                       fontSize: 11.5,
@@ -180,12 +180,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           horizontal: 14, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
+                        borderSide: BorderSide(
                             color: AppColors.divider, width: 1),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
+                        borderSide: BorderSide(
                             color: AppColors.divider, width: 1),
                       ),
                       focusedBorder: OutlineInputBorder(
@@ -284,7 +284,7 @@ class _PhotoPlaceholder extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -297,7 +297,7 @@ class _PhotoPlaceholder extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
                   AppStrings.profileEditPhotoComingSoon,
                   style: TextStyle(
@@ -350,7 +350,7 @@ class _Error extends StatelessWidget {
               color: AppColors.error,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               AppStrings.errorGeneric,
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -363,7 +363,7 @@ class _Error extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),

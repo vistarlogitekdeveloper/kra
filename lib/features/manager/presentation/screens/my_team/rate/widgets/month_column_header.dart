@@ -33,7 +33,7 @@ class MonthColumnHeader extends StatelessWidget {
           ),
           if (isLocked) ...[
             const SizedBox(height: 3),
-            const Icon(
+            Icon(
               Icons.lock_rounded,
               size: 11,
               color: AppColors.textMuted,

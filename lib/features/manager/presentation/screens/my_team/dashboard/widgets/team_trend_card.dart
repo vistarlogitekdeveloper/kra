@@ -34,7 +34,7 @@ class TeamTrendCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         AppStrings.managerDashboardTrendTitle,
                         style: TextStyle(
@@ -47,7 +47,7 @@ class TeamTrendCard extends StatelessWidget {
                     ),
                     Text(
                       trend.cycleName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w700,
@@ -77,7 +77,7 @@ class TeamTrendCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Divider(color: AppColors.divider, height: 1),
+                Divider(color: AppColors.divider, height: 1),
                 const SizedBox(height: 14),
                 if (trend.highest != null)
                   _PerformerRow(
@@ -123,7 +123,7 @@ class _MetricBlock extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,
@@ -181,7 +181,7 @@ class _PerformerRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textSecondary,
@@ -193,7 +193,7 @@ class _PerformerRow extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,

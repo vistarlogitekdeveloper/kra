@@ -61,7 +61,7 @@ class DeadlineWarningCard extends StatelessWidget {
                       '$daysRemaining '
                       '${daysRemaining == 1 ? "day" : "days"} '
                       'remaining',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w600,

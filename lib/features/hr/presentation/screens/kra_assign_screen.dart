@@ -207,7 +207,7 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
                 child: OutlinedButton(
                   onPressed: () => setState(() => _step -= 1),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.divider),
+                    side: BorderSide(color: AppColors.divider),
                     foregroundColor: AppColors.textPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -464,11 +464,11 @@ class _Step1Employees extends ConsumerWidget {
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.divider),
+                borderSide: BorderSide(color: AppColors.divider),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.divider),
+                borderSide: BorderSide(color: AppColors.divider),
               ),
             ),
             onChanged: onSearchChanged,
@@ -566,7 +566,7 @@ class _EmployeeSelectTile extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(color: AppColors.divider),
             ),
@@ -586,7 +586,7 @@ class _EmployeeSelectTile extends StatelessWidget {
                   children: [
                     Text(
                       employee.fullName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
@@ -595,7 +595,7 @@ class _EmployeeSelectTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${employee.employeeCode} · ${employee.email}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -834,7 +834,7 @@ class _SummaryRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w500,
@@ -843,7 +843,7 @@ class _SummaryRow extends StatelessWidget {
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13.5,
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w700,
@@ -865,7 +865,7 @@ class _StepHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           color: AppColors.textSecondary,
           height: 1.4,

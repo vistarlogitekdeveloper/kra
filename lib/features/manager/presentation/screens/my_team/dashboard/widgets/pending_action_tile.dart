@@ -44,7 +44,7 @@ class PendingActionTile extends StatelessWidget {
                       action.employeeName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
@@ -55,7 +55,7 @@ class PendingActionTile extends StatelessWidget {
                       _subtitle(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
@@ -70,7 +70,7 @@ class PendingActionTile extends StatelessWidget {
                   isOverdue: action.isOverdue,
                 ),
               const SizedBox(width: 4),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.textMuted,
               ),

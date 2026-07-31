@@ -62,7 +62,7 @@ class RouteErrorScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 AppStrings.routeErrorTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -72,7 +72,7 @@ class RouteErrorScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 AppStrings.routeErrorMessage,
                 textAlign: TextAlign.center,
                 style: TextStyle(

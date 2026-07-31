@@ -174,7 +174,14 @@ class _KraTemplateFormScreenState
   bool get _allItemsNamed =>
       _items.isNotEmpty && _items.every((i) => i.name.trim().isNotEmpty);
 
-  bool get _canSubmit => _hasValidWeightage && _allItemsNamed && !_isSubmitting;
+  // Every named KRA must be assigned to a reviewer. Gated in the button state
+  // (not only post-tap) so it's consistent with the name/weightage gating and
+  // the unselected reviewer chips visibly signal what's missing.
+  bool get _allItemsReviewed => _items
+      .every((i) => i.name.trim().isEmpty || i.reviewerGroup != null);
+
+  bool get _canSubmit =>
+      _hasValidWeightage && _allItemsNamed && _allItemsReviewed && !_isSubmitting;
 
   Future<bool> _confirmDiscard() async {
     if (!_isDirty) return true;
@@ -195,6 +202,15 @@ class _KraTemplateFormScreenState
     if (!ok || !_canSubmit) return;
     if (_items.isEmpty) {
       setState(() => _serverError = AppStrings.kraTemplateFormItemsRequired);
+      return;
+    }
+    // Every named KRA must be assigned to a reviewer — that assignment is what
+    // routes each KRA to the right person in the Review cycle.
+    final anyNamedMissingReviewer = _items.any(
+        (i) => i.name.trim().isNotEmpty && i.reviewerGroup == null);
+    if (anyNamedMissingReviewer) {
+      setState(
+          () => _serverError = AppStrings.kraTemplateFormReviewerRequired);
       return;
     }
 
@@ -335,7 +351,7 @@ class _KraTemplateFormScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       AppStrings.kraTemplateFormItemsHeader,
                       style: TextStyle(
                         fontSize: 14,
@@ -345,7 +361,7 @@ class _KraTemplateFormScreenState
                     ),
                     Text(
                       '${_items.length} item${_items.length == 1 ? '' : 's'}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textMuted,
                         fontWeight: FontWeight.w600,
@@ -397,7 +413,7 @@ class _KraTemplateFormScreenState
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.divider),
         ),
-        child: const Text(
+        child: Text(
           AppStrings.kraTemplateFormItemsRequired,
           style: TextStyle(
             color: AppColors.textSecondary,
@@ -506,7 +522,7 @@ class _RoleDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           AppStrings.kraTemplateFormRole,
           style: TextStyle(
             fontSize: 13,

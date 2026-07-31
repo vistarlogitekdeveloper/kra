@@ -107,7 +107,7 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
               Expanded(
                 child: Text(
                   e.itemName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.2,
@@ -152,7 +152,7 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
                             : (e.description!.length > 80
                                 ? '${e.description!.substring(0, 80)}…'
                                 : e.description!),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
                           color: AppColors.textSecondary,
                           height: 1.45,
@@ -179,7 +179,7 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
           ],
 
           const SizedBox(height: 14),
-          const Divider(color: AppColors.divider, height: 1),
+          Divider(color: AppColors.divider, height: 1),
           const SizedBox(height: 14),
 
           // ── Score slider ──
@@ -204,30 +204,30 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
             onChanged: widget.onRemarkChanged,
             decoration: InputDecoration(
               labelText: AppStrings.selfRateReasonLabel,
-              labelStyle: const TextStyle(
+              labelStyle: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),
               hintText: AppStrings.selfRateReasonHint,
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textMuted,
               ),
               filled: true,
               fillColor: AppColors.background,
-              counterStyle: const TextStyle(
+              counterStyle: TextStyle(
                 fontSize: 10.5,
                 color: AppColors.textMuted,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: AppColors.divider, width: 1),
+                    BorderSide(color: AppColors.divider, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: AppColors.divider, width: 1),
+                    BorderSide(color: AppColors.divider, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -239,7 +239,7 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13.5,
               color: AppColors.textPrimary,
               height: 1.4,
@@ -309,7 +309,7 @@ class _AttachmentField extends StatelessWidget {
           label: const Text(AppStrings.selfRateAttachmentAdd),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primaryPurple,
-            side: const BorderSide(color: AppColors.divider),
+            side: BorderSide(color: AppColors.divider),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -343,7 +343,7 @@ class _AttachmentField extends StatelessWidget {
                   entry.attachmentName!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -358,7 +358,7 @@ class _AttachmentField extends StatelessWidget {
               IconButton(
                 onPressed: onRemove,
                 tooltip: AppStrings.selfRateAttachmentRemoveTooltip,
-                icon: const Icon(
+                icon: Icon(
                   Icons.close_rounded,
                   size: 18,
                   color: AppColors.textMuted,
@@ -368,14 +368,14 @@ class _AttachmentField extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        const Row(
+        Row(
           children: [
             Icon(
               Icons.info_outline_rounded,
               size: 13,
               color: AppColors.textMuted,
             ),
-            SizedBox(width: 5),
+            const SizedBox(width: 5),
             Expanded(
               child: Text(
                 AppStrings.selfRateAttachmentPendingNote,
@@ -455,7 +455,7 @@ class _MetaRow extends StatelessWidget {
       children: [
         Text(
           '$label: ',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
             color: AppColors.textSecondary,
@@ -465,7 +465,7 @@ class _MetaRow extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               color: AppColors.textPrimary,
               height: 1.4,

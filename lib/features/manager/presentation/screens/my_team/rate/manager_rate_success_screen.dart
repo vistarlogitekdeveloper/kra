@@ -34,7 +34,7 @@ class ManagerRateSuccessScreen extends ConsumerWidget {
               const Spacer(flex: 1),
               const _SuccessIllustration(),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 AppStrings.managerRateSuccessTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -45,7 +45,7 @@ class ManagerRateSuccessScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 AppStrings.managerRateSuccessSubtitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -89,7 +89,7 @@ class ManagerRateSuccessScreen extends ConsumerWidget {
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.divider),
+                  side: BorderSide(color: AppColors.divider),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -167,7 +167,7 @@ class _TotalCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Text(
               AppStrings.managerRateTotalLabel,
               style: TextStyle(

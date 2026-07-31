@@ -108,87 +108,338 @@ class _Content extends StatelessWidget {
               fillColor: AppColors.surface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.divider),
+                borderSide: BorderSide(color: AppColors.divider),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.divider),
+                borderSide: BorderSide(color: AppColors.divider),
               ),
             ),
           ),
         ),
-        const Divider(height: 1, color: AppColors.divider),
+        Divider(height: 1, color: AppColors.divider),
         Expanded(
           child: visible.isEmpty
-              ? const Center(
+              ? Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(32),
                     child: Text(AppStrings.adminDashEmpty,
                         style: TextStyle(color: AppColors.textSecondary)),
                   ),
                 )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: _ReviewTable(
-                        items: visible, role: role, userId: userId),
-                  ),
-                ),
+              : _ReviewList(items: visible, role: role, userId: userId),
         ),
       ],
     );
   }
 }
 
-class _ReviewTable extends StatelessWidget {
+// Shared column flex weights so the wide-table header and rows line up. A
+// Project Location column fills the space the Employee column used to waste;
+// the incentive column carries two figures (payable + quarterly fixed).
+const int _flexEmployee = 26;
+const int _flexLocation = 22;
+const int _flexGrade = 10;
+const int _flexStage = 18;
+const int _flexScore = 10;
+const int _flexIncentive = 24;
+
+// Below this width the columns can't breathe, so we switch to stacked cards —
+// everything for one employee stays visible without any horizontal scroll.
+const double _wideBreakpoint = 720;
+
+// Every review opens in the quarterly KRA sheet — the single place to view and
+// act on it, whatever its stage.
+void _openReview(BuildContext context, MonthlyReviewSummary s) =>
+    context.push(AppRoutes.reviewsQuarterlyFor(s.employeeId));
+
+/// Responsive review list. A width-filling table on wide screens (no more
+/// horizontal scroll), one card per employee on phones — same columns, same
+/// data, laid out to fit the viewport.
+class _ReviewList extends StatelessWidget {
   final List<MonthlyReviewSummary> items;
   final UserRole? role;
   final String? userId;
-  const _ReviewTable({
+  const _ReviewList({
     required this.items,
     required this.role,
     required this.userId,
   });
 
+  bool _needs(MonthlyReviewSummary s) =>
+      role != null && s.needsActionBy(role!, userId: userId);
+
   @override
   Widget build(BuildContext context) {
-    return DataTable(
-      showCheckboxColumn: false,
-      columnSpacing: 26,
-      headingRowHeight: 44,
-      dataRowMinHeight: 52,
-      dataRowMaxHeight: 64,
-      columns: const [
-        DataColumn(label: Text(AppStrings.adminDashColEmployee)),
-        DataColumn(label: Text(AppStrings.adminDashColGrade)),
-        DataColumn(label: Text(AppStrings.adminDashColStage)),
-        DataColumn(label: Text(AppStrings.adminDashColScore), numeric: true),
-        DataColumn(label: Text(AppStrings.adminDashColIncentive), numeric: true),
-      ],
-      rows: [
-        for (final s in items)
-          DataRow(
-            selected: role != null && s.needsActionBy(role!, userId: userId),
-            onSelectChanged: (_) => context.push(
-              s.opensReviewDetail
-                  ? AppRoutes.monthlyReviewDetail(s.id)
-                  : AppRoutes.reviewsQuarterlyFor(s.employeeId),
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth >= _wideBreakpoint) {
+        return Column(
+          children: [
+            const _WideHeader(),
+            Divider(height: 1, color: AppColors.divider),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.only(bottom: 20),
+                itemCount: items.length,
+                separatorBuilder: (_, __) =>
+                    Divider(height: 1, color: AppColors.divider),
+                itemBuilder: (_, i) =>
+                    _WideRow(summary: items[i], needsReview: _needs(items[i])),
+              ),
             ),
-            cells: [
-              DataCell(_EmployeeCell(
-                summary: s,
-                needsReview: role != null && s.needsActionBy(role!, userId: userId),
-              )),
-              DataCell(Text(s.employeeGrade ?? '—')),
-              DataCell(StagePill(
-                  stage: s.currentStage, status: s.currentStageStatus)),
-              DataCell(Text(EmployeeFormatters.percent(s.finalScorePct))),
-              DataCell(Text(
-                  EmployeeFormatters.currencyInr(s.incentiveEligibleAmount ?? 0))),
+          ],
+        );
+      }
+      return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (_, i) =>
+            _ReviewCard(summary: items[i], needsReview: _needs(items[i])),
+      );
+    });
+  }
+}
+
+Widget _locationText(String? location) {
+  final l = (location ?? '').trim();
+  if (l.isEmpty) {
+    return Text('—',
+        style: TextStyle(fontSize: 12, color: AppColors.textMuted));
+  }
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(Icons.location_on_rounded,
+          size: 13, color: AppColors.textMuted),
+      const SizedBox(width: 4),
+      Flexible(
+        child: Text(l,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: 12, height: 1.25, color: AppColors.textSecondary)),
+      ),
+    ],
+  );
+}
+
+Widget _gradeChip(String? grade) {
+  final g = (grade ?? '').trim();
+  if (g.isEmpty || g == '—') {
+    return Text('—',
+        style: TextStyle(fontSize: 12, color: AppColors.textMuted));
+  }
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: AppColors.primaryPurple.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(g,
+        style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: AppColors.primaryPurple)),
+  );
+}
+
+class _WideHeader extends StatelessWidget {
+  const _WideHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final h = TextStyle(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textMuted,
+        letterSpacing: 0.3);
+    return Container(
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          Expanded(flex: _flexEmployee, child: Text(AppStrings.adminDashColEmployee, style: h)),
+          Expanded(flex: _flexLocation, child: Text(AppStrings.adminDashColLocation, style: h)),
+          Expanded(flex: _flexGrade, child: Center(child: Text(AppStrings.adminDashColGrade, style: h))),
+          Expanded(flex: _flexStage, child: Text(AppStrings.adminDashColStage, style: h)),
+          Expanded(
+              flex: _flexScore,
+              child: Text(AppStrings.adminDashColScore,
+                  textAlign: TextAlign.right, style: h)),
+          Expanded(
+              flex: _flexIncentive,
+              child: Text(AppStrings.adminDashColPayable,
+                  textAlign: TextAlign.right, style: h)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Two-line incentive figure used in both the wide row and the narrow card:
+/// the performance-based PAYABLE amount as the headline, with the fixed
+/// quarterly incentive (the ceiling) beneath it.
+class _IncentiveCell extends StatelessWidget {
+  final MonthlyReviewSummary summary;
+  const _IncentiveCell({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          EmployeeFormatters.currencyInr(summary.payableIncentive),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${AppStrings.adminDashFixedPrefix} '
+          '${EmployeeFormatters.currencyInr(summary.quarterlyFixedIncentive)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+        ),
+      ],
+    );
+  }
+}
+
+class _WideRow extends StatelessWidget {
+  final MonthlyReviewSummary summary;
+  final bool needsReview;
+  const _WideRow({required this.summary, required this.needsReview});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: needsReview
+          ? AppColors.accentOrange.withValues(alpha: 0.06)
+          : AppColors.surface,
+      child: InkWell(
+        onTap: () => _openReview(context, summary),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              Expanded(
+                flex: _flexEmployee,
+                child: _EmployeeCell(summary: summary, needsReview: needsReview),
+              ),
+              Expanded(
+                flex: _flexLocation,
+                child: _locationText(summary.projectLocation),
+              ),
+              Expanded(
+                  flex: _flexGrade,
+                  child: Center(child: _gradeChip(summary.employeeGrade))),
+              Expanded(
+                flex: _flexStage,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: StagePill(
+                      stage: summary.currentStage,
+                      status: summary.currentStageStatus),
+                ),
+              ),
+              Expanded(
+                flex: _flexScore,
+                child: Text(
+                  EmployeeFormatters.percent(summary.finalScorePct),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryPurple),
+                ),
+              ),
+              Expanded(
+                flex: _flexIncentive,
+                child: _IncentiveCell(summary: summary),
+              ),
             ],
           ),
-      ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final MonthlyReviewSummary summary;
+  final bool needsReview;
+  const _ReviewCard({required this.summary, required this.needsReview});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _openReview(context, summary),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: needsReview
+                  ? AppColors.accentOrange.withValues(alpha: 0.5)
+                  : AppColors.divider,
+              width: needsReview ? 1.4 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _EmployeeCell(
+                        summary: summary, needsReview: needsReview),
+                  ),
+                  const SizedBox(width: 8),
+                  _gradeChip(summary.employeeGrade),
+                ],
+              ),
+              if ((summary.projectLocation ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _locationText(summary.projectLocation),
+              ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: StagePill(
+                          stage: summary.currentStage,
+                          status: summary.currentStageStatus),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    EmployeeFormatters.percent(summary.finalScorePct),
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primaryPurple),
+                  ),
+                  const SizedBox(width: 12),
+                  _IncentiveCell(summary: summary),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -219,7 +470,7 @@ class _EmployeeCell extends StatelessWidget {
           children: [
             Text(
               summary.employeeName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 color: AppColors.textPrimary,
@@ -228,7 +479,7 @@ class _EmployeeCell extends StatelessWidget {
             if (summary.employeeCode.isNotEmpty)
               Text(
                 summary.employeeCode,
-                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
           ],
         ),
@@ -278,7 +529,7 @@ class _ErrorView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(

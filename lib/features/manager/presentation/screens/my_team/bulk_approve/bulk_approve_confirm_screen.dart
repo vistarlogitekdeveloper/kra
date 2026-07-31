@@ -146,7 +146,7 @@ class _CommentField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             AppStrings.managerBulkApproveCommentLabel,
             style: TextStyle(
               fontSize: 11,
@@ -161,14 +161,14 @@ class _CommentField extends StatelessWidget {
             maxLength: 500,
             minLines: 3,
             maxLines: 5,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13.5,
               color: AppColors.textPrimary,
               height: 1.5,
             ),
             decoration: InputDecoration(
               hintText: AppStrings.managerBulkApproveCommentHint,
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 13,
                 color: AppColors.textMuted,
               ),
@@ -178,12 +178,12 @@ class _CommentField extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
+                borderSide: BorderSide(
                     color: AppColors.divider, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
+                borderSide: BorderSide(
                     color: AppColors.divider, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
@@ -193,7 +193,7 @@ class _CommentField extends StatelessWidget {
                   width: 1.4,
                 ),
               ),
-              counterStyle: const TextStyle(
+              counterStyle: TextStyle(
                 fontSize: 10.5,
                 color: AppColors.textMuted,
               ),

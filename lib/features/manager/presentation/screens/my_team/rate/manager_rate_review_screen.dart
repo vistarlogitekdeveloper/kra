@@ -88,9 +88,9 @@ class _ManagerRateReviewScreenState
     if (review == null) {
       // Notifier still loading after a hot reload / deep link. Show a
       // tiny placeholder and let the post-frame redirect kick in.
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(
+        body: const Center(
           child: CircularProgressIndicator(color: AppColors.primaryPurple),
         ),
       );
@@ -230,7 +230,7 @@ class _RowSummary extends StatelessWidget {
                   row.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -241,7 +241,7 @@ class _RowSummary extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 EmployeeFormatters.weightagePercent(row.weightagePercent),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textSecondary,
@@ -270,7 +270,7 @@ class _RowSummary extends StatelessWidget {
             ],
           ),
           if (hasRemark) ...[
-            const Divider(color: AppColors.divider, height: 22),
+            Divider(color: AppColors.divider, height: 22),
             for (final c in row.monthlyScores)
               if ((c.managerRemark ?? '').trim().isNotEmpty)
                 Padding(
@@ -370,7 +370,7 @@ class _RemarkLine extends StatelessWidget {
         Expanded(
           child: Text(
             remark,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               color: AppColors.textPrimary,
               height: 1.45,
@@ -399,7 +399,7 @@ class _CommentSummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             AppStrings.managerRateCommentLabel,
             style: TextStyle(
               fontSize: 11,
@@ -411,7 +411,7 @@ class _CommentSummary extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             comment,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13.5,
               color: AppColors.textPrimary,
               height: 1.5,
@@ -496,7 +496,7 @@ class _SubmitBar extends StatelessWidget {
                   onPressed: isSubmitting ? null : onBackToEdit,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.divider),
+                    side: BorderSide(color: AppColors.divider),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

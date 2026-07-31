@@ -42,7 +42,7 @@ class BrandedTextField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.textSecondary,
@@ -60,7 +60,7 @@ class BrandedTextField extends StatelessWidget {
           focusNode: focusNode,
           autofocus: autofocus,
           autofillHints: autofillHints,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w500,
             color: AppColors.textPrimary,

@@ -295,6 +295,26 @@ final managerTeamListProvider = StateNotifierProvider.autoDispose<
 });
 
 // ────────────────────────────────────────────────────────────────────────
+// Flat direct-reports list (for the profile "My reports" tree)
+// ────────────────────────────────────────────────────────────────────────
+
+/// Every direct report of the signed-in user, unpaginated-enough for a profile
+/// tree (first 100 — a team is rarely larger), independent of the Team tab's
+/// filter/search state. Empty when the caller manages no one (the backend's
+/// NO_DIRECT_REPORTS 403 is a normal "you have no reports" state, not a error).
+final myDirectReportsProvider =
+    FutureProvider.autoDispose<List<TeamMember>>((ref) async {
+  final repo = ref.watch(managerTeamRepositoryProvider);
+  try {
+    final page = await repo.listTeam(page: 1, pageSize: 100);
+    return page.members;
+  } on ApiError catch (e) {
+    if (e.isNoDirectReports) return const [];
+    rethrow;
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────
 // Per-member profile (detail)
 // ────────────────────────────────────────────────────────────────────────
 

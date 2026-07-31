@@ -82,7 +82,7 @@ class _MyKrasSummaryCardState extends ConsumerState<MyKrasSummaryCard> {
   Widget _buildLoaded(MyKraAssignment? assignment) {
     final items = assignment?.items ?? const [];
     if (items.isEmpty) {
-      return const _Header(
+      return _Header(
         title: AppStrings.homeMyKrasTitle,
         subtitle: AppStrings.homeMyKrasEmpty,
         subtitleColor: AppColors.textSecondary,
@@ -154,7 +154,7 @@ class _Header extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
@@ -189,7 +189,7 @@ class _KraRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         border: showDivider
-            ? const Border(
+            ? Border(
                 bottom: BorderSide(color: AppColors.divider, width: 0.6),
               )
             : null,
@@ -201,7 +201,7 @@ class _KraRow extends StatelessWidget {
               item.name,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,

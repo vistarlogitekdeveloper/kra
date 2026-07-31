@@ -11,7 +11,15 @@ class Employee {
   final String employeeCode;
   final String fullName;
   final String email;
+
+  /// Functional access role (EMPLOYEE / MANAGER / HR / FINANCE / …) — drives
+  /// permissions + review routing. Derived from [position] at save time.
   final String role;
+
+  /// Job designation / title (e.g. "Cluster Manager", "Sr. Accountant"). This
+  /// is what HR picks; [role] is inferred from it. Stored in the backend's
+  /// `position` column.
+  final String? position;
   final String? department;
   final String? projectLocation;
   final String? projectLocationId;
@@ -35,6 +43,7 @@ class Employee {
     required this.fullName,
     required this.email,
     required this.role,
+    this.position,
     this.department,
     this.projectLocation,
     this.projectLocationId,
@@ -55,6 +64,7 @@ class Employee {
       fullName: (json['fullName'] ?? json['name'] ?? '') as String,
       email: (json['email'] ?? '') as String,
       role: (json['role'] ?? 'EMPLOYEE') as String,
+      position: json['position'] as String?,
       department: json['department'] as String?,
       projectLocation: _readNestedName(json['projectLocation']),
       projectLocationId: _readNestedId(json['projectLocation']) ??
@@ -90,6 +100,7 @@ class Employee {
         'fullName': fullName,
         'email': email,
         'role': role,
+        'position': position,
         'department': department,
         'projectLocation': projectLocation,
         'projectLocationId': projectLocationId,
@@ -109,6 +120,7 @@ class Employee {
     String? fullName,
     String? email,
     String? role,
+    String? position,
     String? department,
     String? projectLocation,
     String? projectLocationId,
@@ -127,6 +139,7 @@ class Employee {
       fullName: fullName ?? this.fullName,
       email: email ?? this.email,
       role: role ?? this.role,
+      position: position ?? this.position,
       department: department ?? this.department,
       projectLocation: projectLocation ?? this.projectLocation,
       projectLocationId: projectLocationId ?? this.projectLocationId,

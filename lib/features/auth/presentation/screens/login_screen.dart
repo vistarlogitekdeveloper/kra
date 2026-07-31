@@ -246,7 +246,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
             if (!isOnline) ...[
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 AppStrings.offlineLoginDisabled,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -312,7 +312,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
         ),
         const SizedBox(height: 18),
-        const Text(
+        Text(
           AppStrings.loginWelcome,
           style: TextStyle(
             fontSize: 26,
@@ -322,7 +322,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           AppStrings.loginSubtitle,
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -361,7 +361,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   AppStrings.loginRememberMe,
                   style: TextStyle(
                     fontSize: 13,
@@ -397,8 +397,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 color: AppColors.divider,
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
                 AppStrings.companyName,
                 style: TextStyle(
@@ -418,7 +418,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ],
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           AppStrings.loginFooter,
           textAlign: TextAlign.center,
           style: TextStyle(

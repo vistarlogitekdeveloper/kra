@@ -51,7 +51,7 @@ class ReviewStateIndicator extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             scoreText,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,

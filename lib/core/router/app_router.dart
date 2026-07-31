@@ -9,7 +9,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/reviews/presentation/screens/admin_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
-import '../../features/reviews/presentation/screens/monthly_review_detail_screen.dart';
+import '../../features/reviews/presentation/screens/performance_incentive_sheet_screen.dart';
 import '../../features/reviews/presentation/screens/quarterly_kra_sheet_screen.dart';
 import '../widgets/route_error_screen.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
@@ -23,7 +23,6 @@ import '../../features/employee/presentation/screens/self_rate/self_rate_locked_
 import '../../features/employee/presentation/screens/self_rate/self_rate_review_screen.dart';
 import '../../features/employee/presentation/screens/self_rate/self_rate_success_screen.dart';
 import '../../features/hr/presentation/screens/audit_log_screen.dart';
-import '../../features/hr/presentation/screens/bulk_setup_screen.dart';
 import '../../features/hr/presentation/screens/employee_detail_screen.dart';
 import '../../features/hr/presentation/screens/employee_form_screen.dart';
 import '../../features/hr/presentation/screens/employees_screen.dart';
@@ -63,14 +62,22 @@ class AppRoutes {
 
   // ── Monthly reviews (new pipeline) — role-adaptive, top-level so any
   // login can reach it. Phase 3 wires these into the role shells.
+  //
+  // `/reviews` is the area prefix the workspace switcher uses to detect + offer
+  // the Reviews workspace; the concrete landing route is [monthlyReviews].
+  static const String reviewsDashboard = '/reviews';
   static const String monthlyReviews = '/reviews/monthly';
-  static String monthlyReviewDetail(String id) => '/reviews/monthly/$id';
 
   // Quarterly KRA sheet — the per-employee 3-month sheet. No id → the
   // signed-in user's own sheet (employee self view).
   static const String reviewsQuarterly = '/reviews/quarterly';
   static String reviewsQuarterlyFor(String employeeId) =>
       '/reviews/quarterly/$employeeId';
+
+  // Performance Incentive Sheet — the quarterly read-only report. Top-level
+  // (not under /hr) so HR / Accounts / Management can all reach it; the redirect
+  // guards it to those roles via [canReview].
+  static const String perfIncentiveSheet = '/reports/performance-incentive';
 
   // ── Employee module nested routes ──
   // Every authenticated user (except ADMIN) lands inside /employee/* —
@@ -101,7 +108,6 @@ class AppRoutes {
   static const String hrReviews = '/hr/reviews';
   static const String hrReports = '/hr/reports';
   static const String hrLocations = '/hr/locations';
-  static const String hrBulkSetup = '/hr/bulk-setup';
   static const String hrAuditLog = '/hr/reports/audit-log';
 
   // Helpers for parameterised routes — keep the slash arithmetic in one
@@ -140,30 +146,42 @@ class AppRoutes {
 
   /// The post-login landing route.
   ///
-  /// HR-tier roles (HR / HR_ADMIN / ADMIN) land in the **HR admin area** — that
-  /// is the workspace they actually run day to day, so dropping them on their
-  /// own KRA every login meant a detour through the switcher before any real
-  /// work. Every other role lands on the "My KRA / My Review" self-view.
-  ///
-  /// This changes only where a session STARTS. A user's own KRA/review lives
-  /// under the `/employee/*` self-view, and that surface is still available to
-  /// EVERY role — HR included — reached additively via the workspace switcher
-  /// (see [WorkspaceSwitcher]) and the role drawers. Role still only ADDS areas;
-  /// it never removes the self-view.
+  /// Admins (HR_ADMIN / ADMIN) run the HR console day to day, so they boot
+  /// straight into it. EVERY other login — employee, manager, and the
+  /// review-only HR / Accounts roles — starts on the shared personal "My KRA"
+  /// self-view (`/employee/home`). Role never changes where those users START;
+  /// it only ADDS the areas they can reach from there — My Team, Reviews, HR
+  /// Admin — offered through the workspace switcher (see [WorkspaceSwitcher])
+  /// and enforced by the router guards. So Accounts / HR get the same
+  /// first-class home as everyone else rather than a bare review dashboard.
   ///
   /// This also doubles as the guard bounce-back target: a role deep-linking into
   /// an area it can't access (`/hr/*`, `/manager/*`) is sent here rather than to
-  /// a raw 403. That makes the [canAccessHr] gate load-bearing — returning
-  /// [hrHome] for a role the HR guard would reject would bounce it straight back
-  /// here and spin in a redirect loop, so the two must stay in agreement.
+  /// a raw 403. It returns [hrHome] ONLY for roles the HR guard admits
+  /// ([canAccessHr]); every other role gets the always-accessible self-view — so
+  /// the bounce can never target an area the role is being rejected from and
+  /// spin in a redirect loop.
   static String dashboardForRole(UserRole role) =>
       canAccessHr(role) ? hrHome : employeeHome;
 
-  /// True if [role] may access the HR module (`/hr/*`). Mirrors the
+  /// True if [role] may access the HR admin module (`/hr/*`). Mirrors the
   /// router's `_canAccessHr` guard so UI (e.g. the workspace switcher)
   /// can offer the HR area to exactly the roles the router lets in.
+  ///
+  /// Plain HR is a REVIEW-only role; the admin console is HR_ADMIN / ADMIN only.
   static bool canAccessHr(UserRole role) =>
-      role == UserRole.hr || role == UserRole.hrAdmin || role == UserRole.admin;
+      role == UserRole.hrAdmin || role == UserRole.admin;
+
+  /// True if [role] takes part in the KRA review pipeline as a rater / approver
+  /// — i.e. the "Reviews" workspace (the monthly review dashboard) should be
+  /// offered to them. HR and Accounts (Finance) rate the KRAs assigned to them;
+  /// HR_ADMIN / ADMIN also run the Management review. Managers review their own
+  /// team through the "My Team" workspace instead, so they're not listed here.
+  static bool canReview(UserRole role) =>
+      role == UserRole.hr ||
+      role == UserRole.finance ||
+      role == UserRole.hrAdmin ||
+      role == UserRole.admin;
 
   /// True if [role] may access any `/manager/*` route. Drives the
   /// router's role-guard redirect.
@@ -240,6 +258,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             _canAccessHr(authState.user.role)) {
           return AppRoutes.hrHome;
         }
+        // Performance Incentive Sheet is a Management / HR / Accounts report —
+        // any other role deep-linking in is bounced to their own dashboard.
+        if (loc == AppRoutes.perfIncentiveSheet &&
+            !AppRoutes.canReview(authState.user.role)) {
+          return AppRoutes.dashboardForRole(authState.user.role);
+        }
         // Manager role guard — MANAGER / BD_MANAGER / WAREHOUSE_MGR /
         // HR_ADMIN / ADMIN / any user with reports. Other roles deep-linking
         // to /manager/* get bounced to their own dashboard.
@@ -312,14 +336,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.monthlyReviews,
         builder: (_, __) => const MonthlyReviewDashboardScreen(),
-        routes: [
-          GoRoute(
-            path: ':id',
-            builder: (_, state) => MonthlyReviewDetailScreen(
-              reviewId: state.pathParameters['id']!,
-            ),
-          ),
-        ],
+      ),
+
+      // Performance Incentive Sheet — quarterly read-only report, guarded to
+      // HR / Accounts / Management (see the redirect below).
+      GoRoute(
+        path: AppRoutes.perfIncentiveSheet,
+        builder: (_, __) => const PerformanceIncentiveSheetScreen(),
       ),
 
       // ───── Employee module ─────
@@ -593,10 +616,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.hrLocations,
         builder: (_, __) => const LocationsScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.hrBulkSetup,
-        builder: (_, __) => const BulkSetupScreen(),
       ),
       GoRoute(
         path: AppRoutes.hrEmployeeNew,

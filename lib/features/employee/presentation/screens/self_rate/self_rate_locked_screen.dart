@@ -101,7 +101,7 @@ class _SelfRateLockedScreenState
               Text(
                 reasonLine,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
@@ -113,7 +113,7 @@ class _SelfRateLockedScreenState
                 Text(
                   dateLine,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     color: AppColors.textSecondary,
                     height: 1.45,
@@ -152,7 +152,7 @@ class _SelfRateLockedScreenState
                       .go(AppRoutes.employeeReviewDetail(review.id)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.divider),
+                    side: BorderSide(color: AppColors.divider),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -170,7 +170,7 @@ class _SelfRateLockedScreenState
                   ref.invalidate(employeeDashboardProvider);
                   context.go(AppRoutes.employeeHome);
                 },
-                child: const Text(
+                child: Text(
                   AppStrings.selfRateBackToHome,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,

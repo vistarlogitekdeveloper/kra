@@ -62,7 +62,7 @@ class ListItemSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: AppColors.divider, width: 1),
         ),
@@ -198,9 +198,9 @@ class FullScreenLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.background,
-      body: AmbientBackground(
+      body: const AmbientBackground(
         child: SafeArea(
           child: Center(child: _SplashOrbitColumn()),
         ),
@@ -223,7 +223,7 @@ class _SplashOrbitColumn extends StatelessWidget {
           children: [
             const SOrbitLoader(),
             const SizedBox(height: 32),
-            const Text(
+            Text(
               AppStrings.appName,
               style: TextStyle(
                 fontFamily: 'BricolageGrotesque',
@@ -234,7 +234,7 @@ class _SplashOrbitColumn extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               AppStrings.appTagline,
               textAlign: TextAlign.center,
               style: TextStyle(

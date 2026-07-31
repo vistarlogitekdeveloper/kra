@@ -99,8 +99,8 @@ class _EmptyHistory extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 32),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -109,7 +109,7 @@ class _EmptyHistory extends StatelessWidget {
                 size: 56,
                 color: AppColors.textMuted,
               ),
-              SizedBox(height: 14),
+              const SizedBox(height: 14),
               Text(
                 AppStrings.managerHistoryEmptyTitle,
                 textAlign: TextAlign.center,
@@ -119,7 +119,7 @@ class _EmptyHistory extends StatelessWidget {
                   color: AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Text(
                 AppStrings.managerHistoryEmptyMessage,
                 textAlign: TextAlign.center,

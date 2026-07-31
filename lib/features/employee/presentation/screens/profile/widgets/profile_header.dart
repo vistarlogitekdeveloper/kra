@@ -86,7 +86,7 @@ class ProfileHeader extends StatelessWidget {
                   profile.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -102,7 +102,7 @@ class ProfileHeader extends StatelessWidget {
                       child: Text(
                         profile.employeeCode,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700,

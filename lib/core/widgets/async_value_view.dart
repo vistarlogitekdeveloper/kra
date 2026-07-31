@@ -96,7 +96,7 @@ class _DefaultError extends StatelessWidget {
                 color: AppColors.error,
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 AppStrings.errorGeneric,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -109,7 +109,7 @@ class _DefaultError extends StatelessWidget {
               Text(
                 error.toString(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   color: AppColors.textSecondary,
                 ),

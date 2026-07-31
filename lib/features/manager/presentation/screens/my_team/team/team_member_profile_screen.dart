@@ -230,7 +230,7 @@ class _Header extends StatelessWidget {
                   profile.fullName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -246,7 +246,7 @@ class _Header extends StatelessWidget {
                       child: Text(
                         profile.employeeCode,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
@@ -307,7 +307,7 @@ class _FySummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             AppStrings.managerProfileFySummary,
             style: TextStyle(
               fontSize: 11,
@@ -342,10 +342,10 @@ class _FySummaryCard extends StatelessWidget {
             ],
           ),
           if (fy.averageFinalScore != null) ...[
-            const Divider(color: AppColors.divider, height: 24),
+            Divider(color: AppColors.divider, height: 24),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     AppStrings.managerProfileFyAverage,
                     style: TextStyle(
@@ -373,11 +373,14 @@ class _FySummaryCard extends StatelessWidget {
 class _FyBlock extends StatelessWidget {
   final String label;
   final String value;
-  final Color accent;
+
+  /// Null → falls back to the (theme-aware) primary text colour in [build];
+  /// can't be a `const` default now that AppColors resolves per theme.
+  final Color? accent;
   const _FyBlock({
     required this.label,
     required this.value,
-    this.accent = AppColors.textPrimary,
+    this.accent,
   });
 
   @override
@@ -387,7 +390,7 @@ class _FyBlock extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 9.5,
             fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,
@@ -400,7 +403,7 @@ class _FyBlock extends StatelessWidget {
           style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w800,
-            color: accent,
+            color: accent ?? AppColors.textPrimary,
             letterSpacing: -0.3,
           ),
         ),
@@ -423,7 +426,7 @@ class _Section extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 6),
           child: Text(
             title.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
               color: AppColors.textSecondary,
@@ -442,7 +445,7 @@ class _Section extends StatelessWidget {
               for (int i = 0; i < rows.length; i++) ...[
                 rows[i],
                 if (i != rows.length - 1)
-                  const Divider(
+                  Divider(
                     color: AppColors.divider,
                     height: 1,
                     indent: 16,
@@ -473,7 +476,7 @@ class _FieldRow extends StatelessWidget {
             width: 110,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textSecondary,
@@ -536,7 +539,7 @@ class _CurrentReviewTab extends StatelessWidget {
                 size: 48,
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'Open this employee\'s current quarterly review',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -624,9 +627,9 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
           ref.read(teamHistoryListProvider.notifier).loadMore(),
       onRefresh: () async =>
           ref.read(teamHistoryListProvider.notifier).refresh(),
-      emptyBuilder: (_) => const Center(
+      emptyBuilder: (_) => Center(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Text(
             AppStrings.managerHistoryEmptyMessage,
             textAlign: TextAlign.center,
@@ -693,7 +696,7 @@ class _ProfileError extends StatelessWidget {
               color: AppColors.error,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               AppStrings.errorGeneric,
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -706,7 +709,7 @@ class _ProfileError extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),

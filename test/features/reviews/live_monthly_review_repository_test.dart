@@ -109,7 +109,8 @@ void main() {
       // A re-list must NOT reset the advanced review back to Self-Rating.
       await r.listMonthlyReviews(year: 2026, month: 7);
       final after = await r.getReview(id);
-      expect(after.currentStage, ReviewStage.accountHrRating);
+      // New pipeline: self advances to the reporting manager, not HR.
+      expect(after.currentStage, ReviewStage.reportingManagerRating);
       expect(after.statusOf(ReviewStage.selfRating), StageStatus.submitted);
       expect(after.rows.first.scoreFor(ReviewStage.selfRating)?.value, 8);
     });

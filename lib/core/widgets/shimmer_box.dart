@@ -24,7 +24,7 @@ class ShimmerBox extends StatelessWidget {
 
   // Base is a hair lighter than --surface2 so it's visible against cards
   // that sit on --surface2 themselves.
-  static const Color _baseColor = AppColors.surfaceElevated;
+  static Color get _baseColor => AppColors.surfaceElevated;
   // Pink-orange average — picks up the ribbon's mid stops at low alpha.
   static const Color _highlightColor = Color(0x33E0218A);
 

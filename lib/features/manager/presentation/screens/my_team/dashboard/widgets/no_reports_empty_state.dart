@@ -37,7 +37,7 @@ class NoReportsEmptyState extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 AppStrings.managerDashboardNoReportsTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -47,7 +47,7 @@ class NoReportsEmptyState extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 AppStrings.managerDashboardNoReportsMessage,
                 textAlign: TextAlign.center,
                 style: TextStyle(

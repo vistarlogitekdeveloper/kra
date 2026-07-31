@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/theme_toggle_button.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/connectivity_wrapper.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -13,7 +14,7 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 /// navigation stack across switches — drilling into a templates form
 /// and bouncing to Employees no longer loses the templates back-stack.
 ///
-/// A side drawer provides access to Locations, Bulk Setup, Profile,
+/// A side drawer provides access to Locations, Assign KRAs, Profile,
 /// and Logout — modules outside the tab bar.
 class HrShellScreen extends ConsumerWidget {
   /// The shell-router-provided container that swaps children based on
@@ -121,22 +122,28 @@ class HrDrawer extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.20),
-                    ),
-                    child: Text(
-                      _initials(name),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.20),
+                        ),
+                        child: Text(
+                          _initials(name),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
                       ),
-                    ),
+                      const Spacer(),
+                      const ThemeToggleButton(color: Colors.white),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -193,7 +200,7 @@ class HrDrawer extends StatelessWidget {
                       context.go(AppRoutes.employeeHome);
                     },
                   ),
-                  const Divider(color: AppColors.divider, height: 24),
+                  Divider(color: AppColors.divider, height: 24),
                   const _DrawerSectionLabel(title: 'Management'),
                   _DrawerItem(
                     icon: Icons.location_on_rounded,
@@ -201,14 +208,6 @@ class HrDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).pop();
                       context.go(AppRoutes.hrLocations);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.group_add_rounded,
-                    label: AppStrings.hrDrawerBulkSetup,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      context.go(AppRoutes.hrBulkSetup);
                     },
                   ),
                   _DrawerItem(
@@ -236,7 +235,7 @@ class HrDrawer extends StatelessWidget {
                         context.go(AppRoutes.managerTeamDashboard);
                       },
                     ),
-                  const Divider(color: AppColors.divider, height: 24),
+                  Divider(color: AppColors.divider, height: 24),
                   const _DrawerSectionLabel(title: 'Account'),
                   // No HR-specific profile screen exists yet — the
                   // drawer item used to no-op (just close the drawer)
@@ -256,8 +255,8 @@ class HrDrawer extends StatelessWidget {
             ),
 
             // ── Footer ──
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
                 AppStrings.appName,
                 textAlign: TextAlign.center,
@@ -293,7 +292,7 @@ class _DrawerSectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10.5,
           fontWeight: FontWeight.w800,
           color: AppColors.textMuted,
