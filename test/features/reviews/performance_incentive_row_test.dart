@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_review_summary.dart';
 import 'package:vistar_app/features/reviews/data/models/performance_incentive_row.dart';
 import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
@@ -16,6 +17,7 @@ void main() {
     required double finalPct,
     required ReviewStage stage,
     StageStatus status = StageStatus.inProgress,
+    PayoutStatus payoutStatus = PayoutStatus.pending,
   }) {
     return MonthlyReviewSummary(
       id: 'r$m',
@@ -32,10 +34,12 @@ void main() {
       selfScorePct: self,
       managementReviewPct: management,
       projectLocation: 'Adept, Pune',
+      payoutStatus: payoutStatus,
     );
   }
 
-  test('a finalized quarter: fixed = ×3, payable = fixed × total%', () {
+  test('all months paid → Incentive Paid; fixed = ×3, payable = fixed × total%',
+      () {
     final row = PerformanceIncentiveRow.build(
       srNo: 1,
       employeeId: 'emp1',
@@ -49,6 +53,7 @@ void main() {
             finalPct: 90,
             stage: ReviewStage.completed,
             status: StageStatus.submitted,
+            payoutStatus: PayoutStatus.paid,
           ),
       ],
     );
@@ -61,10 +66,31 @@ void main() {
     expect(row.total, closeTo(90, 1e-9));
     expect(row.quarterlyFixedIncentive, 24000);
     expect(row.payableIncentive, closeTo(24000 * 90 / 100, 1e-6)); // 21,600
-    expect(row.remark, 'Finalized');
+    expect(row.remark, PerformanceIncentiveRow.remarkPaid);
   });
 
-  test('a partly-done quarter: missing month counts as 0, remark pending', () {
+  test('reviewed but a month still unpaid → KRA Not Submitted', () {
+    // All three months present + fully reviewed, but not settled → not paid.
+    final row = PerformanceIncentiveRow.build(
+      srNo: 1,
+      employeeId: 'emp1',
+      months: [
+        for (final mth in [7, 8, 9])
+          month(
+            m: mth,
+            eligible: 8000,
+            self: 85,
+            management: 90,
+            finalPct: 90,
+            stage: ReviewStage.managementReview,
+            status: StageStatus.submitted,
+          ),
+      ],
+    );
+    expect(row.remark, PerformanceIncentiveRow.remarkNotSubmitted);
+  });
+
+  test('a partly-done quarter: missing month counts as 0, not submitted', () {
     final row = PerformanceIncentiveRow.build(
       srNo: 2,
       employeeId: 'emp1',
@@ -92,16 +118,16 @@ void main() {
     expect(row.total, closeTo((70 + 0 + 80) / 3, 1e-9)); // 50
     expect(row.quarterlyFixedIncentive, 15000);
     expect(row.payableIncentive, closeTo(15000 * 50 / 100, 1e-6)); // 7,500
-    expect(row.remark, 'KRA Review Pending');
+    expect(row.remark, PerformanceIncentiveRow.remarkNotSubmitted);
   });
 
-  test('no reviews at all → NO KRA', () {
+  test('no reviews at all → KRA Not Submitted', () {
     final row = PerformanceIncentiveRow.build(
       srNo: 3,
       employeeId: 'emp1',
       months: const [null, null, null],
     );
-    expect(row.remark, 'NO KRA');
+    expect(row.remark, PerformanceIncentiveRow.remarkNotSubmitted);
     expect(row.total, 0);
     expect(row.payableIncentive, 0);
   });

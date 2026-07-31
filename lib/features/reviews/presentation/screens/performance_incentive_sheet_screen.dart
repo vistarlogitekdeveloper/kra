@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_error.dart';
+import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
@@ -36,48 +38,123 @@ const _monthAbbr = [
 String _shortMonth(ReviewPeriod p) =>
     "${_monthAbbr[p.month]} '${p.year.toString().substring(2)}";
 
-/// CSV of the quarter sheet — every Excel column, one row per employee. Numbers
-/// stay numeric (no % sign / currency symbol) so Excel treats them as numbers.
-String _buildCsv(
-    List<PerformanceIncentiveRow> rows, List<ReviewPeriod> months) {
-  String esc(Object? v) {
-    final s = (v ?? '').toString();
-    return (s.contains(',') || s.contains('"') || s.contains('\n'))
-        ? '"${s.replaceAll('"', '""')}"'
-        : s;
-  }
-
+/// An official-looking Vistar Performance Incentive Sheet as a single-file
+/// spreadsheet (HTML that Excel opens as `.xls`): a branded header band with the
+/// Vistar logo, the report title, the quarter, and the generation date, above a
+/// bordered, colour-headed table of every column. Numbers stay numeric so Excel
+/// can sum/sort them; the two remark states are colour-coded.
+String _buildOfficialXls(
+  List<PerformanceIncentiveRow> rows,
+  List<ReviewPeriod> months, {
+  required ReviewPeriod anchor,
+  required String logoDataUri,
+  required String generatedOn,
+}) {
+  String esc(Object? v) => (v ?? '')
+      .toString()
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
   String n(double? v) => v == null ? '' : v.round().toString();
-  final header = <String>[
+
+  const totalCols = 15; // Sr, Code, Name, Amount, Loc, Self×3, Mgmt×3, Total,
+  //                        Fixed, Payable, Remark
+  final headers = <String>[
     'Sr No',
     'EMP Code',
     'Name of Employee',
-    'Performance Incentive Amount',
+    'Perf. Incentive Amount',
     'Project Location',
     for (final m in months) 'Self ${_shortMonth(m)}',
     for (final m in months) 'Mgmt ${_shortMonth(m)}',
     'Total',
-    'Quarterly Fixed Incentive',
+    'Qtr Fixed Incentive',
     'Payable Incentive',
     'Remark',
   ];
-  final lines = <String>[header.map(esc).join(',')];
-  for (final r in rows) {
-    lines.add(<Object?>[
-      r.srNo,
-      r.employeeCode,
-      r.employeeName,
-      r.performanceIncentiveAmount.round(),
-      r.projectLocation ?? '',
-      for (final v in r.selfRatings) n(v),
-      for (final v in r.managementRatings) n(v),
-      r.total.round(),
-      r.quarterlyFixedIncentive.round(),
-      r.payableIncentive.round(),
-      r.remark,
-    ].map(esc).join(','));
+
+  final b = StringBuffer();
+  b.writeln(
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">');
+  b.writeln('<head><meta http-equiv="content-type" '
+      'content="text/html; charset=UTF-8"><style>'
+      'table{border-collapse:collapse;font-family:Calibri,Arial,sans-serif;}'
+      'td,th{border:0.5pt solid #C9C6D6;padding:5px 9px;font-size:11pt;'
+      'color:#1B1630;}'
+      '.plain{border:none;}'
+      '.title{font-size:20pt;font-weight:bold;color:#6B1F7C;}'
+      '.sub{font-size:10.5pt;color:#4A4560;}'
+      '.colhead{background:#6B1F7C;color:#FFFFFF;font-weight:bold;'
+      'text-align:center;}'
+      '.num{text-align:right;} .center{text-align:center;}'
+      '.paid{color:#1E7A3D;font-weight:bold;}'
+      '.notsub{color:#B26A00;font-weight:bold;}'
+      '</style></head><body>');
+  b.writeln('<table>');
+
+  // ── Branded header band ──
+  final logoCell = logoDataUri.isEmpty
+      ? '<td class="plain" colspan="3" rowspan="3"></td>'
+      : '<td class="plain" colspan="3" rowspan="3">'
+          '<img src="$logoDataUri" height="52"/></td>';
+  b.writeln('<tr>$logoCell'
+      '<td class="plain title" colspan="12">Performance Incentive Sheet</td></tr>');
+  b.writeln('<tr><td class="plain sub" colspan="12">'
+      'Vistar Logitek &bull; ${esc(anchor.fiscalQuarterLabel)} &bull; '
+      "${_shortMonth(months.first)} – ${_shortMonth(months.last)}</td></tr>");
+  b.writeln('<tr><td class="plain sub" colspan="12">'
+      'Generated on ${esc(generatedOn)} &bull; Read-only report</td></tr>');
+  b.writeln('<tr><td class="plain" colspan="$totalCols">&nbsp;</td></tr>');
+
+  // ── Column headers ──
+  b.write('<tr class="colhead">');
+  for (final h in headers) {
+    b.write('<td>${esc(h)}</td>');
   }
-  return lines.join('\r\n');
+  b.writeln('</tr>');
+
+  // ── Data rows ──
+  for (final r in rows) {
+    final remarkClass =
+        r.remark == PerformanceIncentiveRow.remarkPaid ? 'paid' : 'notsub';
+    b.write('<tr>');
+    b.write('<td class="center">${r.srNo}</td>');
+    b.write('<td>${esc(r.employeeCode)}</td>');
+    b.write('<td>${esc(r.employeeName)}</td>');
+    b.write('<td class="num">${r.performanceIncentiveAmount.round()}</td>');
+    b.write('<td>${esc(r.projectLocation ?? '')}</td>');
+    for (final v in r.selfRatings) {
+      b.write('<td class="num">${n(v)}</td>');
+    }
+    for (final v in r.managementRatings) {
+      b.write('<td class="num">${n(v)}</td>');
+    }
+    b.write('<td class="num">${r.total.round()}</td>');
+    b.write('<td class="num">${r.quarterlyFixedIncentive.round()}</td>');
+    b.write('<td class="num">${r.payableIncentive.round()}</td>');
+    b.write('<td class="$remarkClass">${esc(r.remark)}</td>');
+    b.writeln('</tr>');
+  }
+
+  b.writeln('</table></body></html>');
+  return b.toString();
+}
+
+/// Loads the bundled Vistar logo as a `data:` URI for embedding in the export.
+/// Returns empty (header renders without a logo) if the asset can't be read.
+Future<String> _logoDataUri() async {
+  try {
+    final data = await rootBundle.load(AppAssets.logo);
+    final b64 = base64Encode(data.buffer.asUint8List());
+    return 'data:image/png;base64,$b64';
+  } catch (_) {
+    return '';
+  }
+}
+
+String _generatedOn() {
+  final now = DateTime.now();
+  return '${now.day} ${_monthAbbr[now.month]} ${now.year}';
 }
 
 /// Quarterly Performance Incentive Sheet — a READ-ONLY report mirroring the
@@ -116,13 +193,19 @@ class _PerformanceIncentiveSheetScreenState
     setState(() => _exporting = true);
     try {
       final months = quarterMonthsFor(anchor);
-      final csv = _buildCsv(rows, months);
-      final bytes = Uint8List.fromList(utf8.encode('﻿$csv'));
+      final html = _buildOfficialXls(
+        rows,
+        months,
+        anchor: anchor,
+        logoDataUri: await _logoDataUri(),
+        generatedOn: _generatedOn(),
+      );
+      final bytes = Uint8List.fromList(utf8.encode(html));
       final ok = await saveProofFile(
         bytes: bytes,
         fileName:
-            'Performance_Incentive_Q${anchor.fiscalQuarter}_FY${anchor.fiscalYearStartYear}.csv',
-        mime: 'text/csv',
+            'Vistar_Performance_Incentive_Q${anchor.fiscalQuarter}_FY${anchor.fiscalYearStartYear}.xls',
+        mime: 'application/vnd.ms-excel',
       );
       _snack(ok
           ? AppStrings.perfIncentiveExported
@@ -490,17 +573,10 @@ class _RemarkChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color;
-    switch (remark) {
-      case 'Finalized':
-        color = AppColors.success;
-        break;
-      case 'NO KRA':
-        color = AppColors.textMuted;
-        break;
-      default: // KRA Review Pending
-        color = AppColors.warning;
-    }
+    // Two states only: paid → green; not submitted/settled → amber.
+    final color = remark == PerformanceIncentiveRow.remarkPaid
+        ? AppColors.success
+        : AppColors.warning;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(

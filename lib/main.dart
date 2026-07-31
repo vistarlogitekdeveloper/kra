@@ -49,6 +49,16 @@ class VistarApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: theme,
       routerConfig: router,
+      // Screens read the GLOBAL AppColors palette (not Theme.of), and many are
+      // built as `const` in the router — so a theme flip wouldn't rebuild them
+      // and they'd keep the old colours. Keying the router's content subtree by
+      // brightness tears it down and rebuilds every screen fresh on a toggle, so
+      // the whole app repaints at once. GoRouter keeps the current route + back
+      // stack (it lives in the provider), so nothing navigates away.
+      builder: (context, child) => KeyedSubtree(
+        key: ValueKey(theme.brightness),
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

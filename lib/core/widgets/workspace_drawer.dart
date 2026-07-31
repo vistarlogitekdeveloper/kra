@@ -128,6 +128,12 @@ class WorkspaceDrawer extends ConsumerWidget {
                 ],
               ),
             ),
+            // Log out — the one account action, available from any workspace.
+            Divider(color: AppColors.divider, height: 1),
+            _LogoutTile(onTap: () {
+              Navigator.of(context).pop();
+              ref.read(authStateProvider.notifier).logout();
+            }),
           ],
         ),
       ),
@@ -211,6 +217,54 @@ class _WorkspaceDrawerItem extends StatelessWidget {
                 if (isCurrent)
                   const Icon(Icons.check_circle_rounded,
                       color: AppColors.primaryPurple, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The drawer's log-out row — same icon-tile visual language as a workspace
+/// item, tinted red to read as the one destructive account action.
+class _LogoutTile extends StatelessWidget {
+  final VoidCallback onTap;
+  const _LogoutTile({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.logout_rounded,
+                      color: AppColors.error, size: 19),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  AppStrings.profileLogout,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.error,
+                  ),
+                ),
               ],
             ),
           ),

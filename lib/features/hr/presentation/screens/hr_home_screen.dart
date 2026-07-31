@@ -10,6 +10,7 @@ import '../../../../core/widgets/ambient_background.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../core/widgets/slow_load_hint.dart';
+import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/models/hr_dashboard_models.dart';
 import '../providers/hr_dashboard_providers.dart';
@@ -17,7 +18,6 @@ import '../widgets/_formatters.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/overview_stat_card.dart';
 import '../widgets/quick_action_button.dart';
-import 'hr_shell_screen.dart';
 
 /// HR home screen. Progressive loading — each panel fetches its own data.
 class HrHomeScreen extends ConsumerWidget {
@@ -25,15 +25,13 @@ class HrHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
-    final user = authState is AuthAuthenticated ? authState.user : null;
     return Scaffold(
       backgroundColor: AppColors.background,
-      // The drawer must live on THIS Scaffold. HrShellScreen also mounts one,
-      // but this inner Scaffold shadows it, so the "☰" below resolved to a
-      // drawer-less Scaffold and silently did nothing — leaving HR admins with
-      // no way to switch back to My KRA / My Team.
-      drawer: HrDrawer(user: user, ref: ref),
+      // The shared workspace drawer — same switcher menu across every workspace.
+      // It must live on THIS Scaffold (the inner one shadows the shell's), so
+      // the "☰" below opens it. Locations / Assign KRAs moved to the quick
+      // actions grid; log out lives in the drawer footer + the app bar.
+      drawer: workspaceDrawerFor(ref),
       // App bar stays as a solid dark surface above the scrolling content.
       // Letting the body scroll behind it (extendBodyBehindAppBar: true)
       // caused the 'HR Dashboard' title to visually overlap whatever card
@@ -467,6 +465,13 @@ class _QuickActionsGrid extends StatelessWidget {
           iconBg: AppColors.success.withValues(alpha: 0.12),
           iconFg: AppColors.success,
           onTap: () => context.push(AppRoutes.hrReviews),
+        ),
+        QuickActionButton(
+          icon: Icons.location_on_rounded,
+          label: AppStrings.hrDrawerLocations,
+          iconBg: AppColors.info.withValues(alpha: 0.14),
+          iconFg: AppColors.info,
+          onTap: () => context.push(AppRoutes.hrLocations),
         ),
       ],
     );
