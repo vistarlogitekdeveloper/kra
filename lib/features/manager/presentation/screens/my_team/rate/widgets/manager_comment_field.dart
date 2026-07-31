@@ -66,7 +66,7 @@ class _ManagerCommentFieldState extends State<ManagerCommentField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             AppStrings.managerRateCommentLabel,
             style: TextStyle(
               fontSize: 11,
@@ -83,14 +83,14 @@ class _ManagerCommentFieldState extends State<ManagerCommentField> {
             maxLength: _charLimit,
             minLines: 3,
             maxLines: 6,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13.5,
               color: AppColors.textPrimary,
               height: 1.45,
             ),
             decoration: InputDecoration(
               hintText: AppStrings.managerRateCommentHint,
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 13,
                 color: AppColors.textMuted,
               ),
@@ -101,12 +101,12 @@ class _ManagerCommentFieldState extends State<ManagerCommentField> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: AppColors.divider, width: 1),
+                    BorderSide(color: AppColors.divider, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: AppColors.divider, width: 1),
+                    BorderSide(color: AppColors.divider, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -115,7 +115,7 @@ class _ManagerCommentFieldState extends State<ManagerCommentField> {
                   width: 1.4,
                 ),
               ),
-              counterStyle: const TextStyle(
+              counterStyle: TextStyle(
                 fontSize: 10.5,
                 color: AppColors.textMuted,
               ),

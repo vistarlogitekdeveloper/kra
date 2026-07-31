@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../data/models/project_location.dart';
 import '../providers/project_location_providers.dart';
@@ -29,7 +30,11 @@ class LocationsScreen extends ConsumerWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
+          // This screen is reached with `context.go` (which replaces the stack),
+          // so there's usually nothing to pop — fall back to the HR home so the
+          // arrow always goes somewhere instead of dead-ending.
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go(AppRoutes.hrHome),
           tooltip: AppStrings.commonBack,
         ),
       ),
@@ -181,7 +186,7 @@ class _LocationTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtitleParts.join(' • '),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12,
                         ),
@@ -190,7 +195,7 @@ class _LocationTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.textMuted,
               ),
@@ -352,7 +357,7 @@ class _LocationSheetState extends ConsumerState<_LocationSheet> {
                   isEdit
                       ? AppStrings.locationFormEditTitle
                       : AppStrings.locationFormCreateTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -489,7 +494,7 @@ class _LabeledInput extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.textSecondary,

@@ -36,9 +36,9 @@ class BulkApproveResultScreen extends ConsumerWidget {
             onPressed: () => context.go(AppRoutes.managerTeamList),
           ),
         ),
-        body: const Center(
+        body: Center(
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
               'No bulk-approve in progress.',
               textAlign: TextAlign.center,
@@ -176,7 +176,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10.5,
             fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,

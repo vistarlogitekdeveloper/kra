@@ -185,7 +185,7 @@ class _AuditTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   entry.entityType,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -199,13 +199,13 @@ class _AuditTile extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.person_outline_rounded,
+              Icon(Icons.person_outline_rounded,
                   size: 14, color: AppColors.textSecondary),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   actorCode.isEmpty ? actor : '$actor · $actorCode',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
@@ -217,7 +217,7 @@ class _AuditTile extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 when,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
                   color: AppColors.textMuted,
                   fontWeight: FontWeight.w600,
@@ -229,7 +229,7 @@ class _AuditTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               entry.reason!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
                 fontStyle: FontStyle.italic,

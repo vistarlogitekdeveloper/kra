@@ -131,7 +131,7 @@ class _RowCard extends StatelessWidget {
                   row.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -208,14 +208,14 @@ class _RowCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
                   row.description!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textSecondary,
                     height: 1.45,
                   ),
                 ),
               ),
-              const Divider(color: AppColors.divider, height: 1),
+              Divider(color: AppColors.divider, height: 1),
               const SizedBox(height: 12),
             ],
             for (int i = 0; i < months.length; i++) ...[
@@ -290,7 +290,7 @@ class _MonthBlock extends StatelessWidget {
             children: [
               Text(
                 month.monthLabel.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textSecondary,
@@ -299,7 +299,7 @@ class _MonthBlock extends StatelessWidget {
               ),
               if (monthClosed) ...[
                 const SizedBox(width: 6),
-                const Icon(
+                Icon(
                   Icons.lock_rounded,
                   size: 11,
                   color: AppColors.textMuted,

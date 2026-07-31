@@ -9,20 +9,35 @@ import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_gradients.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/enums/kra_reviewer.dart';
 import '../../../../core/utils/proof_file_saver.dart';
 import '../../../../core/widgets/adaptive_leading.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/workspace_drawer.dart';
+import '../../../auth/data/models/user.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
+import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/review_stage.dart';
 import '../../data/models/row_score.dart';
 import '../../data/repositories/monthly_review_repository.dart';
+import '../providers/kra_reviewer_map_provider.dart';
 import '../providers/monthly_review_providers.dart';
 
 const _monthAbbr = [
-  '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  '',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// Content type for a proof attachment, from its extension.
@@ -74,6 +89,31 @@ String _mimeFor(String fileName) {
 String _shortMonth(ReviewPeriod p) =>
     "${_monthAbbr[p.month]} '${p.year.toString().substring(2)}";
 
+/// Brand colour that identifies a KRA's single Review-cycle reviewer, so the
+/// name badge and the month cell read as the same owner at a glance.
+Color _reviewerColor(KraReviewer r) {
+  switch (r) {
+    case KraReviewer.reportingManager:
+      return AppColors.primaryPurple;
+    case KraReviewer.hr:
+      return AppColors.info;
+    case KraReviewer.accounts:
+      return AppColors.accentOrange;
+  }
+}
+
+/// Icon that identifies a reviewer group on the sheet.
+IconData _reviewerIcon(KraReviewer r) {
+  switch (r) {
+    case KraReviewer.reportingManager:
+      return Icons.manage_accounts_rounded;
+    case KraReviewer.hr:
+      return Icons.badge_rounded;
+    case KraReviewer.accounts:
+      return Icons.account_balance_rounded;
+  }
+}
+
 /// Quarterly KRA sheet for one employee — models the "KRA for … .xlsx"
 /// reference: every KRA across the 3 months of a quarter with Self + Manager
 /// scores, a quarter average, and the payout. The employee edits their own
@@ -106,6 +146,44 @@ class _QuarterlyKraSheetScreenState
       if (row.id == rowId) return row.scoreFor(stage);
     }
     return null;
+  }
+
+  /// Ensures EVERY KRA row carries its single assigned reviewer, so scoring, the
+  /// Review cell and the evidence slots all treat the KRA as owned by exactly
+  /// one reviewer — never an average of three.
+  ///
+  /// Resolution order PER ROW, chosen so it reads IDENTICALLY for every login:
+  ///   1. the row's OWN reviewer, straight from the backend — the review
+  ///      endpoint is role-agnostic, so this is the same value whoever is
+  ///      signed in. It MUST win, or the sheet would show different reviewers to
+  ///      Accounts vs HR-admin (the template/assignment fetch below is gated to
+  ///      HR_ADMIN/ADMIN, so it is empty for everyone else). The backend keeps
+  ///      this value fresh from the template on read.
+  ///   2. the template's assignment, by normalised KRA name — a best-effort
+  ///      fallback that only loads for HR-tier roles, so it only fills a row the
+  ///      backend left blank;
+  ///   3. the template's assignment by POSITION (the Nth KRA);
+  ///   4. default to the Reporting Manager — the relationship every employee
+  ///      has — so a KRA is never left unassigned.
+  MonthlyReview? _applyReviewerMap(MonthlyReview? r, KraReviewerAssignment map) {
+    if (r == null) return r;
+    // Match the template's ordering so position-based fallback lines up.
+    final ordered = [...r.rows]
+      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    final rows = <MonthlyKraRow>[
+      for (var i = 0; i < ordered.length; i++)
+        () {
+          final row = ordered[i];
+          final reviewer = row.reviewerGroup ??
+              map.byName[kraNameKey(row.name)] ??
+              (i < map.byOrder.length ? map.byOrder[i] : null) ??
+              KraReviewer.reportingManager;
+          return row.reviewerGroup == reviewer
+              ? row
+              : row.copyWith(reviewerGroup: reviewer);
+        }(),
+    ];
+    return r.copyWith(rows: rows);
   }
 
   double? _pct(MonthlyReview? r, String rowId, ReviewStage stage) {
@@ -141,6 +219,22 @@ class _QuarterlyKraSheetScreenState
     return r.managerId != null && r.managerId == scope.userId;
   }
 
+  // The three Review-cycle raters are entered in parallel. Two are gated by
+  // ROLE (HR, Finance); the reporting-manager one stays a RELATIONSHIP (above).
+  //   * HR rating       → HR / HR_ADMIN
+  //   * Finance rating  → FINANCE
+  bool _canEditHr(ReviewScope? scope) =>
+      scope != null &&
+      (scope.role == UserRole.hr || scope.role == UserRole.hrAdmin);
+  bool _canEditFinance(ReviewScope? scope) =>
+      scope != null && scope.role == UserRole.finance;
+
+  // Management review (cycle 3) — HR either approves the Review average or, on
+  // rework, overrides it per KRA. Done by HR_ADMIN / ADMIN.
+  bool _canEditManagement(ReviewScope? scope) =>
+      scope != null &&
+      (scope.role == UserRole.hrAdmin || scope.role == UserRole.admin);
+
   Future<void> _editCell({
     required MonthlyReview review,
     required String rowId,
@@ -162,7 +256,7 @@ class _QuarterlyKraSheetScreenState
       builder: (ctx) => _RatingSheet(
         kraName: kraName,
         monthLabel: monthLabel,
-        isSelf: stage == ReviewStage.selfRating,
+        stageLabel: stage.label,
         currentPct: currentPct,
       ),
     );
@@ -203,12 +297,13 @@ class _QuarterlyKraSheetScreenState
   /// backend gates this with the same rule as reading the review, so the
   /// employee, their reporting manager — whatever that manager's role — and
   /// management can all open it.
-  Future<void> _openProofFile(MonthlyReview review, String rowId) async {
+  Future<void> _openProofFile(
+      MonthlyReview review, String rowId, ReviewStage stage) async {
     setState(() => _saving = true);
     try {
       final file = await ref
           .read(monthlyReviewRepositoryProvider)
-          .fetchProofFile(review.id, rowId, ReviewStage.selfRating);
+          .fetchProofFile(review.id, rowId, stage);
       if (!mounted) return;
       if (file == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -230,22 +325,22 @@ class _QuarterlyKraSheetScreenState
     }
   }
 
-  /// The per-KRA, per-MONTH "Reason & Proof" line item. The review runs monthly,
-  /// so each month ([review]) captures its own reason (max 300 chars) + one proof
-  /// attachment. The EMPLOYEE (owner of the sheet) fills it in for their KRAs;
-  /// the reporting manager / HR / admin can only VIEW it (they never upload proof
-  /// for their own rating). Both the reason (remark) and the attachment now
-  /// persist on that month's SELF_RATING score, so the reporting manager and
-  /// management see exactly the evidence the employee filed.
+  /// The per-KRA, per-MONTH, per-STAGE "Reason & Proof" entry. Each month
+  /// captures a reason (max 300 chars) + one proof attachment PER contributor:
+  /// the EMPLOYEE files evidence on their SELF rating, and each Review-cycle
+  /// reviewer (Reporting Manager / HR / Accounts) files their own on their
+  /// rating stage. Whoever owns [stage] can edit it; everyone else can view +
+  /// download it. Reason + attachment persist on that (row, stage) score.
   Future<void> _openJustification({
     required MonthlyReview review,
     required String rowId,
+    required ReviewStage stage,
     required String kraName,
     required String monthLabel,
     required bool canEdit,
   }) async {
-    final current = _currentScore(review, rowId, ReviewStage.selfRating);
-    final key = '${review.id}|$rowId';
+    final current = _currentScore(review, rowId, stage);
+    final key = '${review.id}|$rowId|${stage.name}';
     // Seed from the STORED attachment (bytes null = "already on the server,
     // untouched"). Without this the editor would look empty to someone who has
     // an attachment, and saving a reason would then read as "removed" and wipe
@@ -269,7 +364,7 @@ class _QuarterlyKraSheetScreenState
           // actually visible to the person rating them.
           fileName: current?.proofFileName ?? _proofFiles[key]?.name,
           onOpenFile: (current?.proofFileName?.isNotEmpty ?? false)
-              ? () => _openProofFile(review, rowId)
+              ? () => _openProofFile(review, rowId, stage)
               : null,
         ),
       );
@@ -302,10 +397,10 @@ class _QuarterlyKraSheetScreenState
               base64Data: base64Encode(picked.bytes!),
             )
           : null;
-      // Preserve this month's existing self score — the reason rides alongside it.
+      // Preserve this stage's existing score — the reason rides alongside it.
       await ref.read(monthlyReviewRepositoryProvider).saveStageScores(
         review.id,
-        ReviewStage.selfRating,
+        stage,
         rowScores: {
           rowId: RowScore(
             value: current?.value,
@@ -350,6 +445,15 @@ class _QuarterlyKraSheetScreenState
 
     final sheetAsync = ref.watch(
         quarterlySheetProvider((employeeId: employeeId, anchor: _anchor!)));
+    // Per-KRA reviewer assignment resolved from the template — fills in the
+    // reviewer on any row that arrived without it, so the "assigned reviewer
+    // only" rule holds even for rows the backend hasn't snapshotted it onto.
+    final reviewerMap =
+        ref.watch(kraReviewerMapProvider(employeeId)).valueOrNull ??
+            (
+              byName: const <String, KraReviewer>{},
+              byOrder: const <KraReviewer?>[]
+            );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -382,24 +486,31 @@ class _QuarterlyKraSheetScreenState
         ),
         data: (data) => _Sheet(
           months: data.months,
-          reviews: data.reviews,
+          reviews: [
+            for (final r in data.reviews) _applyReviewerMap(r, reviewerMap),
+          ],
           scope: scope,
           onPrevQuarter: () => setState(() => _anchor =
-              quarterMonthsFor(_anchor!).first.let((m) => _shiftQuarter(m, -1))),
+              quarterMonthsFor(_anchor!)
+                  .first
+                  .let((m) => _shiftQuarter(m, -1))),
           onNextQuarter: () => setState(() => _anchor =
               quarterMonthsFor(_anchor!).first.let((m) => _shiftQuarter(m, 1))),
           pct: _pct,
           canEditSelf: (r) => _canEditSelf(r, scope),
           canEditManager: (r) => _canEditManager(r, scope),
+          canEditHr: _canEditHr(scope),
+          canEditFinance: _canEditFinance(scope),
+          canEditManagement: _canEditManagement(scope),
           onEdit: _editCell,
           onJustify: _openJustification,
-          // Server value first: a reporting manager / management never picked
-          // the file, so only the stored name can tell them evidence exists.
-          // The local pick is just an optimistic echo for the uploader.
-          fileNameFor: (review, rowId) =>
-              _currentScore(review, rowId, ReviewStage.selfRating)
-                  ?.proofFileName ??
-              _proofFiles['${review.id}|$rowId']?.name,
+          // Server value first: a viewer never picked the file, so only the
+          // stored name can tell them evidence exists. The local pick is just an
+          // optimistic echo for whoever uploaded it. Keyed by stage so the
+          // employee's and each reviewer's attachments are tracked separately.
+          fileNameFor: (review, rowId, stage) =>
+              _currentScore(review, rowId, stage)?.proofFileName ??
+              _proofFiles['${review.id}|$rowId|${stage.name}']?.name,
         ),
       ),
     );
@@ -433,6 +544,8 @@ Widget quarterlyKraSheetBodyForTest({
   required List<MonthlyReview?> reviews,
   bool editableSelf = true,
   bool editableManager = false,
+  bool editableHr = false,
+  bool editableFinance = false,
 }) {
   double? pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
@@ -456,6 +569,9 @@ Widget quarterlyKraSheetBodyForTest({
     pct: pct,
     canEditSelf: (_) => editableSelf,
     canEditManager: (_) => editableManager,
+    canEditHr: editableHr,
+    canEditFinance: editableFinance,
+    canEditManagement: false,
     onEdit: ({
       required review,
       required rowId,
@@ -468,11 +584,12 @@ Widget quarterlyKraSheetBodyForTest({
     onJustify: ({
       required review,
       required rowId,
+      required stage,
       required kraName,
       required monthLabel,
       required canEdit,
     }) async {},
-    fileNameFor: (_, __) => null,
+    fileNameFor: (_, __, ___) => null,
   );
 }
 
@@ -485,6 +602,13 @@ class _Sheet extends StatelessWidget {
   final double? Function(MonthlyReview?, String, ReviewStage) pct;
   final bool Function(MonthlyReview) canEditSelf;
   final bool Function(MonthlyReview) canEditManager;
+  // Role-based (not relationship): the HR / Accounts Review raters and the
+  // Management override. A KRA's Review cell is editable only by its assigned
+  // reviewer — RM via [canEditManager] (relationship), HR via [canEditHr],
+  // Accounts via [canEditFinance].
+  final bool canEditHr;
+  final bool canEditFinance;
+  final bool canEditManagement;
   final Future<void> Function({
     required MonthlyReview review,
     required String rowId,
@@ -497,11 +621,12 @@ class _Sheet extends StatelessWidget {
   final Future<void> Function({
     required MonthlyReview review,
     required String rowId,
+    required ReviewStage stage,
     required String kraName,
     required String monthLabel,
     required bool canEdit,
   }) onJustify;
-  final String? Function(MonthlyReview, String) fileNameFor;
+  final String? Function(MonthlyReview, String, ReviewStage) fileNameFor;
 
   const _Sheet({
     required this.months,
@@ -512,12 +637,16 @@ class _Sheet extends StatelessWidget {
     required this.pct,
     required this.canEditSelf,
     required this.canEditManager,
+    required this.canEditHr,
+    required this.canEditFinance,
+    required this.canEditManagement,
     required this.onEdit,
     required this.onJustify,
     required this.fileNameFor,
   });
 
-  MonthlyReview? get _any => reviews.firstWhere((r) => r != null, orElse: () => null);
+  MonthlyReview? get _any =>
+      reviews.firstWhere((r) => r != null, orElse: () => null);
 
   @override
   Widget build(BuildContext context) {
@@ -526,15 +655,15 @@ class _Sheet extends StatelessWidget {
       // A review row only exists once HR has generated the cycle's monthly
       // reviews. Employees added mid-cycle land here until that happens, so
       // explain it rather than dead-ending on a bare "no review" line.
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
+          padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.event_note_outlined,
                   size: 44, color: AppColors.textMuted),
-              SizedBox(height: 14),
+              const SizedBox(height: 14),
               Text(
                 'No review to rate yet',
                 textAlign: TextAlign.center,
@@ -544,7 +673,7 @@ class _Sheet extends StatelessWidget {
                   color: AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'This quarter’s review hasn’t been set up for these '
                 'KRAs yet. It will appear here once HR generates it — '
@@ -562,79 +691,136 @@ class _Sheet extends StatelessWidget {
       );
     }
     // Canonical KRA rows (same template across months) from the first review.
-    final rows = [...any.rows]..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    final rows = [...any.rows]
+      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
 
     // Weighted monthly totals per stage (0–100) and the quarter average.
     double monthTotal(int i, ReviewStage stage) =>
         reviews[i]?.weightedScorePct(stage) ?? 0;
     double qAvg(ReviewStage stage) =>
-        (monthTotal(0, stage) + monthTotal(1, stage) + monthTotal(2, stage)) / 3;
+        (monthTotal(0, stage) + monthTotal(1, stage) + monthTotal(2, stage)) /
+        3;
 
     final canSelf = canEditSelf(any);
     final canMgr = canEditManager(any);
+    final canEditAny =
+        canSelf || canMgr || canEditHr || canEditFinance || canEditManagement;
     final scopeLabel = canSelf
         ? 'You can edit the Self ratings on this sheet.'
         : canMgr
-            ? 'You can edit the Manager ratings for your report.'
-            : 'View only — you cannot edit this sheet.';
+            ? 'You can rate the KRAs assigned to you as Reporting Manager — '
+                'tap a Review cell.'
+            : canEditHr
+                ? 'You can rate the KRAs assigned to HR — tap a Review cell.'
+                : canEditFinance
+                    ? 'You can rate the KRAs assigned to Accounts — '
+                        'tap a Review cell.'
+                    : canEditManagement
+                        ? 'You can enter the Management rating for each KRA.'
+                        : 'View only — you cannot edit this sheet.';
 
-    final qMgr = qAvg(ReviewStage.reportingManagerRating);
+    // Payout follows the FINAL score (management override → Review average →
+    // self), quarter-averaged across the three months.
+    double qFinalOf() {
+      double sum = 0;
+      for (var i = 0; i < 3; i++) {
+        sum += reviews[i]?.finalScorePct ?? 0;
+      }
+      return sum / 3;
+    }
+
+    final qFinal = qFinalOf();
     final qSelf = qAvg(ReviewStage.selfRating);
     final eligibleMonthly = any.eligibleAmount;
     final quarterEligible = eligibleMonthly * 3;
-    final payout = quarterEligible * qMgr / 100;
+    final payout = quarterEligible * qFinal / 100;
 
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 28),
-      children: [
-        _HeaderCard(
-          review: any,
-          months: months,
-          onPrev: onPrevQuarter,
-          onNext: onNextQuarter,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: Row(
-            children: [
-              Icon(canSelf || canMgr ? Icons.edit_rounded : Icons.visibility_rounded,
-                  size: 14, color: AppColors.textMuted),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(scopeLabel,
-                    style: const TextStyle(
-                        fontSize: 11.5,
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w600)),
+    // Centre the sheet at a max width matching the grid so the header, table
+    // and payout card stay aligned and don't stretch edge-to-edge on a desktop.
+    // 1320 comfortably fits the grid (~1282), so this never forces new
+    // horizontal scrolling; on a phone it's simply full width.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1320),
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 28),
+          children: [
+            _HeaderCard(
+              review: any,
+              months: months,
+              onPrev: onPrevQuarter,
+              onNext: onNextQuarter,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  Icon(
+                      canEditAny
+                          ? Icons.edit_rounded
+                          : Icons.visibility_rounded,
+                      size: 14,
+                      color: AppColors.textMuted),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(scopeLabel,
+                        style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: _ReviewerLegend(),
+            ),
+            // Frame the table so its edge columns don't merge with the screen
+            // edge — a bordered, rounded card (matching the header/payout cards)
+            // with a little internal padding, and a horizontal margin that keeps
+            // it inset from the window. The scroll is clipped to the rounded
+            // corners so content slides cleanly under the border.
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.dividerStrong),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _Grid(
+                  rows: rows,
+                  months: months,
+                  reviews: reviews,
+                  pct: pct,
+                  canEditSelf: canEditSelf,
+                  canEditManager: canEditManager,
+                  canEditHr: canEditHr,
+                  canEditFinance: canEditFinance,
+                  canEditManagement: canEditManagement,
+                  onEdit: onEdit,
+                  onJustify: onJustify,
+                  fileNameFor: fileNameFor,
+                  monthTotal: monthTotal,
+                  qAvg: qAvg,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _PayoutCard(
+              qSelf: qSelf,
+              qFinal: qFinal,
+              eligibleMonthly: eligibleMonthly,
+              quarterEligible: quarterEligible,
+              payout: payout,
+            ),
+          ],
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: _Grid(
-            rows: rows,
-            months: months,
-            reviews: reviews,
-            pct: pct,
-            canEditSelf: canEditSelf,
-            canEditManager: canEditManager,
-            onEdit: onEdit,
-            onJustify: onJustify,
-            fileNameFor: fileNameFor,
-            monthTotal: monthTotal,
-            qAvg: qAvg,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _PayoutCard(
-          qSelf: qSelf,
-          qMgr: qMgr,
-          eligibleMonthly: eligibleMonthly,
-          quarterEligible: quarterEligible,
-          payout: payout,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -682,6 +868,11 @@ class _HeaderCard extends StatelessWidget {
             style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5),
           ),
+          const SizedBox(height: 10),
+          // Fiscal quarter this sheet covers — auto-derived from the months on
+          // view (Q1 = Apr–Jun, Q2 = Jul–Sep, Q3 = Oct–Dec, Q4 = Jan–Mar), so
+          // it updates as you page between quarters and flags the live one.
+          _quarterBadge(),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -703,6 +894,61 @@ class _HeaderCard extends StatelessWidget {
     );
   }
 
+  Widget _quarterBadge() {
+    final anchor = months.first;
+    final now = ReviewPeriod.fromDate(DateTime.now());
+    final isCurrent = now.fiscalQuarter == anchor.fiscalQuarter &&
+        now.fiscalYearStartYear == anchor.fiscalYearStartYear;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.20),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.calendar_month_rounded,
+                size: 15, color: Colors.white),
+            const SizedBox(width: 6),
+            Text('Q${anchor.fiscalQuarter}',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(anchor.fiscalYearLabel,
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12)),
+          ]),
+        ),
+        if (isCurrent)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+            ),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.bolt_rounded, size: 13, color: Colors.white),
+              SizedBox(width: 4),
+              Text('Current quarter',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11)),
+            ]),
+          ),
+      ],
+    );
+  }
+
   Widget _navBtn(IconData icon, VoidCallback onTap) => Material(
         color: Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(8),
@@ -717,6 +963,53 @@ class _HeaderCard extends StatelessWidget {
       );
 }
 
+/// A compact key explaining the per-KRA reviewer colours and the pending
+/// status, so the single-reviewer model reads clearly at the top of the sheet.
+class _ReviewerLegend extends StatelessWidget {
+  const _ReviewerLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('One reviewer per KRA:',
+            style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textMuted)),
+        for (final r in KraReviewer.values) _dot(r),
+        const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.schedule_rounded, size: 11, color: AppColors.warning),
+          SizedBox(width: 3),
+          Text('review pending',
+              style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.warning)),
+        ]),
+      ],
+    );
+  }
+
+  Widget _dot(KraReviewer r) {
+    final color = _reviewerColor(r);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        width: 9,
+        height: 9,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      Text(r.shortLabel,
+          style: TextStyle(
+              fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+    ]);
+  }
+}
+
 class _Grid extends StatefulWidget {
   final List<dynamic> rows; // MonthlyKraRow
   final List<ReviewPeriod> months;
@@ -724,6 +1017,9 @@ class _Grid extends StatefulWidget {
   final double? Function(MonthlyReview?, String, ReviewStage) pct;
   final bool Function(MonthlyReview) canEditSelf;
   final bool Function(MonthlyReview) canEditManager;
+  final bool canEditHr;
+  final bool canEditFinance;
+  final bool canEditManagement;
   final Future<void> Function({
     required MonthlyReview review,
     required String rowId,
@@ -733,16 +1029,17 @@ class _Grid extends StatefulWidget {
     required String kraName,
     required String monthLabel,
   }) onEdit;
-  // The Reason & Proof line item is per KRA AND per month — it opens the
-  // matching month's review, not a single quarter anchor.
+  // The Reason & Proof entry is per KRA, per month AND per stage — the employee
+  // files evidence on self, each reviewer on their own rating stage.
   final Future<void> Function({
     required MonthlyReview review,
     required String rowId,
+    required ReviewStage stage,
     required String kraName,
     required String monthLabel,
     required bool canEdit,
   }) onJustify;
-  final String? Function(MonthlyReview, String) fileNameFor;
+  final String? Function(MonthlyReview, String, ReviewStage) fileNameFor;
   final double Function(int, ReviewStage) monthTotal;
   final double Function(ReviewStage) qAvg;
 
@@ -753,6 +1050,9 @@ class _Grid extends StatefulWidget {
     required this.pct,
     required this.canEditSelf,
     required this.canEditManager,
+    required this.canEditHr,
+    required this.canEditFinance,
+    required this.canEditManagement,
     required this.onEdit,
     required this.onJustify,
     required this.fileNameFor,
@@ -775,27 +1075,63 @@ class _GridState extends State<_Grid> {
       _wKra = 170,
       _wTgt = 112,
       _wTrk = 158,
-      _wMon = 68,
-      _wQtr = 54;
+      _wMon = 70,
+      _wQtr = 56;
+  // Per month: Self | Review | Mgmt (3 cols). Quarter: Self | Review | Final.
   double get _totalWidth =>
-      _wWt + _wKra + _wTgt + _wTrk + _wMon * 6 + _wQtr * 2;
+      _wWt + _wKra + _wTgt + _wTrk + _wMon * 9 + _wQtr * 3;
 
   String _fmt(double? p) => p == null ? '—' : '${p.round()}%';
 
-  RowScore? _selfScore(MonthlyReview r, String rowId) {
+  // Locate row [rowId] within a specific month's review — each month carries
+  // its own scores AND the row's reviewer assignment.
+  MonthlyKraRow? _rowIn(MonthlyReview? r, String rowId) {
+    if (r == null) return null;
     for (final row in r.rows) {
-      if (row.id == rowId) return row.scoreFor(ReviewStage.selfRating);
+      if (row.id == rowId) return row;
     }
     return null;
   }
 
-  // A KRA is "justified" if ANY of its months has a reason or an attachment.
+  // Review-cycle score for ONE KRA/month, straight from the model so every
+  // surface agrees: the ASSIGNED reviewer's rating (null until they score),
+  // averaging only for legacy unassigned rows. See MonthlyReview.reviewPctForRow.
+  double? _reviewPct(MonthlyReview? r, String rowId) {
+    final row = _rowIn(r, rowId);
+    if (row == null) return null;
+    return r!.reviewPctForRow(row);
+  }
+
+  // The final score for ONE KRA/month (management override → Review → self),
+  // per row, straight from the model so the Qtr Final column, totals and payout
+  // all agree. See MonthlyReview.finalPctForRow.
+  double? _rowFinalPct(MonthlyReview? r, String rowId) {
+    final row = _rowIn(r, rowId);
+    if (row == null) return null;
+    return r!.finalPctForRow(row);
+  }
+
+  // The stages that carry a Reason & Proof entry for a KRA row: the employee's
+  // SELF evidence, plus the assigned reviewer's (RM/HR/Accounts) if the KRA is
+  // assigned. Legacy unassigned rows keep just the employee slot.
+  List<ReviewStage> _evidenceStages(MonthlyKraRow? row) {
+    final stages = <ReviewStage>[ReviewStage.selfRating];
+    final rs = row?.reviewStage;
+    if (rs != null) stages.add(rs);
+    return stages;
+  }
+
+  // A KRA is "justified" if ANY month has a reason or attachment on the employee
+  // entry OR its assigned reviewer's entry.
   bool _anyJustified(String rowId) {
     for (final r in widget.reviews) {
       if (r == null) continue;
-      final s = _selfScore(r, rowId);
-      if (s?.remark?.trim().isNotEmpty ?? false) return true;
-      if (widget.fileNameFor(r, rowId) != null) return true;
+      final row = _rowIn(r, rowId);
+      for (final stage in _evidenceStages(row)) {
+        final s = row?.scoreFor(stage);
+        if (s?.remark?.trim().isNotEmpty ?? false) return true;
+        if (widget.fileNameFor(r, rowId, stage) != null) return true;
+      }
     }
     return false;
   }
@@ -827,31 +1163,43 @@ class _GridState extends State<_Grid> {
   }
 
   Widget _headerRow() {
-    const h = TextStyle(
+    final h = TextStyle(
         fontSize: 10.5,
         fontWeight: FontWeight.w800,
         color: AppColors.textMuted,
         height: 1.15);
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.divider)),
       ),
       child: Row(children: [
-        _cell(_wWt, const Text('Wt', style: h), align: Alignment.centerLeft),
-        _cell(_wKra, const Text('KRA', style: h), align: Alignment.centerLeft),
-        _cell(_wTgt, const Text('Target', style: h),
+        _cell(_wWt, Text('Wt', style: h), align: Alignment.centerLeft),
+        _cell(_wKra, Text('KRA', style: h), align: Alignment.centerLeft),
+        _cell(_wTgt, Text('Target', style: h),
             align: Alignment.centerLeft),
-        _cell(_wTrk, const Text('Tracking\nmethod', style: h),
+        _cell(_wTrk, Text('Tracking\nmethod', style: h),
             align: Alignment.centerLeft),
         for (final m in widget.months) ...[
-          _cell(_wMon,
-              Text('${_shortMonth(m)}\nSelf', style: h, textAlign: TextAlign.right)),
-          _cell(_wMon,
-              Text('${_shortMonth(m)}\nMgr', style: h, textAlign: TextAlign.right)),
+          _cell(
+              _wMon,
+              Text('${_shortMonth(m)}\nSelf',
+                  style: h, textAlign: TextAlign.right)),
+          _cell(
+              _wMon,
+              Text('${_shortMonth(m)}\nReview',
+                  style: h, textAlign: TextAlign.right)),
+          _cell(
+              _wMon,
+              Text('${_shortMonth(m)}\nMgmt',
+                  style: h, textAlign: TextAlign.right)),
         ],
-        _cell(_wQtr, const Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
-        _cell(_wQtr, const Text('Qtr\nMgr', style: h, textAlign: TextAlign.right)),
+        _cell(_wQtr,
+            Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
+        _cell(_wQtr,
+            Text('Qtr\nReview', style: h, textAlign: TextAlign.right)),
+        _cell(_wQtr,
+            Text('Qtr\nFinal', style: h, textAlign: TextAlign.right)),
       ]),
     );
   }
@@ -862,7 +1210,8 @@ class _GridState extends State<_Grid> {
       Container(
         decoration: BoxDecoration(
           border: Border(
-              bottom: BorderSide(color: AppColors.divider.withValues(alpha: 0.5))),
+              bottom:
+                  BorderSide(color: AppColors.divider.withValues(alpha: 0.5))),
         ),
         child: _mainRow(row),
       ),
@@ -871,7 +1220,7 @@ class _GridState extends State<_Grid> {
           width: _totalWidth,
           decoration: BoxDecoration(
             color: AppColors.primaryPurple.withValues(alpha: 0.035),
-            border: const Border(bottom: BorderSide(color: AppColors.divider)),
+            border: Border(bottom: BorderSide(color: AppColors.divider)),
           ),
           child: _lineItem(row),
         ),
@@ -882,32 +1231,55 @@ class _GridState extends State<_Grid> {
     final rowId = row.id as String;
     final maxScore = (row.maxScore as num).toDouble();
     final name = row.name as String;
-    double qKra(ReviewStage stage) {
-      final vals = [
-        for (var i = 0; i < 3; i++)
-          widget.pct(widget.reviews[i], rowId, stage) ?? 0,
-      ];
-      return (vals[0] + vals[1] + vals[2]) / 3;
+    // Quarter average of a per-row extractor across the three months (missing
+    // months count as 0, matching the totals row).
+    double qAvgRow(double? Function(MonthlyReview?) f) {
+      double sum = 0;
+      for (var i = 0; i < 3; i++) {
+        sum += f(widget.reviews[i]) ?? 0;
+      }
+      return sum / 3;
     }
 
     return Row(children: [
-      _cell(_wWt, Text('${(row.weightagePercent as num).round()}%',
-          style: const TextStyle(fontSize: 12)), align: Alignment.centerLeft),
+      _cell(
+          _wWt,
+          Text('${(row.weightagePercent as num).round()}%',
+              style: const TextStyle(fontSize: 12)),
+          align: Alignment.centerLeft),
       _cell(_wKra, _kraNameBlock(row), align: Alignment.centerLeft),
       _cell(_wTgt, _targetCell(row), align: Alignment.centerLeft),
       _cell(_wTrk, _trackingCell(row), align: Alignment.centerLeft),
       for (var i = 0; i < 3; i++) ...[
-        _cell(_wMon, _scoreCell(i, rowId, maxScore, name, ReviewStage.selfRating)),
-        _cell(_wMon,
-            _scoreCell(i, rowId, maxScore, name, ReviewStage.reportingManagerRating)),
+        _cell(
+            _wMon,
+            _scoreCell(i, rowId, maxScore, name, ReviewStage.selfRating,
+                canEdit: widget.canEditSelf)),
+        _cell(_wMon, _reviewCell(i, row)),
+        _cell(
+            _wMon,
+            _scoreCell(i, rowId, maxScore, name, ReviewStage.managementReview,
+                canEdit: (_) => widget.canEditManagement)),
       ],
-      _cell(_wQtr, Text(_fmt(qKra(ReviewStage.selfRating)),
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-      _cell(_wQtr, Text(_fmt(qKra(ReviewStage.reportingManagerRating)),
-          style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-              color: AppColors.primaryPurple))),
+      _cell(
+          _wQtr,
+          Text(
+              _fmt(
+                  qAvgRow((r) => widget.pct(r, rowId, ReviewStage.selfRating))),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+      _cell(
+          _wQtr,
+          Text(_fmt(qAvgRow((r) => _reviewPct(r, rowId))),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+      _cell(
+          _wQtr,
+          Text(_fmt(qAvgRow((r) => _rowFinalPct(r, rowId))),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  color: AppColors.primaryPurple))),
     ]);
   }
 
@@ -915,6 +1287,7 @@ class _GridState extends State<_Grid> {
     final cat = row.category as String?;
     final rowId = row.id as String;
     final name = row.name as String;
+    final KraReviewer? reviewer = row.reviewerGroup as KraReviewer?;
     final expanded = _expanded.contains(rowId);
     final justified = _anyJustified(rowId);
     final color = justified ? AppColors.success : AppColors.primaryPurple;
@@ -929,7 +1302,12 @@ class _GridState extends State<_Grid> {
                   fontWeight: FontWeight.w700,
                   color: AppColors.accentOrange)),
         Text(name,
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            style:
+                const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+        if (reviewer != null) ...[
+          const SizedBox(height: 4),
+          _reviewerBadge(reviewer),
+        ],
         const SizedBox(height: 6),
         // Expand toggle for the per-month Reason & Proof line item.
         InkWell(
@@ -949,8 +1327,12 @@ class _GridState extends State<_Grid> {
               border: Border.all(color: color.withValues(alpha: 0.30)),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                  size: 14, color: color),
+              Icon(
+                  expanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 14,
+                  color: color),
               const SizedBox(width: 3),
               Flexible(
                 child: Text('Reason & proof',
@@ -958,7 +1340,9 @@ class _GridState extends State<_Grid> {
                     softWrap: false,
                     overflow: TextOverflow.clip,
                     style: TextStyle(
-                        fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: color)),
               ),
               if (justified) ...[
                 const SizedBox(width: 3),
@@ -976,11 +1360,11 @@ class _GridState extends State<_Grid> {
   Widget _targetCell(dynamic row) {
     final target = row.target as String?;
     if (target == null || target.trim().isEmpty) {
-      return const Text('—',
+      return Text('—',
           style: TextStyle(fontSize: 11, color: AppColors.textMuted));
     }
     return Text(target.trim(),
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 11.5,
             height: 1.3,
             fontWeight: FontWeight.w600,
@@ -991,22 +1375,20 @@ class _GridState extends State<_Grid> {
   Widget _trackingCell(dynamic row) {
     final tracking = row.trackingMethod as String?;
     if (tracking == null || tracking.trim().isEmpty) {
-      return const Text('—',
+      return Text('—',
           style: TextStyle(fontSize: 11, color: AppColors.textMuted));
     }
     return Text(tracking.trim(),
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 11, height: 1.3, color: AppColors.textMuted));
   }
 
   Widget _scoreCell(int monthIdx, String rowId, double maxScore, String name,
-      ReviewStage stage) {
+      ReviewStage stage,
+      {required bool Function(MonthlyReview) canEdit}) {
     final review = widget.reviews[monthIdx];
     final p = widget.pct(review, rowId, stage);
-    final editable = review != null &&
-        (stage == ReviewStage.selfRating
-            ? widget.canEditSelf(review)
-            : widget.canEditManager(review));
+    final editable = review != null && canEdit(review);
     final text = Text(_fmt(p),
         maxLines: 1,
         softWrap: false,
@@ -1045,133 +1427,397 @@ class _GridState extends State<_Grid> {
     );
   }
 
-  // The full-width expandable Reason & Proof line item — one entry per month.
+  // Small pill under a KRA name showing which reviewer owns it in the Review
+  // cycle. Makes the per-KRA assignment visible on the sheet.
+  Widget _reviewerBadge(KraReviewer reviewer) {
+    final color = _reviewerColor(reviewer);
+    return ConstrainedBox(
+      // Never wider than the KRA column, so a long label clips instead of
+      // overflowing the fixed grid.
+      constraints: const BoxConstraints(maxWidth: _wKra - 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          color: color.withValues(alpha: 0.12),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(_reviewerIcon(reviewer), size: 11, color: color),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text('Reviewed by ${reviewer.shortLabel}',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.w800, color: color)),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // True when the current viewer owns [stage] for this review: RM by
+  // relationship, HR / Accounts by role.
+  bool _canEditReviewerStage(MonthlyReview review, ReviewStage stage) {
+    switch (stage) {
+      case ReviewStage.reportingManagerRating:
+        return widget.canEditManager(review);
+      case ReviewStage.accountHrRating:
+        return widget.canEditHr;
+      case ReviewStage.financeRating:
+        return widget.canEditFinance;
+      default:
+        return false;
+    }
+  }
+
+  // The Review-cycle cell for ONE KRA/month. Each KRA is assigned to exactly
+  // ONE reviewer (Reporting Manager / HR / Accounts) — never an average — so
+  // this cell shows that single reviewer's rating and is editable only by them.
+  // Until they've rated, it shows an explicit "<reviewer> pending" status.
+  Widget _reviewCell(int monthIdx, dynamic row) {
+    final review = widget.reviews[monthIdx];
+    final rowId = row.id as String;
+    // Every row resolves to a single reviewer (see _applyReviewerMap); a bare
+    // row passed straight through (tests) defaults to the reporting manager.
+    final KraReviewer reviewer =
+        (row.reviewerGroup as KraReviewer?) ?? KraReviewer.reportingManager;
+    final ReviewStage stage =
+        (row.reviewStage as ReviewStage?) ?? ReviewStage.reportingManagerRating;
+    if (review == null) {
+      return Text(_fmt(null),
+          style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: AppColors.textSecondary));
+    }
+    final maxScore = (row.maxScore as num).toDouble();
+    final name = row.name as String;
+    final p = widget.pct(review, rowId, stage);
+    final editable = _canEditReviewerStage(review, stage);
+    final color = _reviewerColor(reviewer);
+
+    void openEditor() => widget.onEdit(
+          review: review,
+          rowId: rowId,
+          maxScore: maxScore,
+          stage: stage,
+          currentPct: p,
+          kraName: name,
+          monthLabel: _shortMonth(widget.months[monthIdx]),
+        );
+
+    // Already rated → show the reviewer's single score.
+    if (p != null) {
+      final text = Text(_fmt(p),
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.clip,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            color: editable ? color : AppColors.textSecondary,
+          ));
+      if (!editable) return text;
+      return _reviewTapBox(
+        color: color,
+        onTap: openEditor,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(child: text),
+          const SizedBox(width: 2),
+          Icon(Icons.edit_rounded,
+              size: 10, color: color.withValues(alpha: 0.85)),
+        ]),
+      );
+    }
+
+    // Not rated yet, and YOU are the assigned reviewer → a "Rate" affordance.
+    if (editable) {
+      return _reviewTapBox(
+        color: color,
+        onTap: openEditor,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
+            child: Text('Rate',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.clip,
+                style: TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 11.5, color: color)),
+          ),
+          const SizedBox(width: 2),
+          Icon(Icons.add_rounded, size: 12, color: color),
+        ]),
+      );
+    }
+
+    // Not rated yet, view-only → the pending status, naming WHO must rate it.
+    return _pendingChip(reviewer);
+  }
+
+  // Bordered, tappable box shared by the rated-editable and "Rate" states.
+  Widget _reviewTapBox({
+    required Color color,
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.45)),
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  // "<reviewer> review pending" — a compact amber chip (clock + short tag) that
+  // tells the viewer exactly which reviewer this KRA is still waiting on.
+  Widget _pendingChip(KraReviewer reviewer) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        color: AppColors.warning.withValues(alpha: 0.12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.30)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.schedule_rounded, size: 10, color: AppColors.warning),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(reviewer.cellTag,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
+              style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.warning)),
+        ),
+      ]),
+    );
+  }
+
+  // The expandable Reason & Proof panel. Fills the viewport width and lays the
+  // three months out as cards that WRAP — 3-across on a wide screen (everything
+  // in one view), gracefully down to one column on a phone. Each month card
+  // holds the employee's evidence and, for an assigned KRA, its reviewer's.
   Widget _lineItem(dynamic row) {
     final rowId = row.id as String;
     final name = row.name as String;
-    final maxW = (MediaQuery.of(context).size.width - 32).clamp(300.0, 560.0);
+    final reviewer = row.reviewerGroup as KraReviewer?;
+    final screenW = MediaQuery.of(context).size.width;
+    // Fill the viewport minus the weight-column inset, not a fixed 560.
+    final panelW = (screenW - _wWt - 30).clamp(260.0, 1180.0).toDouble();
+    // Columns per row: 3 on a wide screen, 2 on a tablet, 1 on a phone.
+    final cols = panelW >= 840 ? 3 : (panelW >= 560 ? 2 : 1);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_wWt + 6, 10, 12, 12),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxW),
+      padding: const EdgeInsets.fromLTRB(_wWt + 6, 12, 14, 14),
+      child: SizedBox(
+        width: panelW,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(children: [
+            Row(children: [
               Icon(Icons.sticky_note_2_outlined,
-                  size: 13, color: AppColors.textMuted),
-              SizedBox(width: 5),
-              Text('Reason & proof — one per month (reason ≤ 300 chars)',
+                  size: 14, color: AppColors.textMuted),
+              const SizedBox(width: 6),
+              Text('Reason & proof',
                   style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textMuted)),
+                      color: AppColors.textPrimary)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    'employee + reviewer evidence · one per month · reason ≤ 300 chars',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600)),
+              ),
             ]),
-            const SizedBox(height: 8),
-            for (var i = 0; i < 3; i++) _monthReasonRow(row, i, rowId, name),
+            const SizedBox(height: 10),
+            // Cards laid out in rows of `cols`. Each row is an IntrinsicHeight +
+            // stretch Row, so every card in it is the SAME height (aligned
+            // borders) regardless of how much evidence it holds; the last row
+            // is padded so a lone card keeps the same width as the others.
+            for (var start = 0; start < 3; start += cols) ...[
+              if (start > 0) const SizedBox(height: 12),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var c = 0; c < cols; c++) ...[
+                      if (c > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: (start + c) < 3
+                            ? _monthCard(
+                                row, start + c, rowId, name, reviewer)
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _monthReasonRow(dynamic row, int i, String rowId, String name) {
+  Widget _monthCard(
+      dynamic row, int i, String rowId, String name, KraReviewer? reviewer) {
     final review = widget.reviews[i];
     final label = _shortMonth(widget.months[i]);
-    if (review == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(children: [
-          SizedBox(
-              width: 56,
-              child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textMuted))),
-          const SizedBox(width: 8),
-          const Text('Not generated yet',
-              style: TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.textMuted,
-                  fontStyle: FontStyle.italic)),
-        ]),
-      );
-    }
-    final s = _selfScore(review, rowId);
+    final ReviewStage? rs = row.reviewStage as ReviewStage?;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.primaryPurple.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primaryPurple)),
+          ),
+          const SizedBox(height: 8),
+          if (review == null)
+            Text('Not generated yet',
+                style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textMuted,
+                    fontStyle: FontStyle.italic))
+          else ...[
+            _evidenceTile(review, rowId, name, label, ReviewStage.selfRating,
+                'Employee', Icons.person_rounded, widget.canEditSelf(review)),
+            if (rs != null) ...[
+              // Min gap + a Spacer pins the reviewer tile to the card's bottom;
+              // since the row's cards share a height, the reviewer tiles line
+              // up across all three months regardless of the employee entry.
+              const SizedBox(height: 8),
+              const Spacer(),
+              _evidenceTile(
+                  review,
+                  rowId,
+                  name,
+                  label,
+                  rs,
+                  'Reviewer · ${reviewer?.shortLabel ?? ''}',
+                  Icons.how_to_reg_rounded,
+                  _canEditReviewerStage(review, rs)),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  // One evidence slot (employee's or a reviewer's) inside a month card.
+  Widget _evidenceTile(
+      MonthlyReview review,
+      String rowId,
+      String name,
+      String monthLabel,
+      ReviewStage stage,
+      String roleLabel,
+      IconData roleIcon,
+      bool canEdit) {
+    final s = _rowIn(review, rowId)?.scoreFor(stage);
     final reason = s?.remark?.trim() ?? '';
-    final fileName = widget.fileNameFor(review, rowId);
-    final canEdit = widget.canEditSelf(review);
+    final fileName = widget.fileNameFor(review, rowId, stage);
     final filled = reason.isNotEmpty || fileName != null;
-    final promptText = filled
+    final prompt = filled
         ? (reason.isNotEmpty ? reason : 'Attachment added')
-        : (canEdit ? 'Add reason & proof' : 'No reason & proof');
+        : (canEdit ? 'Add reason & proof' : 'No entry');
     final promptColor = filled
         ? AppColors.textPrimary
         : (canEdit ? AppColors.primaryPurple : AppColors.textMuted);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Material(
-        color: AppColors.surface,
+    return Material(
+      color: filled
+          ? AppColors.primaryPurple.withValues(alpha: 0.04)
+          : AppColors.background,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: () => widget.onJustify(
-            review: review,
-            rowId: rowId,
-            kraName: name,
-            monthLabel: label,
-            canEdit: canEdit,
+        onTap: () => widget.onJustify(
+          review: review,
+          rowId: rowId,
+          stage: stage,
+          kraName: name,
+          monthLabel: '$monthLabel · $roleLabel',
+          canEdit: canEdit,
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.divider),
           ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: Row(children: [
-              SizedBox(
-                  width: 48,
-                  child: Text(label,
-                      style: const TextStyle(
-                          fontSize: 11.5, fontWeight: FontWeight.w800))),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(promptText,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(roleIcon, size: 12, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(roleLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 0.2)),
+                ),
+                Icon(canEdit ? Icons.edit_rounded : Icons.visibility_rounded,
+                    size: 13, color: AppColors.textMuted),
+              ]),
+              const SizedBox(height: 4),
+              Text(prompt,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: filled ? FontWeight.w500 : FontWeight.w700,
+                      color: promptColor)),
+              if (fileName != null) ...[
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Icon(Icons.attach_file_rounded,
+                      size: 11, color: AppColors.primaryPurple),
+                  const SizedBox(width: 3),
+                  Expanded(
+                    child: Text(fileName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 12,
-                            fontWeight:
-                                filled ? FontWeight.w500 : FontWeight.w700,
-                            color: promptColor)),
-                    if (fileName != null) ...[
-                      const SizedBox(height: 3),
-                      Row(children: [
-                        const Icon(Icons.attach_file_rounded,
-                            size: 11, color: AppColors.primaryPurple),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: Text(fileName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: AppColors.textSecondary)),
-                        ),
-                      ]),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Icon(canEdit ? Icons.edit_rounded : Icons.visibility_rounded,
-                  size: 14, color: AppColors.textMuted),
-            ]),
+                            fontSize: 10, color: AppColors.textSecondary)),
+                  ),
+                ]),
+              ],
+            ],
           ),
         ),
       ),
@@ -1180,30 +1826,56 @@ class _GridState extends State<_Grid> {
 
   Widget _totalsRow() {
     const t = TextStyle(fontWeight: FontWeight.w800, fontSize: 12);
+    // Weighted monthly Review total and Final total, plus their quarter means.
+    double monthReview(int i) => widget.reviews[i]?.reviewWeightedPct ?? 0;
+    double monthFinal(int i) => widget.reviews[i]?.finalScorePct ?? 0;
+    double qReview() => (monthReview(0) + monthReview(1) + monthReview(2)) / 3;
+    double qFinal() => (monthFinal(0) + monthFinal(1) + monthFinal(2)) / 3;
     return Container(
       decoration:
           BoxDecoration(color: AppColors.primaryPurple.withValues(alpha: 0.06)),
       child: Row(children: [
-        _cell(_wWt,
-            const Text('100%', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+        _cell(
+            _wWt,
+            const Text('100%',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
             align: Alignment.centerLeft),
-        _cell(_wKra, const Text('Total', style: t), align: Alignment.centerLeft),
+        _cell(_wKra, const Text('Total', style: t),
+            align: Alignment.centerLeft),
         _cell(_wTgt, const SizedBox.shrink(), align: Alignment.centerLeft),
         _cell(_wTrk, const SizedBox.shrink(), align: Alignment.centerLeft),
         for (var i = 0; i < 3; i++) ...[
-          _cell(_wMon,
+          _cell(
+              _wMon,
               Text('${widget.monthTotal(i, ReviewStage.selfRating).round()}%',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 12))),
+          _cell(
+              _wMon,
+              Text('${monthReview(i).round()}%',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      color: AppColors.accentOrange))),
           _cell(
               _wMon,
               Text(
-                  '${widget.monthTotal(i, ReviewStage.reportingManagerRating).round()}%',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                  '${widget.monthTotal(i, ReviewStage.managementReview).round()}%',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 12))),
         ],
-        _cell(_wQtr, Text('${widget.qAvg(ReviewStage.selfRating).round()}%', style: t)),
+        _cell(_wQtr,
+            Text('${widget.qAvg(ReviewStage.selfRating).round()}%', style: t)),
         _cell(
             _wQtr,
-            Text('${widget.qAvg(ReviewStage.reportingManagerRating).round()}%',
+            Text('${qReview().round()}%',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: AppColors.accentOrange))),
+        _cell(
+            _wQtr,
+            Text('${qFinal().round()}%',
                 style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 12,
@@ -1215,13 +1887,13 @@ class _GridState extends State<_Grid> {
 
 class _PayoutCard extends StatelessWidget {
   final double qSelf;
-  final double qMgr;
+  final double qFinal;
   final double eligibleMonthly;
   final double quarterEligible;
   final double payout;
   const _PayoutCard({
     required this.qSelf,
-    required this.qMgr,
+    required this.qFinal,
     required this.eligibleMonthly,
     required this.quarterEligible,
     required this.payout,
@@ -1244,8 +1916,9 @@ class _PayoutCard extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
           const SizedBox(height: 12),
           _row('Quarter self average', '${qSelf.round()}%'),
-          _row('Quarter manager average', '${qMgr.round()}%'),
-          _row('Monthly incentive', EmployeeFormatters.currencyInr(eligibleMonthly)),
+          _row('Quarter final average', '${qFinal.round()}%'),
+          _row('Monthly incentive',
+              EmployeeFormatters.currencyInr(eligibleMonthly)),
           _row('Quarter eligible (×3)',
               EmployeeFormatters.currencyInr(quarterEligible)),
           const Divider(height: 20),
@@ -1255,8 +1928,9 @@ class _PayoutCard extends StatelessWidget {
             emphasize: true,
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Payout = monthly incentive × 3 × quarter manager average.',
+          Text(
+            'Payout = monthly incentive × 3 × quarter final average '
+            '(management override, else the Review average).',
             style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
         ],
@@ -1296,12 +1970,12 @@ class _PayoutCard extends StatelessWidget {
 class _RatingSheet extends StatefulWidget {
   final String kraName;
   final String monthLabel;
-  final bool isSelf;
+  final String stageLabel;
   final double? currentPct;
   const _RatingSheet({
     required this.kraName,
     required this.monthLabel,
-    required this.isSelf,
+    required this.stageLabel,
     required this.currentPct,
   });
 
@@ -1343,9 +2017,8 @@ class _RatingSheetState extends State<_RatingSheet> {
               ),
             ),
             Text(
-              '${widget.monthLabel} · '
-              '${widget.isSelf ? 'Self rating' : 'Manager rating'}',
-              style: const TextStyle(
+              '${widget.monthLabel} · ${widget.stageLabel}',
+              style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textMuted,
@@ -1356,7 +2029,7 @@ class _RatingSheetState extends State<_RatingSheet> {
               widget.kraName,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary),
@@ -1393,7 +2066,7 @@ class _RatingSheetState extends State<_RatingSheet> {
               ),
             ),
             const SizedBox(height: 4),
-            const Text('Quick set',
+            Text('Quick set',
                 style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
@@ -1435,7 +2108,7 @@ class _RatingSheetState extends State<_RatingSheet> {
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
-                      side: const BorderSide(color: AppColors.divider),
+                      side: BorderSide(color: AppColors.divider),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text('Cancel'),
@@ -1482,7 +2155,7 @@ class _SheetError extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 14,
                 height: 1.4,
@@ -1631,7 +2304,7 @@ class _JustificationDialogState extends State<_JustificationDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.kraName,
-                style: const TextStyle(
+                style: TextStyle(
                     fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             const SizedBox(height: 14),
             TextField(
@@ -1695,7 +2368,7 @@ class _FilePickRow extends StatelessWidget {
           label: const Text(AppStrings.ratingProofFileAdd),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primaryPurple,
-            side: const BorderSide(color: AppColors.divider),
+            side: BorderSide(color: AppColors.divider),
           ),
         ),
       );
@@ -1721,7 +2394,7 @@ class _FilePickRow extends StatelessWidget {
                   file!.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary),
@@ -1734,14 +2407,14 @@ class _FilePickRow extends StatelessWidget {
               IconButton(
                 onPressed: onRemove,
                 tooltip: AppStrings.ratingProofFileRemove,
-                icon: const Icon(Icons.close_rounded,
+                icon: Icon(Icons.close_rounded,
                     size: 18, color: AppColors.textMuted),
               ),
             ],
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           AppStrings.ratingProofFileLocalNote,
           style: TextStyle(
               fontSize: 10.5, color: AppColors.textMuted, height: 1.3),
@@ -1794,9 +2467,8 @@ class _ProofFileViewer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(file.name,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary)),
+                style: TextStyle(
+                    fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             const SizedBox(height: 12),
             if (isImage && bytes != null)
               ClipRRect(
@@ -1818,7 +2490,7 @@ class _ProofFileViewer extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '${file.mime} · attached by the employee',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 12.5, color: AppColors.textSecondary),
                     ),
                   ),
@@ -1874,14 +2546,14 @@ class _JustificationView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(kraName,
-              style: const TextStyle(
+              style: TextStyle(
                   fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const SizedBox(height: 14),
           _labelled('Reason',
               reason.trim().isEmpty ? AppStrings.ratingNoReason : reason.trim(),
               muted: reason.trim().isEmpty),
           const SizedBox(height: 12),
-          const Text('PROOF ATTACHMENT',
+          Text('PROOF ATTACHMENT',
               style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
@@ -1901,7 +2573,7 @@ class _JustificationView extends StatelessWidget {
                     child: Text(fileName!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 13.5, color: AppColors.textPrimary)),
                   ),
                   if (onOpenFile != null) ...[
@@ -1913,7 +2585,7 @@ class _JustificationView extends StatelessWidget {
               ),
             )
           else
-            const Text('No attachment uploaded.',
+            Text('No attachment uploaded.',
                 style: TextStyle(fontSize: 13.5, color: AppColors.textMuted)),
         ],
       ),
@@ -1931,7 +2603,7 @@ class _JustificationView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textMuted,

@@ -49,7 +49,7 @@ class ReviewHistoryCard extends StatelessWidget {
                       children: [
                         Text(
                           cycle?.name ?? 'Cycle',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
@@ -60,7 +60,7 @@ class ReviewHistoryCard extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             cycle!.fyLabel!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11.5,
                               color: AppColors.textSecondary,
                               fontWeight: FontWeight.w600,
@@ -73,7 +73,7 @@ class ReviewHistoryCard extends StatelessWidget {
                   ),
                   ReviewStateBadge(state: review.state, compact: true),
                   const SizedBox(width: 6),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
                     color: AppColors.textMuted,
                   ),
@@ -130,7 +130,7 @@ class _ScoreColumn extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10.5,
             fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,

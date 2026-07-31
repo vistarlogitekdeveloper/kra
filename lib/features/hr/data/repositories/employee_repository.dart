@@ -20,6 +20,7 @@ abstract class EmployeeRepository {
     required String fullName,
     required String email,
     required String role,
+    String? position,
     String? department,
     String? projectLocationId,
     String? managerId,

@@ -167,7 +167,7 @@ class _Header extends StatelessWidget {
                         review.employee.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
@@ -180,7 +180,7 @@ class _Header extends StatelessWidget {
                         '${review.cycle.name}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary,
@@ -192,7 +192,7 @@ class _Header extends StatelessWidget {
                 ReviewStateBadge(state: review.state),
               ],
             ),
-            const Divider(color: AppColors.divider, height: 24),
+            Divider(color: AppColors.divider, height: 24),
             Row(
               children: [
                 Expanded(
@@ -243,7 +243,7 @@ class _TotalsBlock extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,
@@ -333,7 +333,7 @@ class _WaitingForEmployeeCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -342,7 +342,7 @@ class _WaitingForEmployeeCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${review.employee.name} $message',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       color: AppColors.textSecondary,
                       height: 1.4,
@@ -450,7 +450,7 @@ class _RowsPreview extends StatelessWidget {
             for (int i = 0; i < review.rows.length; i++) ...[
               _RowPreviewTile(row: review.rows[i]),
               if (i != review.rows.length - 1)
-                const Divider(
+                Divider(
                   color: AppColors.divider,
                   height: 1,
                   indent: 16,
@@ -499,7 +499,7 @@ class _RowPreviewTile extends StatelessWidget {
                   row.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -512,7 +512,7 @@ class _RowPreviewTile extends StatelessWidget {
                   '${row.category != null ? "  •  ${row.category}" : ""}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
@@ -595,7 +595,7 @@ class _ManagerCommentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               AppStrings.managerReviewDetailManagerComment,
               style: TextStyle(
                 fontSize: 11,
@@ -607,7 +607,7 @@ class _ManagerCommentCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               comment,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
                 color: AppColors.textPrimary,
                 height: 1.5,
@@ -657,7 +657,7 @@ class _IncentiveCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     AppStrings.managerReviewDetailIncentive,
                     style: TextStyle(
                       fontSize: 11.5,
@@ -731,7 +731,7 @@ class _DetailError extends StatelessWidget {
                 color: AppColors.error,
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 AppStrings.errorGeneric,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -744,7 +744,7 @@ class _DetailError extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   color: AppColors.textSecondary,
                 ),

@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
+import '../../../../../core/widgets/shimmer_box.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../manager/presentation/providers/manager_team_providers.dart';
 import '../../../data/models/employee_profile.dart';
 import '../../providers/my_profile_providers.dart';
 import 'widgets/profile_header.dart';
@@ -92,13 +95,65 @@ class _TreeBody extends StatelessWidget {
         const SizedBox(height: 24),
         const _SectionLabel(text: AppStrings.profileReportingTreeMyReports),
         const SizedBox(height: 8),
-        // The /employee/profile endpoint doesn't carry direct-reports
-        // — that view is a manager-module surface. Stage 5 wires it in.
-        const _EmptyHint(
-          icon: Icons.people_outline_rounded,
-          message: AppStrings.profileReportingTreeNoReports,
-        ),
+        // Direct reports come from the manager-team roster (the same source the
+        // Team dashboard uses), not /employee/profile — so a reporting manager
+        // sees their whole team here, and a plain employee still sees the empty
+        // state.
+        const _MyReportsSection(),
       ],
+    );
+  }
+}
+
+/// The "My reports" list. Fetches the signed-in user's direct reports from the
+/// manager-team roster when they could have any (a manager, or an employee who
+/// is someone's reporting manager); otherwise it's the empty state.
+class _MyReportsSection extends ConsumerWidget {
+  const _MyReportsSection();
+
+  static const _empty = _EmptyHint(
+    icon: Icons.people_outline_rounded,
+    message: AppStrings.profileReportingTreeNoReports,
+  );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final user = authState is AuthAuthenticated ? authState.user : null;
+    // Skip the roster call for users who can't have reports. `hasReports`
+    // catches an EMPLOYEE-role team lead; the role check catches a manager
+    // whose flag hasn't propagated yet.
+    final couldHaveReports = user != null &&
+        (user.hasReports || AppRoutes.canAccessManager(user.role));
+    if (!couldHaveReports) return _empty;
+
+    final async = ref.watch(myDirectReportsProvider);
+    return async.when(
+      loading: () => const Column(
+        children: [
+          ShimmerBox(height: 74, borderRadius: 14),
+          SizedBox(height: 10),
+          ShimmerBox(height: 74, borderRadius: 14),
+        ],
+      ),
+      // A roster failure on a profile screen shouldn't shout — fall back to the
+      // empty hint rather than a scary error card.
+      error: (_, __) => _empty,
+      data: (reports) {
+        if (reports.isEmpty) return _empty;
+        return Column(
+          children: [
+            for (var i = 0; i < reports.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              _PersonNode(
+                name: reports[i].fullName,
+                code: reports[i].employeeCode,
+                role: reports[i].role,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -183,7 +238,7 @@ class _PersonNode extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -215,7 +270,7 @@ class _PersonNode extends StatelessWidget {
                     if (code.isNotEmpty)
                       Text(
                         code,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700,
@@ -258,7 +313,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
           color: AppColors.textSecondary,
@@ -290,7 +345,7 @@ class _EmptyHint extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
                 height: 1.45,
@@ -342,7 +397,7 @@ class _Error extends StatelessWidget {
               color: AppColors.error,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               AppStrings.errorGeneric,
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -355,7 +410,7 @@ class _Error extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),

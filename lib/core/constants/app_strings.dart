@@ -9,10 +9,15 @@ class AppStrings {
   static const String adminDashFilterAll = 'All KRAs';
   static const String adminDashFilterHint = 'Filter by KRA';
   static const String adminDashColEmployee = 'Employee';
+  static const String adminDashColLocation = 'Location';
   static const String adminDashColGrade = 'Grade';
   static const String adminDashColStage = 'Stage';
   static const String adminDashColScore = 'Score';
   static const String adminDashColIncentive = 'Incentive';
+  // Incentive column shows the performance-based payable amount headline, with
+  // the fixed quarterly ceiling beneath it.
+  static const String adminDashColPayable = 'Payable';
+  static const String adminDashFixedPrefix = 'Qtr fixed';
   static const String adminDashNeedsReview = 'Awaiting your review';
   static const String adminDashSearchHint = 'Search employees…';
 
@@ -231,6 +236,8 @@ class AppStrings {
   static const String employeeFormFullName = 'Full name';
   static const String employeeFormEmail = 'Work email';
   static const String employeeFormRole = 'Role';
+  static const String employeeFormDesignation = 'Designation';
+  static const String employeeFormDesignationHint = 'Select designation';
   static const String employeeFormDepartment = 'Department';
   static const String employeeFormProjectLocation = 'Project location';
   static const String employeeFormManager = 'Reporting manager';
@@ -291,10 +298,13 @@ class AppStrings {
   static const String kraTemplateFormItemDescription = 'Description';
   static const String kraTemplateFormItemTarget = 'Target';
   static const String kraTemplateFormItemTracking = 'Tracking method';
+  static const String kraTemplateFormItemReviewer = 'Reviewed by';
   static const String kraTemplateFormItemWeightage = 'Weightage %';
   static const String kraTemplateFormSaved = 'Template saved.';
   static const String kraTemplateFormItemsRequired =
       'Add at least one KRA item.';
+  static const String kraTemplateFormReviewerRequired =
+      'Pick who reviews each KRA (Reporting Manager, HR or Accounts).';
 
   // ───── Weightage indicator ─────
   static const String weightageOf = 'of';
@@ -395,7 +405,6 @@ class AppStrings {
 
   // ───── HR Drawer ─────
   static const String hrDrawerLocations = 'Locations';
-  static const String hrDrawerBulkSetup = 'Bulk Setup';
   static const String hrDrawerAssignKras = 'Assign KRAs';
   static const String hrDrawerProfile = 'Profile';
 
@@ -418,21 +427,6 @@ class AppStrings {
       'Employees assigned here will need to be reassigned.';
   static const String locationDeleteSuccess = 'Location deleted.';
   static const String locationSaved = 'Location saved.';
-
-  // ───── Bulk Setup wizard ─────
-  static const String bulkSetupTitle = 'Bulk Setup';
-  static const String bulkSetupStep1 = 'Filter Employees';
-  static const String bulkSetupStep2 = 'Select Employees';
-  static const String bulkSetupStep3 = 'Preview';
-  static const String bulkSetupStep4 = 'Execute';
-  static const String bulkSetupFindEmployees = 'Find Eligible Employees';
-  static const String bulkSetupPreview = 'Preview';
-  static const String bulkSetupExecute = 'Create Reviews';
-  static const String bulkSetupConfirmTitle = 'Create reviews?';
-  static const String bulkSetupConfirmMessage =
-      'This will create KRA reviews for the selected employees. This cannot be undone.';
-  static const String bulkSetupSuccess = 'Reviews created successfully.';
-  static const String bulkSetupNoCycle = 'Please select a review cycle.';
 
   // ───── Audit Log ─────
   static const String auditLogTitle = 'Audit Log';
@@ -528,6 +522,12 @@ class AppStrings {
   static const String monthlyReviewsTitleAll = 'Monthly Reviews';
   static const String monthlyReviewsNavPreview = 'Monthly Reviews (preview)';
   static const String monthlyReviewsEmpty = 'No reviews for this month.';
+  static const String monthlyReviewsSearchHint = 'Search by name or code';
+  static const String monthlyReviewsNoMatch = 'No reviews match your search.';
+  static const String monthlyReviewsFilterAll = 'All';
+  static const String monthlyReviewsFilterMine = 'Awaiting my review';
+  static const String monthlyReviewsNoneAwaiting =
+      'Nothing is awaiting your review right now.';
   static const String monthlyReviewsNeedsYou = 'Needs you';
   static const String monthlyReviewsWaitingOn = 'Waiting on';
   static const String monthlyReviewStageDone = 'Done';
@@ -543,10 +543,45 @@ class AppStrings {
   static const String monthlyReviewReturned =
       'Returned to the reporting manager.';
   static const String monthlyReviewPaid = 'Incentive marked as paid.';
+  static const String monthlyReviewPaidBadge = 'Paid';
+  static const String monthlyReviewMarkPaidTooltip = 'Mark incentive paid';
+  static const String monthlyReviewMarkPaidConfirmTitle = 'Mark incentive paid?';
+  static const String monthlyReviewMarkPaidConfirmMessage =
+      'Confirm the incentive payout has been settled. This finalizes the '
+      'review and can\'t be undone.';
   static const String monthlyReviewActionFailed =
       'Could not complete the action. Please try again.';
   static const String monthlyReviewProjectedPayout = 'Projected payout';
   static const String monthlyReviewEligible = 'Eligible amount';
+
+  // ───── Performance Incentive Sheet (quarterly report) ─────
+  static const String perfIncentiveTitle = 'Performance Incentive Sheet';
+  static const String perfIncentiveSubtitle =
+      'Quarterly performance-incentive report — every employee, all months.';
+  static const String perfIncentiveReadOnly =
+      'Read only · quarterly performance-incentive report';
+  static const String perfIncentiveExport = 'Export to Excel (CSV)';
+  static const String perfIncentiveExported =
+      'Exported — the CSV opens in Excel.';
+  static const String perfIncentiveExportNothing = 'Nothing to export yet.';
+  static const String perfIncentiveExportUnsupported =
+      'Export/download is only available in the web app.';
+  static const String perfIncentiveEmpty =
+      'No reviews have been generated for this quarter yet.';
+  static const String perfIncColSrNo = 'Sr';
+  static const String perfIncColCode = 'EMP Code';
+  static const String perfIncColName = 'Name of Employee';
+  static const String perfIncColAmount = 'Incentive\nAmount';
+  static const String perfIncColLocation = 'Project\nLocation';
+  static const String perfIncColTotal = 'Total';
+  static const String perfIncColFixed = 'Qtr Fixed\nIncentive';
+  static const String perfIncColPayable = 'Payable\nIncentive';
+  static const String perfIncColRemark = 'Remark';
+
+  // ───── Theme ─────
+  static const String themeSwitchToLight = 'Switch to light mode';
+  static const String themeSwitchToDark = 'Switch to dark mode';
+  static const String themeAppearance = 'Appearance';
 
   // ───── Self-Rate ─────
   static const String selfRateTitle = 'Rate yourself';
@@ -925,6 +960,9 @@ class AppStrings {
   static const String workspaceMyKraSubtitle = 'Your own review & self-rating';
   static const String workspaceMyTeam = 'My Team';
   static const String workspaceMyTeamSubtitle = 'Review your team';
+  static const String workspaceReviews = 'Reviews';
+  static const String workspaceReviewsSubtitle =
+      'Rate & approve monthly KRA reviews';
   static const String workspaceHrAdmin = 'HR Admin';
   static const String workspaceHrAdminSubtitle =
       'Employees, templates & reports';

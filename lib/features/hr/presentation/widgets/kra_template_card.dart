@@ -66,7 +66,7 @@ class KraTemplateCard extends StatelessWidget {
                           template.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
@@ -79,7 +79,7 @@ class KraTemplateCard extends StatelessWidget {
                   ),
                   if (onClone != null || onDelete != null)
                     PopupMenuButton<String>(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.more_vert_rounded,
                         color: AppColors.textSecondary,
                         size: 20,
@@ -126,7 +126,7 @@ class KraTemplateCard extends StatelessWidget {
                   template.description!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textSecondary,
                     height: 1.4,

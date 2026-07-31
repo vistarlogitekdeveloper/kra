@@ -10,6 +10,27 @@ void main() {
   final now = DateTime(2026, 6, 22);
   MockMonthlyReviewRepository repo() => MockMonthlyReviewRepository(now: now);
 
+  // Walk a review seeded at reportingManagerRating through the three parallel
+  // Review raters (RM → HR → Finance) so it lands at managementReview. The
+  // reordered pipeline no longer jumps RM → management in a single submit.
+  Future<void> advanceToManagement(
+      MockMonthlyReviewRepository r, String id) async {
+    for (final stage in const [
+      ReviewStage.reportingManagerRating,
+      ReviewStage.accountHrRating,
+      ReviewStage.financeRating,
+    ]) {
+      final rev = await r.getReview(id);
+      await r.submitStage(
+        id,
+        stage,
+        rowScores: {for (final row in rev.rows) row.id: const RowScore(value: 7)},
+        actorId: 'x',
+        actorName: 'X',
+      );
+    }
+  }
+
   group('MockMonthlyReviewRepository seeding + scoping', () {
     test('seeds both the current and previous month', () async {
       final r = repo();
@@ -56,7 +77,7 @@ void main() {
   });
 
   group('MockMonthlyReviewRepository state machine', () {
-    test('submitting self-rating advances to Account & HR', () async {
+    test('submitting self-rating advances to the reporting manager', () async {
       final r = repo();
       const id = '2026-06-emp1'; // seeded at selfRating
       final before = await r.getReview(id);
@@ -72,7 +93,8 @@ void main() {
         actorId: 'emp1',
         actorName: 'Asha',
       );
-      expect(after.currentStage, ReviewStage.accountHrRating);
+      // New pipeline: self → the three Review raters (RM first) → management.
+      expect(after.currentStage, ReviewStage.reportingManagerRating);
       expect(after.statusOf(ReviewStage.selfRating), StageStatus.submitted);
       expect(after.rows.first.scoreFor(ReviewStage.selfRating)?.value, 8);
     });
@@ -95,15 +117,9 @@ void main() {
       const id = '2026-06-emp2'; // seeded at reportingManagerRating
       var rev = await r.getReview(id);
       expect(rev.currentStage, ReviewStage.reportingManagerRating);
-      rev = await r.submitStage(
-        id,
-        ReviewStage.reportingManagerRating,
-        rowScores: {
-          for (final row in rev.rows) row.id: const RowScore(value: 7),
-        },
-        actorId: 'm1',
-        actorName: 'Manish',
-      );
+      // Walk RM → HR → Finance so the review reaches management review.
+      await advanceToManagement(r, id);
+      rev = await r.getReview(id);
       expect(rev.currentStage, ReviewStage.managementReview);
 
       final returned = await r.submitStage(
@@ -139,14 +155,8 @@ void main() {
         () async {
       final r = repo();
       const id = '2026-06-emp2'; // seeded at reportingManagerRating
-      final seeded = await r.getReview(id);
-      await r.submitStage(
-        id,
-        ReviewStage.reportingManagerRating,
-        rowScores: {for (final row in seeded.rows) row.id: const RowScore(value: 7)},
-        actorId: 'm1',
-        actorName: 'Manish',
-      );
+      // Walk RM → HR → Finance so the review reaches management review.
+      await advanceToManagement(r, id);
       final returned = await r.submitStage(
         id,
         ReviewStage.managementReview,
@@ -159,14 +169,10 @@ void main() {
       expect(returned.recordFor(ReviewStage.managementReview)?.comment,
           'Please revisit row 2');
 
-      final resubmitted = await r.submitStage(
-        id,
-        ReviewStage.reportingManagerRating,
-        rowScores: {for (final row in returned.rows) row.id: const RowScore(value: 9)},
-        actorId: 'm1',
-        actorName: 'Manish',
-      );
-      // Once redone, the stale note is gone so management re-badges as pending.
+      // Redo the reporting-manager rating and walk back through HR + Finance to
+      // management review. Resubmitting RM clears the stale management note.
+      await advanceToManagement(r, id);
+      final resubmitted = await r.getReview(id);
       expect(resubmitted.currentStage, ReviewStage.managementReview);
       expect(resubmitted.recordFor(ReviewStage.managementReview), isNull);
       expect(resubmitted.statusOf(ReviewStage.managementReview),

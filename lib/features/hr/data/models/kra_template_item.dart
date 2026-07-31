@@ -1,3 +1,5 @@
+import '../../../../core/enums/kra_reviewer.dart';
+
 /// A single KRA item inside a [KraTemplate]. Weightages must sum to 100
 /// (or 1.0) across all items in a template — see [weightagePercent].
 ///
@@ -11,6 +13,12 @@ class KraTemplateItem {
   final String? target;
   final String? trackingMethod;
 
+  /// Which single reviewer rates this KRA in the Review cycle (Reporting
+  /// Manager / HR / Accounts). Null until the author picks one — the form
+  /// requires it before Save, but a legacy template loaded without it stays
+  /// null and the review falls back to averaging whoever rated.
+  final KraReviewer? reviewerGroup;
+
   /// Stored as a percentage (0–100). The API accepts either a decimal
   /// (0.30) or a percentage (30) — see [toJson] for the wire format.
   final double weightage;
@@ -22,6 +30,7 @@ class KraTemplateItem {
     this.description,
     this.target,
     this.trackingMethod,
+    this.reviewerGroup,
     required this.weightage,
     required this.sortOrder,
   });
@@ -57,6 +66,13 @@ class KraTemplateItem {
       description: json['description'] as String?,
       target: json['target'] as String?,
       trackingMethod: json['trackingMethod'] as String?,
+      // Tolerate a few key spellings: the app sends `reviewerGroup`, the raw
+      // table may surface `reviewer_group` or the legacy `scoreSource`.
+      reviewerGroup: KraReviewer.fromApi((json['reviewerGroup'] ??
+              json['reviewer_group'] ??
+              json['scoreSource'] ??
+              json['score_source'])
+          ?.toString()),
       weightage: pct,
       sortOrder: internalSortOrder,
     );
@@ -92,6 +108,13 @@ class KraTemplateItem {
         'description': description ?? '',
         'target': target ?? '',
         'trackingMethod': trackingMethod ?? '',
+        // Which reviewer owns this KRA. `scoreSource` is the field the live
+        // template API actually persists (its `score_source` column) and its
+        // enum is fixed, so it MUST be sent in that vocabulary. `reviewerGroup`
+        // is sent alongside for any backend that reads a dedicated column; the
+        // template API simply ignores unknown keys.
+        if (reviewerGroup != null) 'scoreSource': reviewerGroup!.toScoreSource(),
+        if (reviewerGroup != null) 'reviewerGroup': reviewerGroup!.toApiString(),
         'weightage': weightagePercent / 100,
         'sortOrder': sortOrder + 1,
       };
@@ -102,6 +125,7 @@ class KraTemplateItem {
     String? description,
     String? target,
     String? trackingMethod,
+    KraReviewer? reviewerGroup,
     double? weightage,
     int? sortOrder,
   }) {
@@ -111,6 +135,7 @@ class KraTemplateItem {
       description: description ?? this.description,
       target: target ?? this.target,
       trackingMethod: trackingMethod ?? this.trackingMethod,
+      reviewerGroup: reviewerGroup ?? this.reviewerGroup,
       weightage: weightage ?? this.weightage,
       sortOrder: sortOrder ?? this.sortOrder,
     );

@@ -31,13 +31,13 @@ class ScoreComparisonTable extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingTextStyle: const TextStyle(
+          headingTextStyle: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,
             letterSpacing: 0.4,
           ),
-          dataTextStyle: const TextStyle(
+          dataTextStyle: TextStyle(
             fontSize: 12,
             color: AppColors.textPrimary,
           ),
@@ -60,7 +60,7 @@ class ScoreComparisonTable extends StatelessWidget {
                   DataCell(_KraNameCell(row: row)),
                   DataCell(Text(
                     EmployeeFormatters.weightagePercent(row.weightPercent),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textSecondary,
@@ -124,7 +124,7 @@ class _KraNameCell extends StatelessWidget {
             row.templateItem?.name ?? '—',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -162,7 +162,7 @@ class _CellWidget extends StatelessWidget {
       orElse: () => MonthlyScore(id: '', monthId: monthId),
     );
     if (cell.id.isEmpty || cell.isNotApplicable) {
-      return const Text(
+      return Text(
         '—',
         style: TextStyle(
           fontSize: 12,
@@ -189,8 +189,8 @@ class _CellWidget extends StatelessWidget {
               small: true,
             ),
             if (hasRemark)
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
                 child: Icon(
                   Icons.comment_rounded,
                   size: 11,
@@ -244,7 +244,7 @@ class _CommentSheet extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
@@ -305,7 +305,7 @@ class _RemarkBlock extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               color: AppColors.textPrimary,
               height: 1.45,

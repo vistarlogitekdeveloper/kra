@@ -102,6 +102,12 @@ class _DetailContent extends StatelessWidget {
           title: 'Employment',
           rows: [
             _DetailRow(
+              label: AppStrings.employeeFormDesignation,
+              value: (employee.position?.trim().isNotEmpty ?? false)
+                  ? employee.position!.trim()
+                  : '—',
+            ),
+            _DetailRow(
               label: 'Role',
               value: _humanRole(employee.role),
             ),
@@ -187,7 +193,7 @@ class _DetailContent extends StatelessWidget {
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.divider),
+                  side: BorderSide(color: AppColors.divider),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -282,7 +288,7 @@ class _KraAssignmentsSection extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'KRA Assignments',
                 style: TextStyle(
                   fontSize: 12,
@@ -334,7 +340,7 @@ class _KraAssignmentsSection extends ConsumerWidget {
                         color: AppColors.textMuted.withValues(alpha: 0.7),
                       ),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'No KRAs assigned yet. Use the Assign KRA action below.',
                           style: TextStyle(
@@ -399,7 +405,7 @@ class _AssignmentRow extends StatelessWidget {
               children: [
                 Text(
                   cycleLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -408,7 +414,7 @@ class _AssignmentRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '$templateLabel · $itemCount KRA${itemCount == 1 ? '' : 's'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
@@ -425,12 +431,12 @@ class _AssignmentRow extends StatelessWidget {
                 color: AppColors.textMuted.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.lock_rounded,
                       size: 11, color: AppColors.textMuted),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
                     'Locked',
                     style: TextStyle(
@@ -502,7 +508,7 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 Text(
                   employee.fullName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -511,7 +517,7 @@ class _ProfileHeader extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   employee.email,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -566,7 +572,7 @@ class _DetailCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textSecondary,
@@ -628,7 +634,7 @@ class _DetailRow extends StatelessWidget {
             width: 110,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
                 color: AppColors.textSecondary,
@@ -773,7 +779,7 @@ class _AssignIncentiveSheetState extends ConsumerState<_AssignIncentiveSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               AppStrings.employeeIncentiveSheetTitle,
               style: TextStyle(
                 fontSize: 17,
@@ -784,7 +790,7 @@ class _AssignIncentiveSheetState extends ConsumerState<_AssignIncentiveSheet> {
             const SizedBox(height: 4),
             Text(
               widget.employee.fullName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
               ),
@@ -797,7 +803,7 @@ class _AssignIncentiveSheetState extends ConsumerState<_AssignIncentiveSheet> {
               ),
               const SizedBox(height: 12),
             ],
-            const Text(
+            Text(
               AppStrings.employeeFormMonthlyIncentive,
               style: TextStyle(
                 fontSize: 13,

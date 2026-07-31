@@ -36,7 +36,9 @@ class StagePill extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
       child: Text(
-        stage.label,
+        // Phase label — the three Review raters collapse to a single "Review",
+        // and a completed Review phase shows as "Management Review" (pending).
+        stage.phaseLabel,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
@@ -124,7 +126,7 @@ class StageTimeline extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${s.pipelineIndex}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textMuted,

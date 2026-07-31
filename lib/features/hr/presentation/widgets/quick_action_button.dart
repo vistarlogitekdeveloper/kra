@@ -9,7 +9,7 @@ class QuickActionButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final Color iconBg;
+  final Color? iconBg;
   final Color iconFg;
 
   const QuickActionButton({
@@ -17,7 +17,7 @@ class QuickActionButton extends StatefulWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.iconBg = AppColors.primaryPurpleSurface,
+    this.iconBg,
     this.iconFg = AppColors.primaryPurple,
   });
 
@@ -51,7 +51,7 @@ class _QuickActionButtonState extends State<QuickActionButton> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: widget.iconBg,
+                  color: widget.iconBg ?? AppColors.primaryPurpleSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(widget.icon, color: widget.iconFg, size: 22),
@@ -60,7 +60,7 @@ class _QuickActionButtonState extends State<QuickActionButton> {
               Expanded(
                 child: Text(
                   widget.label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -68,7 +68,7 @@ class _QuickActionButtonState extends State<QuickActionButton> {
                   ),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.textMuted,
                 size: 20,

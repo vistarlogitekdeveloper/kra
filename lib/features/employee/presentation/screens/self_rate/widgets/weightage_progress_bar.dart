@@ -31,7 +31,7 @@ class WeightageProgressBar extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
           bottom: BorderSide(color: AppColors.divider, width: 1),
@@ -42,7 +42,7 @@ class WeightageProgressBar extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 AppStrings.selfRateLiveTotal,
                 style: TextStyle(
                   fontSize: 12.5,

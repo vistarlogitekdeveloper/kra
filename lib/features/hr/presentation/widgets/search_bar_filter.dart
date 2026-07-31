@@ -94,25 +94,25 @@ class _SearchBarFilterState extends State<SearchBarFilter> {
               child: TextField(
                 controller: _controller,
                 onChanged: _onChanged,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14.5,
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
                   hintText: widget.hint,
-                  hintStyle: const TextStyle(
+                  hintStyle: TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 14,
                   ),
-                  prefixIcon: const Icon(
+                  prefixIcon: Icon(
                     Icons.search_rounded,
                     color: AppColors.textSecondary,
                     size: 20,
                   ),
                   suffixIcon: _hasText
                       ? IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.close_rounded,
                             size: 18,
                             color: AppColors.textSecondary,

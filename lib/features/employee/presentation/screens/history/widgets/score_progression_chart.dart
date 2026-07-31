@@ -30,7 +30,7 @@ class ScoreProgressionChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Self vs Manager',
             style: TextStyle(
               fontSize: 13,
@@ -77,7 +77,7 @@ class _RowBars extends StatelessWidget {
           row.templateItem?.name ?? '—',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
@@ -183,7 +183,7 @@ class _LegendDot extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,

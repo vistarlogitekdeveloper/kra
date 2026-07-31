@@ -110,7 +110,7 @@ class SelfRatingChip extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 selfRemark!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13.5,
                   color: AppColors.textPrimary,
                   height: 1.5,

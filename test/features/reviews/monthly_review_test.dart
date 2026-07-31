@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/enums/kra_reviewer.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_kra_row.dart';
@@ -208,11 +209,12 @@ void main() {
       expect(r.furthestScoredStage, isNull);
     });
 
-    test('Yash case: manager scores present but the pipeline cursor is '
-        'frozen at selfRating (save-scores never advances it) — the display '
-        'stage still reports the manager stage as submitted', () {
-      // Mirrors the live payload: currentStage SELF_RATING, but rows carry
-      // both self and reporting-manager scores.
+    test('Yash case: every KRA reviewed but the cursor is frozen at selfRating '
+        '(save-scores never advances it) — the display advances to Management '
+        'Review as the pending next step', () {
+      // Mirrors the live payload: currentStage SELF_RATING, but the (single)
+      // KRA carries both a self and a reporting-manager (Review) score — so the
+      // Review phase is complete and management is what's pending.
       final r = reviewAt(
         ReviewStage.selfRating,
         rows: [
@@ -225,13 +227,91 @@ void main() {
         ],
       );
       expect(r.furthestScoredStage, ReviewStage.reportingManagerRating);
-      expect(r.displayStage, ReviewStage.reportingManagerRating);
-      expect(r.displayStatus, StageStatus.submitted);
-      // The summary the dashboard renders picks this up instead of 0% / self.
+      expect(r.reviewPhaseComplete, isTrue);
+      expect(r.displayStage, ReviewStage.managementReview);
+      expect(r.displayStatus, StageStatus.inProgress);
+      // The summary the dashboard renders reflects it: Management Review
+      // pending, with the Review average as the running score.
       final summary = MonthlyReviewSummary.fromReview(r);
-      expect(summary.currentStage, ReviewStage.reportingManagerRating);
-      expect(summary.currentStageStatus, StageStatus.submitted);
+      expect(summary.currentStage, ReviewStage.managementReview);
+      expect(summary.currentStageStatus, StageStatus.inProgress);
       expect(summary.finalScorePct, closeTo(95, 1e-9));
+    });
+
+    test('a partly-reviewed sheet stays in the Review phase (in progress)', () {
+      // Two KRAs, each owned by ONE reviewer: RM has rated theirs, Accounts
+      // has NOT — the Review phase is not done, so it must not read as
+      // "Management Review" (nor as submitted/green).
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        rows: [
+          const MonthlyKraRow(
+                  id: 'm',
+                  name: 'M',
+                  weightagePercent: 50,
+                  maxScore: 100,
+                  reviewerGroup: KraReviewer.reportingManager)
+              .withStageScore(
+                  ReviewStage.reportingManagerRating,
+                  const RowScore(value: 90)),
+          const MonthlyKraRow(
+              id: 'a',
+              name: 'A',
+              weightagePercent: 50,
+              maxScore: 100,
+              reviewerGroup: KraReviewer.accounts),
+        ],
+      );
+      expect(r.reviewPhaseComplete, isFalse);
+      expect(r.displayStage.reviewCycle, 2); // still the Review phase
+      expect(r.displayStatus, StageStatus.inProgress);
+    });
+
+    test('all assigned reviewers done → Management Review (pending)', () {
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        rows: [
+          const MonthlyKraRow(
+                  id: 'm',
+                  name: 'M',
+                  weightagePercent: 50,
+                  maxScore: 100,
+                  reviewerGroup: KraReviewer.reportingManager)
+              .withStageScore(ReviewStage.reportingManagerRating,
+                  const RowScore(value: 90)),
+          const MonthlyKraRow(
+                  id: 'a',
+                  name: 'A',
+                  weightagePercent: 50,
+                  maxScore: 100,
+                  reviewerGroup: KraReviewer.accounts)
+              .withStageScore(
+                  ReviewStage.financeRating, const RowScore(value: 100)),
+        ],
+      );
+      expect(r.reviewPhaseComplete, isTrue);
+      expect(r.displayStage, ReviewStage.managementReview);
+      expect(r.displayStatus, StageStatus.inProgress);
+    });
+
+    test('once management scores, the stage reads Management Review (done)', () {
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        rows: [
+          const MonthlyKraRow(
+                  id: 'm',
+                  name: 'M',
+                  weightagePercent: 100,
+                  maxScore: 100,
+                  reviewerGroup: KraReviewer.reportingManager)
+              .withStageScore(ReviewStage.reportingManagerRating,
+                  const RowScore(value: 90))
+              .withStageScore(
+                  ReviewStage.managementReview, const RowScore(value: 80)),
+        ],
+      );
+      expect(r.displayStage, ReviewStage.managementReview);
+      expect(r.displayStatus, StageStatus.submitted);
     });
 
     test('with only self scored, display stage is self (submitted)', () {
@@ -303,6 +383,158 @@ void main() {
     test('returns 0 when nothing has been scored yet', () {
       final r = reviewAt(ReviewStage.selfRating, rows: rows);
       expect(r.finalScorePct, 0);
+    });
+  });
+
+  group('MonthlyReview Review-cycle scoring', () {
+    const rows = [
+      MonthlyKraRow(id: 'a', name: 'A', weightagePercent: 100, maxScore: 10),
+    ];
+
+    test('reviewPctForRow averages whichever of RM/HR/Finance are present', () {
+      // RM 100%, HR 80%, Finance 60% → mean 80%.
+      final r = reviewAt(ReviewStage.reportingManagerRating, rows: [
+        rows[0]
+            .withStageScore(
+                ReviewStage.reportingManagerRating, const RowScore(value: 10))
+            .withStageScore(
+                ReviewStage.accountHrRating, const RowScore(value: 8))
+            .withStageScore(
+                ReviewStage.financeRating, const RowScore(value: 6)),
+      ]);
+      expect(r.reviewPctForRow(r.rows.first), closeTo(80, 1e-9));
+      expect(r.reviewWeightedPct, closeTo(80, 1e-9));
+      expect(r.finalScorePct, closeTo(80, 1e-9));
+    });
+
+    test('a single Review rater present is the row average (no zero-fill)', () {
+      final r = reviewAt(ReviewStage.reportingManagerRating, rows: [
+        rows[0].withStageScore(
+            ReviewStage.accountHrRating, const RowScore(value: 9)),
+      ]);
+      expect(r.reviewPctForRow(r.rows.first), closeTo(90, 1e-9));
+    });
+
+    test('reviewPctForRow is null until a Review rater scores the row', () {
+      final r = reviewAt(ReviewStage.selfRating, rows: [
+        rows[0]
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 10)),
+      ]);
+      expect(r.reviewPctForRow(r.rows.first), isNull);
+    });
+
+    test('management override wins over the Review average as the final', () {
+      final r = reviewAt(ReviewStage.managementReview, rows: [
+        rows[0]
+            .withStageScore(
+                ReviewStage.reportingManagerRating, const RowScore(value: 10))
+            .withStageScore(
+                ReviewStage.accountHrRating, const RowScore(value: 10))
+            .withStageScore(
+                ReviewStage.managementReview, const RowScore(value: 5)),
+      ]);
+      // Review average would be 100%, but management reworked it to 50%.
+      expect(r.reviewWeightedPct, closeTo(100, 1e-9));
+      expect(r.finalScorePct, closeTo(50, 1e-9));
+    });
+
+    test('furthestScoredStage tracks self → RM → HR → Finance → management',
+        () {
+      final r = reviewAt(ReviewStage.selfRating, rows: [
+        rows[0]
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 10))
+            .withStageScore(
+                ReviewStage.financeRating, const RowScore(value: 8)),
+      ]);
+      expect(r.furthestScoredStage, ReviewStage.financeRating);
+    });
+
+    test('an ASSIGNED KRA uses only its reviewer, ignoring other raters', () {
+      // KRA assigned to HR. HR rated 8/10; a stray RM rating must NOT blend in.
+      final r = reviewAt(ReviewStage.reportingManagerRating, rows: [
+        const MonthlyKraRow(
+                id: 'a',
+                name: 'A',
+                weightagePercent: 100,
+                maxScore: 10,
+                reviewerGroup: KraReviewer.hr)
+            .withStageScore(
+                ReviewStage.reportingManagerRating, const RowScore(value: 10))
+            .withStageScore(
+                ReviewStage.accountHrRating, const RowScore(value: 8)),
+      ]);
+      expect(r.reviewPctForRow(r.rows.first), closeTo(80, 1e-9));
+      expect(r.reviewWeightedPct, closeTo(80, 1e-9));
+    });
+
+    test('an ASSIGNED KRA is null until ITS reviewer scores it', () {
+      // Assigned to Accounts, but only RM has scored → no Review score yet.
+      final r = reviewAt(ReviewStage.reportingManagerRating, rows: [
+        const MonthlyKraRow(
+                id: 'a',
+                name: 'A',
+                weightagePercent: 100,
+                maxScore: 10,
+                reviewerGroup: KraReviewer.accounts)
+            .withStageScore(
+                ReviewStage.reportingManagerRating, const RowScore(value: 9)),
+      ]);
+      expect(r.reviewPctForRow(r.rows.first), isNull);
+    });
+
+    test('finalScorePct blends each KRA\'s OWN furthest stage (per-row)', () {
+      // Regression: a partial management rework must not collapse Final onto
+      // only the reworked KRAs. 2 KRAs, weight 50 each, max 10.
+      //   A: self8 / RM9 / mgmt6  → final 60%
+      //   B (assigned RM): self7 / RM8 / no mgmt → final 80%
+      final r = reviewAt(ReviewStage.managementReview, rows: [
+        const MonthlyKraRow(
+                id: 'a',
+                name: 'A',
+                weightagePercent: 50,
+                maxScore: 10,
+                reviewerGroup: KraReviewer.reportingManager)
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 8))
+            .withStageScore(
+                ReviewStage.reportingManagerRating, const RowScore(value: 9))
+            .withStageScore(
+                ReviewStage.managementReview, const RowScore(value: 6)),
+        const MonthlyKraRow(
+                id: 'b',
+                name: 'B',
+                weightagePercent: 50,
+                maxScore: 10,
+                reviewerGroup: KraReviewer.reportingManager)
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 7))
+            .withStageScore(
+                ReviewStage.reportingManagerRating, const RowScore(value: 8)),
+      ]);
+      expect(r.finalPctForRow(r.rows[0]), closeTo(60, 1e-9));
+      expect(r.finalPctForRow(r.rows[1]), closeTo(80, 1e-9));
+      // (60×50 + 80×50) / 100 = 70 — NOT 60 (the old whole-review mgmt-only bug).
+      expect(r.finalScorePct, closeTo(70, 1e-9));
+    });
+
+    test('finalScorePct blends reviewed rows with self-only rows', () {
+      // A reviewed at 80%; B only self-rated at 60% → weighted 70%, no row dropped.
+      final r = reviewAt(ReviewStage.reportingManagerRating, rows: [
+        const MonthlyKraRow(
+                id: 'a',
+                name: 'A',
+                weightagePercent: 50,
+                maxScore: 10,
+                reviewerGroup: KraReviewer.reportingManager)
+            .withStageScore(
+                ReviewStage.reportingManagerRating, const RowScore(value: 8)),
+        const MonthlyKraRow(
+                id: 'b',
+                name: 'B',
+                weightagePercent: 50,
+                maxScore: 10,
+                reviewerGroup: KraReviewer.hr)
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 6)),
+      ]);
+      expect(r.finalScorePct, closeTo(70, 1e-9));
     });
   });
 

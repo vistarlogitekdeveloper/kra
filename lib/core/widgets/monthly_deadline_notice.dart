@@ -61,7 +61,7 @@ class MonthlyDeadlineNotice extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: '$title — due $dateLabel',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,

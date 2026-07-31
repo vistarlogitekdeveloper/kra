@@ -93,7 +93,7 @@ class SelfRateSubmitBar extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       AppStrings.selfRateLiveTotal,
                       style: TextStyle(
                         fontSize: 11.5,
@@ -108,7 +108,7 @@ class SelfRateSubmitBar extends StatelessWidget {
                       children: [
                         Text(
                           EmployeeFormatters.percent(weightedTotalPct),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.3,

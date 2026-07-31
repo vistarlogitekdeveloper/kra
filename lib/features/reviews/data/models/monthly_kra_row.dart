@@ -1,4 +1,5 @@
 import '../../../../core/api/json_parse.dart';
+import '../../../../core/enums/kra_reviewer.dart';
 import 'review_stage.dart';
 import 'row_score.dart';
 
@@ -36,6 +37,12 @@ class MonthlyKraRow {
   final String? target;
   final String? trackingMethod;
 
+  /// The single reviewer that owns this KRA in the Review cycle (Reporting
+  /// Manager / HR / Accounts), snapshotted from the template item. Null for
+  /// legacy rows generated before KRAs carried an assignment — those fall back
+  /// to averaging whoever rated (see [MonthlyReview.reviewPctForRow]).
+  final KraReviewer? reviewerGroup;
+
   /// Sort position within the review — lower renders first.
   final int displayOrder;
 
@@ -49,11 +56,30 @@ class MonthlyKraRow {
     this.maxScore = defaultMaxScore,
     this.target,
     this.trackingMethod,
+    this.reviewerGroup,
     this.displayOrder = 0,
     this.stageScores = const {},
   });
 
   RowScore? scoreFor(ReviewStage stage) => stageScores[stage];
+
+  /// The Review-cycle [ReviewStage] that this KRA's assigned reviewer scores:
+  ///   Reporting Manager → REPORTING_MANAGER_RATING,
+  ///   HR               → ACCOUNT_HR_RATING,
+  ///   Accounts         → FINANCE_RATING.
+  /// Null when the KRA has no assigned reviewer (legacy rows).
+  ReviewStage? get reviewStage {
+    switch (reviewerGroup) {
+      case KraReviewer.reportingManager:
+        return ReviewStage.reportingManagerRating;
+      case KraReviewer.hr:
+        return ReviewStage.accountHrRating;
+      case KraReviewer.accounts:
+        return ReviewStage.financeRating;
+      case null:
+        return null;
+    }
+  }
 
   /// Has the actor for [stage] entered any value or remark yet?
   bool hasEntryFor(ReviewStage stage) {
@@ -78,6 +104,12 @@ class MonthlyKraRow {
       maxScore: JsonParse.parseDouble(json['maxScore']) ?? defaultMaxScore,
       target: JsonParse.parseString(json['target']),
       trackingMethod: JsonParse.parseString(json['trackingMethod']),
+      // Tolerate the raw column name and the legacy score_source spelling.
+      reviewerGroup: KraReviewer.fromApi(JsonParse.parseString(
+          json['reviewerGroup'] ??
+              json['reviewer_group'] ??
+              json['scoreSource'] ??
+              json['score_source'])),
       displayOrder: JsonParse.parseInt(json['displayOrder']) ?? 0,
       stageScores: scores,
     );
@@ -91,6 +123,7 @@ class MonthlyKraRow {
         'maxScore': maxScore,
         'target': target,
         'trackingMethod': trackingMethod,
+        if (reviewerGroup != null) 'reviewerGroup': reviewerGroup!.toApiString(),
         'displayOrder': displayOrder,
         'stageScores':
             stageScores.map((k, v) => MapEntry(k.toApiString(), v.toJson())),
@@ -104,6 +137,7 @@ class MonthlyKraRow {
     double? maxScore,
     String? target,
     String? trackingMethod,
+    KraReviewer? reviewerGroup,
     int? displayOrder,
     Map<ReviewStage, RowScore>? stageScores,
   }) {
@@ -115,6 +149,7 @@ class MonthlyKraRow {
       maxScore: maxScore ?? this.maxScore,
       target: target ?? this.target,
       trackingMethod: trackingMethod ?? this.trackingMethod,
+      reviewerGroup: reviewerGroup ?? this.reviewerGroup,
       displayOrder: displayOrder ?? this.displayOrder,
       stageScores: stageScores ?? this.stageScores,
     );

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
+import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_review_summary.dart';
 import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 import 'package:vistar_app/features/reviews/data/models/stage_status.dart';
@@ -14,6 +15,7 @@ void main() {
     required ReviewStage stage,
     StageStatus status = StageStatus.inProgress,
     String? managerId,
+    PayoutStatus payoutStatus = PayoutStatus.pending,
   }) {
     return MonthlyReviewSummary(
       id: 'r1',
@@ -26,6 +28,7 @@ void main() {
       monthLabel: 'June 2026',
       currentStage: stage,
       currentStageStatus: status,
+      payoutStatus: payoutStatus,
     );
   }
 
@@ -88,15 +91,59 @@ void main() {
     });
   });
 
+  group('MonthlyReviewSummary payout / mark-paid', () {
+    test('Accounts can mark paid once the management review is done', () {
+      final s = summary(
+        stage: ReviewStage.managementReview,
+        status: StageStatus.submitted,
+      );
+      expect(s.managementReviewDone, isTrue);
+      expect(s.canMarkPaidBy(UserRole.finance), isTrue);
+      // HR / HR-admin are payout actors too.
+      expect(s.canMarkPaidBy(UserRole.hr), isTrue);
+      expect(s.canMarkPaidBy(UserRole.hrAdmin), isTrue);
+    });
+
+    test('not markable before the management review is done', () {
+      // Review phase still in progress → management not done → no payout yet.
+      final s = summary(
+        stage: ReviewStage.reportingManagerRating,
+        status: StageStatus.inProgress,
+      );
+      expect(s.managementReviewDone, isFalse);
+      expect(s.canMarkPaidBy(UserRole.finance), isFalse);
+    });
+
+    test('a manager or employee can never mark paid', () {
+      final s = summary(
+        stage: ReviewStage.managementReview,
+        status: StageStatus.submitted,
+      );
+      expect(s.canMarkPaidBy(UserRole.manager), isFalse);
+      expect(s.canMarkPaidBy(UserRole.employee), isFalse);
+    });
+
+    test('already-paid reviews show as paid and are not markable again', () {
+      final s = summary(
+        stage: ReviewStage.completed,
+        status: StageStatus.submitted,
+        payoutStatus: PayoutStatus.paid,
+      );
+      expect(s.payoutPaid, isTrue);
+      expect(s.canMarkPaidBy(UserRole.finance), isFalse);
+    });
+  });
+
   group('MonthlyReviewSummary.needsActionBy — org-level stages', () {
     test('still light up for exactly the roles agreed in the pipeline spec, '
         'independent of any reporting relationship', () {
       const table = <ReviewStage, Set<UserRole>>{
+        // HR and Finance are now SEPARATE Review raters.
         ReviewStage.accountHrRating: {
           UserRole.hr,
           UserRole.hrAdmin,
-          UserRole.finance,
         },
+        ReviewStage.financeRating: {UserRole.finance},
         ReviewStage.managementReview: {UserRole.admin, UserRole.hrAdmin},
         ReviewStage.incentivePayout: {
           UserRole.finance,

@@ -89,13 +89,13 @@ class _EmptyHistory extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.people_outline_rounded,
                 size: 56,
                 color: AppColors.textMuted,
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 AppStrings.managerHistoryEmptyTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -105,7 +105,7 @@ class _EmptyHistory extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 AppStrings.managerHistoryEmptyMessage,
                 textAlign: TextAlign.center,
                 style: TextStyle(

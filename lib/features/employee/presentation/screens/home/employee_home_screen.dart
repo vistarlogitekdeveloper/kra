@@ -6,6 +6,7 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../../../core/widgets/theme_toggle_button.dart';
 import '../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../core/widgets/workspace_switcher.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
@@ -86,12 +87,13 @@ class EmployeeHomeScreen extends ConsumerWidget {
       ),
     );
 
-    // The "☰" workspace switcher is HR-admin only. HR admins genuinely span
-    // every area (My KRA / My Team / HR Admin), so they need a picker. Everyone
-    // else has at most one place to go back to, which the back button already
-    // handles (a manager's back returns them to My Team) — a menu there was
-    // just a second, redundant way to do the same thing.
-    final hasWorkspaceMenu = user != null && AppRoutes.canAccessHr(user.role);
+    // The "☰" workspace switcher shows for ANY role that has more than one
+    // workspace — a manager (My KRA / My Team) as well as an HR admin (My KRA /
+    // My Team / HR Admin). A reporting manager who lands on My KRA needs a
+    // clear, discoverable way over to My Team; a lone back arrow that silently
+    // jumped there read as a browser-back, which is what looked broken.
+    final hasWorkspaceMenu =
+        user != null && WorkspaceSwitcher.hasExtras(user);
     final header = GreetingHeader(
       name: _firstName(fullName),
       employeeCode: employeeCode,
@@ -103,7 +105,13 @@ class EmployeeHomeScreen extends ConsumerWidget {
           if (hasWorkspaceMenu) const _WorkspaceMenuButton(),
         ],
       ),
-      trailing: const _HomeLogoutButton(),
+      trailing: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ThemeToggleButton(color: Colors.white),
+          _HomeLogoutButton(),
+        ],
+      ),
     );
 
     return Scaffold(
@@ -152,7 +160,7 @@ class _WorkspaceMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Builder(
       builder: (ctx) => IconButton(
-        icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
+        icon: Icon(Icons.menu_rounded, color: AppColors.textPrimary),
         tooltip: AppStrings.workspaceSwitchTooltip,
         visualDensity: VisualDensity.compact,
         onPressed: () => Scaffold.of(ctx).openDrawer(),
@@ -163,40 +171,22 @@ class _WorkspaceMenuButton extends StatelessWidget {
 
 /// Top-left back button on the home hero.
 ///
-/// Home (My KRA) is a bottom-nav root, so "back" only means something when
-/// there's actually somewhere to return to:
-///   * drilled in from another route → pop it;
-///   * a manager/HR who switched into My KRA → return to their own workspace
-///     (My Team / HR Admin);
-///   * a plain employee, whose only workspace IS My KRA → nothing to go back
-///     to, so no dead button is rendered.
-class _HomeBackButton extends ConsumerWidget {
+/// Home (My KRA) is a bottom-nav root, so "back" only means something when the
+/// screen was actually drilled into from somewhere (`context.canPop()`). Cross-
+/// workspace navigation (a manager hopping to My Team) is the "☰" switcher's
+/// job now — not a hidden meaning on the back arrow — so on the root there is
+/// no dead/confusing button at all.
+class _HomeBackButton extends StatelessWidget {
   const _HomeBackButton();
 
-  Widget _btn({required String tooltip, required VoidCallback onTap}) =>
-      IconButton(
-        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-        tooltip: tooltip,
-        visualDensity: VisualDensity.compact,
-        onPressed: onTap,
-      );
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (context.canPop()) {
-      return _btn(tooltip: AppStrings.commonBack, onTap: () => context.pop());
-    }
-    final authState = ref.watch(authStateProvider);
-    final user = authState is AuthAuthenticated ? authState.user : null;
-    if (user == null) return const SizedBox.shrink();
-    // Everything past index 0 is a workspace beyond My KRA; the last one is the
-    // user's most specific area (HR Admin for admins, My Team for managers).
-    final extras = WorkspaceSwitcher.workspacesFor(user).skip(1).toList();
-    if (extras.isEmpty) return const SizedBox.shrink();
-    final target = extras.last;
-    return _btn(
-      tooltip: '${AppStrings.commonBack} · ${target.label}',
-      onTap: () => context.go(target.route),
+  Widget build(BuildContext context) {
+    if (!context.canPop()) return const SizedBox.shrink();
+    return IconButton(
+      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+      tooltip: AppStrings.commonBack,
+      visualDensity: VisualDensity.compact,
+      onPressed: () => context.pop(),
     );
   }
 }
@@ -492,7 +482,7 @@ class _SectionError extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     AppStrings.errorGeneric,
                     style: TextStyle(
                       fontSize: 13,
@@ -505,7 +495,7 @@ class _SectionError extends StatelessWidget {
                     message,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
                       color: AppColors.textSecondary,
                       height: 1.4,

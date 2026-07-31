@@ -58,7 +58,7 @@ class SkippedList extends StatelessWidget {
                 for (int i = 0; i < items.length; i++) ...[
                   _Tile(item: items[i]),
                   if (i != items.length - 1)
-                    const Divider(
+                    Divider(
                       color: AppColors.divider,
                       height: 1,
                       indent: 16,
@@ -125,7 +125,7 @@ class _Tile extends StatelessWidget {
                   item.employeeName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -136,7 +136,7 @@ class _Tile extends StatelessWidget {
                   _reasonMessage(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
@@ -159,7 +159,7 @@ class _Tile extends StatelessWidget {
             ),
             child: Text(
               item.detail!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
                 color: AppColors.textSecondary,
                 height: 1.45,

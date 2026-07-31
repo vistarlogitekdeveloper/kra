@@ -141,7 +141,7 @@ class _ActiveCycleCard extends StatelessWidget {
                     cycle.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -155,7 +155,7 @@ class _ActiveCycleCard extends StatelessWidget {
                             '$deadlineText',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
@@ -235,7 +235,7 @@ class _DashboardError extends StatelessWidget {
           color: AppColors.error,
         ),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           AppStrings.errorGeneric,
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -248,7 +248,7 @@ class _DashboardError extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             color: AppColors.textSecondary,
           ),

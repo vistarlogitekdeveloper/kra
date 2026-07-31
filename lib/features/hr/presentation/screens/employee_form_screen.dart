@@ -40,7 +40,9 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   // separate "reset password" flow if it ships later.
   final _passwordController = TextEditingController();
 
-  String _role = 'EMPLOYEE';
+  // The selected job designation (title). The functional access role is
+  // DERIVED from it (see [_roleFromDesignation]); HR only picks a designation.
+  String _designation = '';
   String? _department;
   String? _projectLocationId;
   String? _managerId;
@@ -62,16 +64,43 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   /// API on a 400 (validation) and clear on the next keystroke.
   final Map<String, String> _fieldErrors = {};
 
-  static const _roles = [
-    'EMPLOYEE',
-    'MANAGER',
-    'OPS',
-    'HR',
-    'HR_ADMIN',
-    'FINANCE',
-    'BD_MANAGER',
-    'WAREHOUSE_MGR',
+  /// Job designations HR picks from. The functional access role
+  /// (EMPLOYEE / MANAGER / HR / FINANCE) is inferred from the choice by
+  /// [_roleFromDesignation], so reviews + permissions keep working while HR
+  /// works purely in org titles.
+  static const _designations = [
+    'Manager',
+    'Assistant Manager',
+    'Cluster Manager',
+    'Cluster Manager-Tpt',
+    'Commercial Manager',
+    'Regional Manager',
+    'Regional Manager-Ka',
+    'Sr. General Manager',
+    'Project Incharge',
+    'Senior Officer',
+    'Senior Officer-Hr',
+    'Software Developer',
+    'Sr. Accountant',
   ];
+
+  /// Maps a designation to the functional role that drives access + reviews:
+  ///   * "…-Hr" / anything HR      → HR (reviews HR-assigned KRAs)
+  ///   * "…Accountant" / Finance   → FINANCE (reviews Accounts-assigned KRAs)
+  ///   * any Manager / Incharge    → MANAGER
+  ///   * everything else           → EMPLOYEE
+  static String _roleFromDesignation(String designation) {
+    final d = designation.toUpperCase();
+    if (d.contains('HR')) return 'HR';
+    if (d.contains('ACCOUNT') || d.contains('FINANCE')) return 'FINANCE';
+    if (d.contains('MANAGER') ||
+        d.contains('INCHARGE') ||
+        d.contains('IN-CHARGE') ||
+        d.contains('IN CHARGE')) {
+      return 'MANAGER';
+    }
+    return 'EMPLOYEE';
+  }
 
   /// Department options as they appear in the company Master Data sheet,
   /// with the sheet's "Transporation" typo corrected — the backend data is
@@ -122,7 +151,9 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
         ? ''
         : e.monthlyIncentiveAmount!.toStringAsFixed(0);
     setState(() {
-      _role = e.role;
+      // Prefer the stored designation; if an older record has none, leave it
+      // empty (HR picks one) rather than guessing from the functional role.
+      _designation = (e.position?.trim().isEmpty ?? true) ? '' : e.position!.trim();
       _department =
           (e.department?.isEmpty ?? true) ? null : e.department;
       _projectLocationId = e.projectLocationId;
@@ -187,6 +218,15 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       // is sent as selected regardless of role.
       final managerIdForPayload = _managerId;
       final passwordText = _passwordController.text;
+      // Designation → stored title (position) + derived functional role. A
+      // blank designation keeps the existing role (edit) or defaults to
+      // EMPLOYEE (create), so editing an unrelated field can't downgrade a
+      // manager just because the title wasn't set yet.
+      final designation = _designation.trim();
+      final position = designation.isEmpty ? null : designation;
+      final role = designation.isEmpty
+          ? (_original?.role ?? 'EMPLOYEE')
+          : _roleFromDesignation(designation);
       if (widget.isEdit) {
         final grade =
             _gradeController.text.trim().isEmpty ? null : _gradeController.text.trim();
@@ -201,7 +241,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           code: _codeController.text.trim(),
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
-          role: _role,
+          role: role,
+          position: position,
           department: _department,
           projectLocationId: _projectLocationId,
           managerId: managerIdForPayload,
@@ -230,7 +271,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           employeeCode: _codeController.text.trim(),
           fullName: _nameController.text.trim(),
           email: _emailController.text.trim(),
-          role: _role,
+          role: role,
+          position: position,
           department: _department,
           projectLocationId: _projectLocationId,
           managerId: managerIdForPayload,
@@ -291,6 +333,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     required String name,
     required String email,
     required String role,
+    required String? position,
     required String? department,
     required String? projectLocationId,
     required String? managerId,
@@ -305,6 +348,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
         'name': name,
         'email': email,
         'role': role,
+        'position': position,
         'department': department,
         'projectLocationId': projectLocationId,
         'managerId': managerId,
@@ -316,11 +360,13 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
 
     final oDept = (o.department?.isEmpty ?? true) ? null : o.department;
     final oGrade = (o.grade?.isEmpty ?? true) ? null : o.grade;
+    final oPosition = (o.position?.isEmpty ?? true) ? null : o.position;
     final changes = <String, dynamic>{};
     if (code != o.employeeCode) changes['employeeCode'] = code;
     if (name != o.fullName) changes['name'] = name;
     if (email != o.email) changes['email'] = email;
     if (role != o.role) changes['role'] = role;
+    if (position != oPosition) changes['position'] = position;
     if (department != oDept) changes['department'] = department;
     if (projectLocationId != o.projectLocationId) {
       changes['projectLocationId'] = projectLocationId;
@@ -461,12 +507,12 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           const _SectionHeader(title: AppStrings.employeeFormSectionEmployment),
           const SizedBox(height: 12),
           _RoleDropdown(
-            value: _role,
-            roles: _roles,
+            value: _designation,
+            roles: _designations,
             onChanged: (v) => setState(() {
-              // The reporting line is independent of the role — changing
-              // someone to MANAGER must NOT clear who they report to.
-              _role = v;
+              // The reporting line is independent of the designation — changing
+              // someone's title must NOT clear who they report to.
+              _designation = v;
               _isDirty = true;
             }),
           ),
@@ -540,7 +586,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           ),
           const SizedBox(height: 6),
           if (widget.isEdit) ...[
-            const Text(
+            Text(
               'Reset this employee\'s password via a secure set-password '
               'action, then share the new one with them directly.',
               style: TextStyle(
@@ -559,7 +605,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               ),
             ),
           ] else ...[
-            const Text(
+            Text(
               'Optional. Leave blank to create the account without a '
               'password — the employee won\'t be able to log in until '
               'HR sets one later.',
@@ -602,7 +648,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               onChanged: _passwordController.text.isEmpty
                   ? null
                   : (v) => setState(() => _forcePasswordReset = v ?? false),
-              title: const Text(
+              title: Text(
                 'Require employee to change this password on first sign-in',
                 style: TextStyle(
                   fontSize: 13,
@@ -703,7 +749,7 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
                   ? AppStrings.setPasswordSubtitle
                   : 'For ${widget.employeeName}. '
                       '${AppStrings.setPasswordSubtitle}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
                 height: 1.35,
@@ -784,7 +830,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12.5,
         fontWeight: FontWeight.w800,
         color: AppColors.textSecondary,
@@ -804,11 +850,6 @@ class _RoleDropdown extends StatelessWidget {
     required this.onChanged,
   });
 
-  String _humanise(String r) {
-    if (r.isEmpty) return r;
-    return r[0].toUpperCase() + r.substring(1).toLowerCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     // Backend may return a role string that isn't in our standard list —
@@ -822,8 +863,8 @@ class _RoleDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          AppStrings.employeeFormRole,
+        Text(
+          AppStrings.employeeFormDesignation,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -839,24 +880,24 @@ class _RoleDropdown extends StatelessWidget {
         // on a moving Flutter API.
         InputDecorator(
           decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.work_outline_rounded, size: 20),
+            prefixIcon: Icon(Icons.badge_outlined, size: 20),
           ),
           child: DropdownButtonHideUnderline(
+            // Empty (no designation yet) → null so the hint shows instead of
+            // asserting on a value that matches no item.
             child: DropdownButton<String>(
-              value: value,
+              value: value.isEmpty ? null : value,
               isExpanded: true,
+              hint: const Text(AppStrings.employeeFormDesignationHint),
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               items: [
                 if (hasOrphan)
                   DropdownMenuItem(
                     value: value,
-                    child: Text('${_humanise(value)} (current)'),
+                    child: Text('$value (current)'),
                   ),
                 for (final r in roles)
-                  DropdownMenuItem(
-                    value: r,
-                    child: Text(_humanise(r)),
-                  ),
+                  DropdownMenuItem(value: r, child: Text(r)),
               ],
               onChanged: (v) {
                 if (v != null) onChanged(v);
@@ -889,7 +930,7 @@ class _DepartmentDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           AppStrings.employeeFormDepartment,
           style: TextStyle(
             fontSize: 13,
@@ -906,7 +947,7 @@ class _DepartmentDropdown extends StatelessWidget {
             child: DropdownButton<String?>(
               value: value,
               isExpanded: true,
-              hint: const Text(
+              hint: Text(
                 'Select department',
                 style: TextStyle(color: AppColors.textMuted),
               ),
@@ -966,7 +1007,7 @@ class _ManagerDropdown extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Reporting manager',
           style: TextStyle(
             fontSize: 13,
@@ -1000,7 +1041,7 @@ class _ManagerDropdown extends ConsumerWidget {
                 child: DropdownButton<String?>(
                   value: value,
                   isExpanded: true,
-                  hint: const Text(
+                  hint: Text(
                     'Select manager',
                     style: TextStyle(color: AppColors.textMuted),
                   ),
@@ -1046,7 +1087,7 @@ class _LocationDropdown extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           AppStrings.employeeFormProjectLocation,
           style: TextStyle(
             fontSize: 13,
@@ -1078,7 +1119,7 @@ class _LocationDropdown extends ConsumerWidget {
                 child: DropdownButton<String?>(
                   value: value,
                   isExpanded: true,
-                  hint: const Text(
+                  hint: Text(
                     'Select location',
                     style: TextStyle(color: AppColors.textMuted),
                   ),
@@ -1148,7 +1189,7 @@ class _DateField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.textSecondary,
@@ -1167,7 +1208,7 @@ class _DateField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today_outlined,
+                Icon(Icons.calendar_today_outlined,
                     size: 20, color: AppColors.textSecondary),
                 const SizedBox(width: 12),
                 Text(

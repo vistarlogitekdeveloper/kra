@@ -34,7 +34,7 @@ class PendingActionsList extends StatelessWidget {
                 child: Text(
                   '${AppStrings.managerDashboardPendingTitle} '
                   '(${actions.length})',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,

@@ -76,7 +76,7 @@ class _SlowLoadHintState extends State<SlowLoadHint> {
               Expanded(
                 child: Text(
                   widget.message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,

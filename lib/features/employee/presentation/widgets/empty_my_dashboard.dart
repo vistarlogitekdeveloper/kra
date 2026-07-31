@@ -46,7 +46,7 @@ class EmptyMyDashboard extends StatelessWidget {
               Text(
                 title ?? AppStrings.emptyDashboardTitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
@@ -56,7 +56,7 @@ class EmptyMyDashboard extends StatelessWidget {
               Text(
                 message ?? AppStrings.emptyDashboardMessage,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13.5,
                   color: AppColors.textSecondary,
                   height: 1.45,

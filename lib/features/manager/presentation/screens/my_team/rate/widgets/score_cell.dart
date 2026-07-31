@@ -152,12 +152,12 @@ class _ScoreCellState extends State<ScoreCell> {
       ),
       decoration: InputDecoration(
         hintText: '0',
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           color: AppColors.textMuted,
           fontWeight: FontWeight.w700,
         ),
         suffixText: '/ ${widget.maxScore.toStringAsFixed(0)}',
-        suffixStyle: const TextStyle(
+        suffixStyle: TextStyle(
           fontSize: 12,
           color: AppColors.textSecondary,
           fontWeight: FontWeight.w700,
@@ -298,14 +298,14 @@ class _RemarkField extends StatelessWidget {
       maxLines: 2,
       minLines: 1,
       onChanged: onChanged,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11.5,
         color: AppColors.textPrimary,
         height: 1.4,
       ),
       decoration: InputDecoration(
         hintText: AppStrings.managerRateRemarkHint,
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           fontSize: 11,
           color: AppColors.textMuted,
         ),
@@ -317,12 +317,12 @@ class _RemarkField extends StatelessWidget {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide:
-              const BorderSide(color: AppColors.divider, width: 1),
+              BorderSide(color: AppColors.divider, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide:
-              const BorderSide(color: AppColors.divider, width: 1),
+              BorderSide(color: AppColors.divider, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

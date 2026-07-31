@@ -61,7 +61,7 @@ class IncentiveSnapshotCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         AppStrings.homeIncentiveTitle,
                         style: TextStyle(
@@ -72,7 +72,7 @@ class IncentiveSnapshotCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.chevron_right_rounded,
                       color: AppColors.textMuted,
                       size: 20,
@@ -99,7 +99,7 @@ class IncentiveSnapshotCard extends StatelessWidget {
                         color: AppColors.primaryPurple,
                       ),
                     ),
-                    const Text(
+                    Text(
                       AppStrings.homeIncentiveCaption,
                       style: TextStyle(
                         fontSize: 11,
@@ -132,14 +132,14 @@ class _AmountRow extends StatelessWidget {
         children: [
           TextSpan(
             text: EmployeeFormatters.currencyInr(earned),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
               letterSpacing: -0.6,
             ),
           ),
-          const TextSpan(
+          TextSpan(
             text: ' ${AppStrings.homeIncentiveOf} ',
             style: TextStyle(
               fontSize: 13,
@@ -149,7 +149,7 @@ class _AmountRow extends StatelessWidget {
           ),
           TextSpan(
             text: EmployeeFormatters.currencyInr(eligible),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w700,
@@ -173,7 +173,7 @@ class _ProgressBar extends StatelessWidget {
         height: 10,
         child: Stack(
           children: [
-            const ColoredBox(color: AppColors.divider),
+            ColoredBox(color: AppColors.divider),
             FractionallySizedBox(
               widthFactor: progress,
               child: Container(

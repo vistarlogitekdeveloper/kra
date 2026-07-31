@@ -70,7 +70,7 @@ class LocationHeatmap extends ConsumerWidget {
               message,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
               ),
@@ -102,7 +102,7 @@ class LocationHeatmap extends ConsumerWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.divider),
         ),
-        child: const Text(
+        child: Text(
           'No heatmap data yet',
           style: TextStyle(
             color: AppColors.textSecondary,
@@ -164,7 +164,7 @@ class _HeaderRow extends StatelessWidget {
             child: Text(
               m.label.toUpperCase(),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textSecondary,
@@ -209,7 +209,7 @@ class _LocationRow extends StatelessWidget {
                 location.locationName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -290,7 +290,7 @@ Future<void> _showLocationSheet(
                 const SizedBox(height: 16),
                 Text(
                   location.locationName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -304,14 +304,14 @@ Future<void> _showLocationSheet(
                       : '${AppStrings.hrHeatmapAverage}: '
                           '${cycleAvg.toStringAsFixed(1)}% '
                           '· $totalReviews ${AppStrings.hrHeatmapReviewsCount}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   AppStrings.hrHeatmapMonthlyBreakdown,
                   style: TextStyle(
                     fontSize: 11,
@@ -385,7 +385,7 @@ class _MonthBreakdownTile extends StatelessWidget {
             width: 60,
             child: Text(
               month.label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -395,7 +395,7 @@ class _MonthBreakdownTile extends StatelessWidget {
           Expanded(
             child: Text(
               '$reviews ${AppStrings.hrHeatmapReviewsCount}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
@@ -486,7 +486,7 @@ class _Legend extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Text(
+        Text(
           'Low',
           style: TextStyle(
             fontSize: 10,
@@ -511,7 +511,7 @@ class _Legend extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
+        Text(
           'High',
           style: TextStyle(
             fontSize: 10,

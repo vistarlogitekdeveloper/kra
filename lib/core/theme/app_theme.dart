@@ -16,14 +16,18 @@ import '../constants/app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  // Kept named `lightTheme` for backwards compatibility with the bootstrap
-  // call site that reads `AppTheme.lightTheme`. The theme is dark — name is
-  // historical, behaviour matches the Vistar Premium spec.
-  static ThemeData get lightTheme {
+  /// The app theme for [brightness]. The Vistar Premium surface/text/divider
+  /// colours are theme-aware ([AppColors]), so this sets the active brightness
+  /// FIRST, then reads those tokens — light or dark both flow from one builder.
+  static ThemeData themeFor(Brightness brightness) {
+    // Resolve every AppColors token below against the requested brightness.
+    AppColors.setBrightness(brightness);
+    final bool isLight = brightness == Brightness.light;
+
     // Manrope as the global default; specific display styles below override
     // to Bricolage Grotesque to match the spec's two-font system.
     final TextTheme manropeBase = GoogleFonts.manropeTextTheme(
-      ThemeData(brightness: Brightness.dark).textTheme,
+      ThemeData(brightness: brightness).textTheme,
     );
 
     TextStyle? display(TextStyle? base, double letterSpacing) =>
@@ -81,27 +85,29 @@ class AppTheme {
       ),
     );
 
+    final colorScheme = (isLight ? ColorScheme.light : ColorScheme.dark)(
+      primary: AppColors.primaryPurple,
+      onPrimary: Colors.white,
+      secondary: AppColors.pink,
+      onSecondary: Colors.white,
+      tertiary: AppColors.orange,
+      error: AppColors.error,
+      onError: Colors.white,
+      surface: AppColors.surface,
+      onSurface: AppColors.textPrimary,
+      surfaceContainerHighest: AppColors.surfaceElevated,
+      outline: AppColors.divider,
+    );
+
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: brightness,
       scaffoldBackgroundColor: AppColors.background,
       primaryColor: AppColors.primaryPurple,
       canvasColor: AppColors.background,
       dividerColor: AppColors.divider,
 
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.primaryPurple,
-        onPrimary: Colors.white,
-        secondary: AppColors.pink,
-        onSecondary: Colors.white,
-        tertiary: AppColors.orange,
-        error: AppColors.error,
-        onError: Colors.white,
-        surface: AppColors.surface,
-        onSurface: AppColors.textPrimary,
-        surfaceContainerHighest: AppColors.surfaceElevated,
-        outline: AppColors.divider,
-      ),
+      colorScheme: colorScheme,
 
       textTheme: textTheme,
 
@@ -124,7 +130,7 @@ class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.divider, width: 1),
+          side: BorderSide(color: AppColors.divider, width: 1),
         ),
       ),
 
@@ -133,12 +139,12 @@ class AppTheme {
         fillColor: AppColors.surface,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           color: AppColors.textMuted,
           fontSize: 14,
           fontWeight: FontWeight.w400,
         ),
-        labelStyle: const TextStyle(
+        labelStyle: TextStyle(
           color: AppColors.textSecondary,
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -152,11 +158,11 @@ class AppTheme {
         suffixIconColor: AppColors.textSecondary,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(11),
-          borderSide: const BorderSide(color: AppColors.divider, width: 1),
+          borderSide: BorderSide(color: AppColors.divider, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(11),
-          borderSide: const BorderSide(color: AppColors.divider, width: 1),
+          borderSide: BorderSide(color: AppColors.divider, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(11),
@@ -183,7 +189,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(11),
-            side: const BorderSide(color: AppColors.divider),
+            side: BorderSide(color: AppColors.divider),
           ),
           textStyle: GoogleFonts.manrope(
             fontSize: 14,
@@ -196,7 +202,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          side: const BorderSide(color: AppColors.divider),
+          side: BorderSide(color: AppColors.divider),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(11),
@@ -225,13 +231,13 @@ class AppTheme {
           }
           return Colors.transparent;
         }),
-        side: const BorderSide(color: AppColors.dividerStrong, width: 1.5),
+        side: BorderSide(color: AppColors.dividerStrong, width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(5),
         ),
       ),
 
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
         selectedItemColor: AppColors.pink,
         unselectedItemColor: AppColors.textMuted,
@@ -253,7 +259,7 @@ class AppTheme {
           if (states.contains(WidgetState.selected)) {
             return const IconThemeData(color: AppColors.pink);
           }
-          return const IconThemeData(color: AppColors.textMuted);
+          return IconThemeData(color: AppColors.textMuted);
         }),
       ),
 
@@ -267,7 +273,7 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(11),
-          side: const BorderSide(color: AppColors.divider),
+          side: BorderSide(color: AppColors.divider),
         ),
       ),
 
@@ -276,11 +282,11 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.divider),
+          side: BorderSide(color: AppColors.divider),
         ),
       ),
 
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: AppColors.surface,
         elevation: 0,
         modalBackgroundColor: AppColors.surface,
@@ -290,7 +296,7 @@ class AppTheme {
         color: AppColors.surfaceOverlay,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(11),
-          side: const BorderSide(color: AppColors.divider),
+          side: BorderSide(color: AppColors.divider),
         ),
         textStyle: GoogleFonts.manrope(
           fontSize: 13,

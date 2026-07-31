@@ -272,14 +272,14 @@ class _RoleFilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.tune_rounded,
+            Icon(Icons.tune_rounded,
                 color: AppColors.textSecondary, size: 18),
             const SizedBox(width: 6),
             Text(
               value == null
                   ? AppStrings.employeesFilterAll
                   : _humanRole(value!),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -363,7 +363,7 @@ class _ActiveFilterChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               _label(value),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,

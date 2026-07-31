@@ -49,7 +49,7 @@ class ManagerRatePartialSuccessScreen extends ConsumerWidget {
         children: [
           const _Illustration(),
           const SizedBox(height: 22),
-          const Text(
+          Text(
             AppStrings.managerRatePartialSubtitle,
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -117,7 +117,7 @@ class ManagerRatePartialSuccessScreen extends ConsumerWidget {
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.textPrimary,
-              side: const BorderSide(color: AppColors.divider),
+              side: BorderSide(color: AppColors.divider),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -208,7 +208,7 @@ class _ReasonCard extends StatelessWidget {
           Expanded(
             child: Text(
               _userMessage(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textPrimary,
                 height: 1.45,
@@ -237,7 +237,7 @@ class _TotalSaved extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Text(
               AppStrings.managerRateTotalLabel,
               style: TextStyle(

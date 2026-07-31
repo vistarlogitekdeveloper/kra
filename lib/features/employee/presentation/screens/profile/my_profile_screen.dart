@@ -231,7 +231,7 @@ class _Section extends StatelessWidget {
             padding: const EdgeInsets.only(left: 4, bottom: 6),
             child: Text(
               label.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textSecondary,
@@ -293,7 +293,7 @@ class _ProfileError extends StatelessWidget {
           color: AppColors.error,
         ),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           AppStrings.errorGeneric,
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -306,7 +306,7 @@ class _ProfileError extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             color: AppColors.textSecondary,
           ),

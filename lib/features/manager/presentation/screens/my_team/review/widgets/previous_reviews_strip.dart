@@ -23,7 +23,7 @@ class PreviousReviewsStrip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             AppStrings.managerReviewDetailPreviousReviews,
             style: TextStyle(
               fontSize: 11,
@@ -77,7 +77,7 @@ class _Chip extends StatelessWidget {
                 review.cycleName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,

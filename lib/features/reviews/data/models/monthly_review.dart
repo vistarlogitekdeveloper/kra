@@ -38,6 +38,29 @@ class ReviewPeriod {
   String get label => '${(month >= 1 && month <= 12) ? _names[month] : ''} '
       '$year';
 
+  /// India's fiscal-year quarter this month falls in:
+  ///   Q1 = Apr–Jun, Q2 = Jul–Sep, Q3 = Oct–Dec, Q4 = Jan–Mar.
+  int get fiscalQuarter {
+    if (month >= 4 && month <= 6) return 1;
+    if (month >= 7 && month <= 9) return 2;
+    if (month >= 10 && month <= 12) return 3;
+    return 4; // Jan–Mar
+  }
+
+  /// The calendar year India's fiscal year STARTS in for this period — the FY
+  /// runs Apr→Mar, so Jan–Mar belong to the PREVIOUS April's fiscal year.
+  int get fiscalYearStartYear => month >= 4 ? year : year - 1;
+
+  /// e.g. "FY 2026–27".
+  String get fiscalYearLabel {
+    final start = fiscalYearStartYear;
+    final end = (start + 1) % 100;
+    return 'FY $start–${end.toString().padLeft(2, '0')}';
+  }
+
+  /// e.g. "Q2 · FY 2026–27".
+  String get fiscalQuarterLabel => 'Q$fiscalQuarter · $fiscalYearLabel';
+
   /// A DateTime anchored at [day] of this period.
   DateTime dateOn(int day) => DateTime(year, month, day);
 
@@ -155,19 +178,79 @@ class MonthlyReview {
     return (weighted * 100 / totalWeight).clamp(0, 100).toDouble();
   }
 
-  /// The agreed score that drives the incentive — the furthest-along
-  /// rating stage that has any scores (manager → account/HR → self).
-  double get finalScorePct {
-    for (final stage in const [
-      ReviewStage.reportingManagerRating,
-      ReviewStage.accountHrRating,
-      ReviewStage.selfRating,
-    ]) {
-      if (rows.any((r) => r.scoreFor(stage)?.value != null)) {
-        return weightedScorePct(stage);
-      }
+  /// The Review-cycle (cycle 2) score for a single KRA row, as a 0–100 %.
+  ///
+  /// A KRA is defined "in three parts": each KRA is ASSIGNED to exactly one
+  /// reviewer (Reporting Manager / HR / Accounts — see [MonthlyKraRow.reviewStage]),
+  /// so its Review score is that one reviewer's rating. Legacy rows with no
+  /// assignment fall back to averaging whichever of the three rated it. Null
+  /// until the relevant rater(s) have scored the row.
+  double? reviewPctForRow(MonthlyKraRow row) {
+    if (row.maxScore <= 0) return null;
+    final assigned = row.reviewStage;
+    if (assigned != null) {
+      final s = row.scoreFor(assigned);
+      if (s?.value == null) return null;
+      return (s!.value! / row.maxScore) * 100;
     }
-    return 0;
+    // Legacy fallback: average whichever of the three raters scored the row.
+    final present = <double>[];
+    for (final stage in ReviewStage.reviewRaters) {
+      final s = row.scoreFor(stage);
+      if (s?.value != null) present.add((s!.value! / row.maxScore) * 100);
+    }
+    if (present.isEmpty) return null;
+    return present.reduce((a, b) => a + b) / present.length;
+  }
+
+  /// Weighted 0–100 total of the Review cycle — each KRA's [reviewPctForRow]
+  /// weighted by its KRA weight. Rows nobody has reviewed drop out.
+  double get reviewWeightedPct {
+    double weighted = 0;
+    double totalWeight = 0;
+    for (final row in rows) {
+      final pct = reviewPctForRow(row);
+      if (pct == null) continue;
+      totalWeight += row.weightagePercent;
+      weighted += pct * row.weightagePercent;
+    }
+    if (totalWeight <= 0) return 0;
+    return (weighted / totalWeight).clamp(0, 100).toDouble();
+  }
+
+  /// The final score for a single KRA row, as a 0–100 %, by cycle precedence
+  /// applied PER ROW: management override (rework) → the row's Review score →
+  /// self. Null until the row has any of the three.
+  ///
+  /// Precedence is per row, not per review: management reworks ONE KRA at a
+  /// time, and each KRA's Review score comes from its own assigned reviewer —
+  /// so a review can hold a management override on KRA A, a plain Review score
+  /// on KRA B and only a self score on KRA C, each contributing its own final.
+  double? finalPctForRow(MonthlyKraRow row) {
+    if (row.maxScore <= 0) return null;
+    final mgmt = row.scoreFor(ReviewStage.managementReview)?.value;
+    if (mgmt != null) return (mgmt / row.maxScore) * 100;
+    final review = reviewPctForRow(row);
+    if (review != null) return review;
+    final self = row.scoreFor(ReviewStage.selfRating)?.value;
+    if (self != null) return (self / row.maxScore) * 100;
+    return null;
+  }
+
+  /// The score that drives the incentive: the weighted total of every KRA's
+  /// [finalPctForRow], so each KRA contributes its own furthest-along score.
+  /// Rows nothing has touched drop from both numerator and denominator.
+  double get finalScorePct {
+    double weighted = 0;
+    double totalWeight = 0;
+    for (final row in rows) {
+      final pct = finalPctForRow(row);
+      if (pct == null) continue;
+      totalWeight += row.weightagePercent;
+      weighted += pct * row.weightagePercent;
+    }
+    if (totalWeight <= 0) return 0;
+    return (weighted / totalWeight).clamp(0, 100).toDouble();
   }
 
   /// Projected payout = eligible × finalScore%.
@@ -182,20 +265,52 @@ class MonthlyReview {
   /// read off the scores themselves, not the (frozen) pipeline cursor.
   ReviewStage? get furthestScoredStage {
     ReviewStage? found;
+    // Pipeline order: self → the three Review raters → management override.
     for (final stage in const [
       ReviewStage.selfRating,
-      ReviewStage.accountHrRating,
       ReviewStage.reportingManagerRating,
+      ReviewStage.accountHrRating,
+      ReviewStage.financeRating,
+      ReviewStage.managementReview,
     ]) {
       if (rows.any((r) => r.scoreFor(stage)?.value != null)) found = stage;
     }
     return found;
   }
 
-  /// Stage to show on dashboards: whichever is further along — the formal
-  /// pipeline cursor or the furthest stage that actually has scores. This
-  /// keeps the badge honest when rating happens via in-place `save-scores`.
+  /// True when the Review phase (cycle 2) is DONE for this review — every KRA
+  /// has been scored by its single ASSIGNED reviewer (Reporting Manager / HR /
+  /// Accounts). Because each KRA is owned by exactly one reviewer,
+  /// [reviewPctForRow] is non-null precisely when that reviewer has rated it,
+  /// so "all rows have a Review score" is the honest completion signal — not
+  /// "the furthest of three raters happened to score something".
+  bool get reviewPhaseComplete {
+    if (rows.isEmpty) return false;
+    for (final row in rows) {
+      if (reviewPctForRow(row) == null) return false;
+    }
+    return true;
+  }
+
+  bool get _hasManagementScore =>
+      rows.any((r) => r.scoreFor(ReviewStage.managementReview)?.value != null);
+
+  /// Stage to show on dashboards, mapped to the conceptual pipeline
+  /// (Self → Review → Management → Payout):
+  ///   * Review phase fully done but management hasn't overridden yet →
+  ///     Management Review (the pending next step). This is the key fix: a
+  ///     review whose RM/HR/Accounts ratings are all in should read as
+  ///     "Management Review", not as whichever rater scored last.
+  ///   * otherwise the furthest stage that actually carries scores (or the
+  ///     formal cursor if it's further along).
   ReviewStage get displayStage {
+    if (reviewPhaseComplete && !_hasManagementScore) {
+      // Don't regress a cursor that's already past management (payout/done).
+      return ReviewStage.managementReview.pipelineIndex >=
+              currentStage.pipelineIndex
+          ? ReviewStage.managementReview
+          : currentStage;
+    }
     final scored = furthestScoredStage;
     if (scored == null) return currentStage;
     return scored.pipelineIndex >= currentStage.pipelineIndex
@@ -203,12 +318,28 @@ class MonthlyReview {
         : currentStage;
   }
 
-  /// Status of [displayStage] — submitted once that stage carries scores.
+  /// Status of [displayStage]:
+  ///   * the Review phase is "in progress" (orange) until EVERY assigned
+  ///     reviewer has rated — a partly-reviewed sheet must not read as done;
+  ///   * Management Review surfaced because the Review phase finished but
+  ///     management hasn't acted is likewise pending action (in progress);
+  ///   * otherwise submitted once the displayed stage carries scores.
   StageStatus get displayStatus {
     if (isComplete) return StageStatus.submitted;
+    final ds = displayStage;
+    if (ds.reviewCycle == 2) {
+      // A rater stage is only ever the display stage while the Review phase is
+      // still underway (a complete one advances to Management Review above).
+      return StageStatus.inProgress;
+    }
+    if (ds == ReviewStage.managementReview &&
+        reviewPhaseComplete &&
+        !_hasManagementScore) {
+      return StageStatus.inProgress; // review done → awaiting management
+    }
     final scored = furthestScoredStage;
-    if (scored != null && scored == displayStage) return StageStatus.submitted;
-    return statusOf(displayStage);
+    if (scored != null && scored == ds) return StageStatus.submitted;
+    return statusOf(ds);
   }
 
   factory MonthlyReview.fromJson(Map<String, dynamic> json) {

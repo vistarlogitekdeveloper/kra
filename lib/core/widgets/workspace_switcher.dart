@@ -8,12 +8,14 @@ import '../../features/auth/data/models/user.dart';
 ///
 /// Every authenticated user HAS **My KRA** — the employee self-view — whatever
 /// their role, and it is always first in this list. Role only ADDS workspaces on
-/// top: a manager also gets **My Team**, HR/admin also get **HR Admin**.
+/// top: a manager also gets **My Team**, a reviewer (HR / Accounts / admin) also
+/// gets **Reviews**, and an admin also gets **HR Admin**.
 /// [WorkspaceDrawer] renders the left "☰" menu from this list.
 ///
-/// Note this is about what a role can REACH, not where it starts: HR-tier roles
-/// land in the HR area on login (see [AppRoutes.dashboardForRole]) and come back
-/// to My KRA through this switcher.
+/// EVERY login now STARTS on My KRA (see [AppRoutes.dashboardForRole]); this
+/// switcher is how a role reaches the extra areas it's entitled to — so access
+/// is expressed entirely as "which workspaces are offered", not as a different
+/// home per role.
 ///
 /// The list is derived from the same predicates the router's guards use
 /// ([AppRoutes.canAccessManager] / [AppRoutes.canAccessHr]), so the menu can
@@ -22,10 +24,12 @@ class WorkspaceSwitcher {
   const WorkspaceSwitcher._();
 
   /// True when [user] has at least one workspace beyond My KRA — i.e. the
-  /// "☰" menu is worth surfacing. Pure employees (and ops/finance) have only
-  /// their own KRA, so callers hide the menu for them entirely.
+  /// "☰" menu is worth surfacing. A pure employee (or ops) has only their own
+  /// KRA and gets no menu; a manager also has My Team, a reviewer (HR /
+  /// Accounts / admin) also has Reviews, and an admin also has HR Admin.
   static bool hasExtras(User user) =>
       AppRoutes.canAccessManager(user.role, hasReports: user.hasReports) ||
+      AppRoutes.canReview(user.role) ||
       AppRoutes.canAccessHr(user.role);
 
   /// The ordered workspaces available to [user]. My KRA is always first.
@@ -45,6 +49,14 @@ class WorkspaceSwitcher {
           icon: Icons.groups_rounded,
           route: AppRoutes.managerTeamDashboard,
           areaPrefix: AppRoutes.managerDashboard, // '/manager'
+        ),
+      if (AppRoutes.canReview(user.role))
+        const Workspace(
+          label: AppStrings.workspaceReviews,
+          subtitle: AppStrings.workspaceReviewsSubtitle,
+          icon: Icons.fact_check_rounded,
+          route: AppRoutes.monthlyReviews,
+          areaPrefix: AppRoutes.reviewsDashboard, // '/reviews'
         ),
       if (AppRoutes.canAccessHr(user.role))
         const Workspace(

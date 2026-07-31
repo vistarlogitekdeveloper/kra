@@ -279,7 +279,7 @@ class _NoActiveCycle extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -291,7 +291,7 @@ class _NoActiveCycle extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     AppStrings.homeNoActiveCycleMessage,
                     style: TextStyle(
@@ -358,7 +358,7 @@ class _SurfaceCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     monthLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

@@ -374,7 +374,7 @@ class _RecentActivitySection extends ConsumerWidget {
                   ),
                   title: Text(
                     items[i].actionLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -382,7 +382,7 @@ class _RecentActivitySection extends ConsumerWidget {
                   ),
                   subtitle: Text(
                     '${items[i].user?.name ?? 'System'} • ${HrFormatters.relativeTime(items[i].createdAt)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textMuted,
                     ),
@@ -416,7 +416,7 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
@@ -517,7 +517,7 @@ class _ErrorPanel extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             message,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12,
             ),

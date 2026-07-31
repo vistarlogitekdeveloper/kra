@@ -49,7 +49,7 @@ class MatrixTableView extends StatelessWidget {
         children: [
           // ── Header row ──
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
                   color: AppColors.divider,
@@ -60,10 +60,10 @@ class MatrixTableView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   flex: rowFlex,
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'KRA',
                       style: TextStyle(
@@ -95,7 +95,7 @@ class MatrixTableView extends StatelessWidget {
               onRemarkChanged: onRemarkChanged,
             ),
             if (i != review.rows.length - 1)
-              const Divider(
+              Divider(
                 color: AppColors.divider,
                 height: 1,
                 indent: 12,
@@ -166,7 +166,7 @@ class _RowMeta extends StatelessWidget {
       children: [
         Text(
           row.name,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -215,7 +215,7 @@ class _RowMeta extends StatelessWidget {
             row.description!,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11.5,
               color: AppColors.textSecondary,
               height: 1.4,

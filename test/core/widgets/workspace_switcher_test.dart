@@ -32,34 +32,39 @@ void main() {
       }
     });
 
-    test('plain employee has ONLY My KRA', () {
+    test('plain employee / ops has ONLY My KRA', () {
       expect(labels(UserRole.employee), ['My KRA']);
       expect(labels(UserRole.ops), ['My KRA']);
-      expect(labels(UserRole.finance), ['My KRA']);
     });
 
     test('employee with reports gets My KRA + My Team', () {
       expect(labels(UserRole.employee, hasReports: true), ['My KRA', 'My Team']);
     });
 
-    test('manager gets My KRA + My Team (no HR)', () {
+    test('manager gets My KRA + My Team (no Reviews / HR)', () {
       final list = WorkspaceSwitcher.workspacesFor(mockUser(UserRole.manager));
       expect(list.map((w) => w.route),
           [AppRoutes.employeeHome, AppRoutes.managerTeamDashboard]);
     });
 
-    test('plain HR gets My KRA + HR Admin (no team — HR cannot access /manager)',
-        () {
-      final list = WorkspaceSwitcher.workspacesFor(mockUser(UserRole.hr));
-      expect(list.map((w) => w.route),
-          [AppRoutes.employeeHome, AppRoutes.hrHome]);
+    test('HR and Accounts (Finance) get My KRA + Reviews', () {
+      // Review-only roles land on the shared My KRA home and reach the review
+      // dashboard through the Reviews workspace — not a bare, menu-less screen.
+      for (final r in [UserRole.hr, UserRole.finance]) {
+        expect(labels(r), ['My KRA', 'Reviews'], reason: '$r');
+        expect(
+          WorkspaceSwitcher.workspacesFor(mockUser(r)).map((w) => w.route),
+          [AppRoutes.employeeHome, AppRoutes.monthlyReviews],
+        );
+      }
     });
 
-    test('HR_ADMIN gets all three (My KRA + My Team + HR Admin)', () {
+    test('HR_ADMIN gets all four (My KRA + My Team + Reviews + HR Admin)', () {
       final list = WorkspaceSwitcher.workspacesFor(mockUser(UserRole.hrAdmin));
       expect(list.map((w) => w.route), [
         AppRoutes.employeeHome,
         AppRoutes.managerTeamDashboard,
+        AppRoutes.monthlyReviews,
         AppRoutes.hrHome,
       ]);
     });
@@ -69,16 +74,21 @@ void main() {
     test('false for roles with only the self-view', () {
       expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.employee)), isFalse);
       expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.ops)), isFalse);
-      expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.finance)), isFalse);
     });
 
     test('true for employee with reports', () {
       expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.employee, hasReports: true)), isTrue);
     });
 
-    test('true for manager / HR / admin roles', () {
-      expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.manager)), isTrue);
+    test('true for reviewer roles (HR / Accounts) — they get Reviews', () {
+      // They now land on My KRA and reach the review dashboard via the "☰"
+      // menu, so the menu MUST surface for them.
       expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.hr)), isTrue);
+      expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.finance)), isTrue);
+    });
+
+    test('true for manager / HR_ADMIN / admin roles', () {
+      expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.manager)), isTrue);
       expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.hrAdmin)), isTrue);
       expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.admin)), isTrue);
     });

@@ -257,7 +257,7 @@ class KraTemplatesScreen extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     '• ${f.name} — ${f.reason}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12.5, color: AppColors.textSecondary),
                   ),
                 ),

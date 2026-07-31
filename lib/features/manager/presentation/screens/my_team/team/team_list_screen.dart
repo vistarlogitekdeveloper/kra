@@ -216,7 +216,7 @@ class _EmptyForFilter extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.groups_outlined,
                 size: 56,
                 color: AppColors.textMuted,
@@ -225,7 +225,7 @@ class _EmptyForFilter extends StatelessWidget {
               Text(
                 _message(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,

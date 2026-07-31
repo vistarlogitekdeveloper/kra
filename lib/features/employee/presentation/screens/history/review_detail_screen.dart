@@ -126,7 +126,7 @@ class _HeaderBlock extends StatelessWidget {
               Expanded(
                 child: Text(
                   review.reviewCycle?.name ?? '—',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -141,7 +141,7 @@ class _HeaderBlock extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               review.reviewCycle!.fyLabel!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w700,
@@ -195,7 +195,7 @@ class _TotalBlock extends StatelessWidget {
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w800,
               color: AppColors.textSecondary,
@@ -327,7 +327,7 @@ class _IncentiveCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   AppStrings.historyDetailIncentiveLabel,
                   style: TextStyle(
                     fontSize: 12,
@@ -392,7 +392,7 @@ class _DetailError extends StatelessWidget {
           color: AppColors.error,
         ),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           AppStrings.errorGeneric,
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -405,7 +405,7 @@ class _DetailError extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             color: AppColors.textSecondary,
           ),
@@ -474,7 +474,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
           color: AppColors.textSecondary,

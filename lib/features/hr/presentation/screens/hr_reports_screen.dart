@@ -24,6 +24,14 @@ class HrReportsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           _ReportTile(
+            icon: Icons.payments_rounded,
+            iconColor: AppColors.accentOrange,
+            title: AppStrings.perfIncentiveTitle,
+            subtitle: AppStrings.perfIncentiveSubtitle,
+            onTap: () => context.push(AppRoutes.perfIncentiveSheet),
+          ),
+          const SizedBox(height: 12),
+          _ReportTile(
             icon: Icons.receipt_long_rounded,
             iconColor: AppColors.primaryPurple,
             title: AppStrings.auditLogTitle,
@@ -92,7 +100,7 @@ class _ReportTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
@@ -101,7 +109,7 @@ class _ReportTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
                         height: 1.4,
@@ -110,7 +118,7 @@ class _ReportTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.textMuted,
               ),
@@ -152,7 +160,7 @@ class _ComingSoonCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textSecondary,
@@ -161,7 +169,7 @@ class _ComingSoonCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textMuted,
                     height: 1.4,

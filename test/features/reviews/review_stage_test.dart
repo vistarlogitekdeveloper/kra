@@ -5,11 +5,14 @@ import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 void main() {
   group('ReviewStage pipeline', () {
     test('advances in the fixed order, terminating at completed', () {
-      expect(ReviewStage.selfRating.next, ReviewStage.accountHrRating);
-      expect(
-          ReviewStage.accountHrRating.next, ReviewStage.reportingManagerRating);
+      // Self → the three parallel Review raters (RM, HR, Finance) → management
+      // → payout → completed. The raters are entered in parallel in practice;
+      // this linear `next` only drives the formal cursor.
+      expect(ReviewStage.selfRating.next, ReviewStage.reportingManagerRating);
       expect(ReviewStage.reportingManagerRating.next,
-          ReviewStage.managementReview);
+          ReviewStage.accountHrRating);
+      expect(ReviewStage.accountHrRating.next, ReviewStage.financeRating);
+      expect(ReviewStage.financeRating.next, ReviewStage.managementReview);
       expect(ReviewStage.managementReview.next, ReviewStage.incentivePayout);
       expect(ReviewStage.incentivePayout.next, ReviewStage.completed);
       expect(ReviewStage.completed.next, ReviewStage.completed);
@@ -18,27 +21,61 @@ void main() {
 
     test('carries the right deadline day per stage', () {
       expect(ReviewStage.selfRating.deadlineDay, 10);
-      expect(ReviewStage.accountHrRating.deadlineDay, 12);
+      // The three Review raters share the same deadline (they run in parallel).
       expect(ReviewStage.reportingManagerRating.deadlineDay, 13);
+      expect(ReviewStage.accountHrRating.deadlineDay, 13);
+      expect(ReviewStage.financeRating.deadlineDay, 13);
       expect(ReviewStage.managementReview.deadlineDay, 15);
       expect(ReviewStage.incentivePayout.deadlineDay, 20);
       expect(ReviewStage.completed.deadlineDay, isNull);
     });
 
-    test('only self/account-HR/manager are rating stages', () {
+    test('self, the three Review raters and management are rating stages', () {
       expect(ReviewStage.selfRating.isRatingStage, isTrue);
-      expect(ReviewStage.accountHrRating.isRatingStage, isTrue);
       expect(ReviewStage.reportingManagerRating.isRatingStage, isTrue);
-      expect(ReviewStage.managementReview.isRatingStage, isFalse);
+      expect(ReviewStage.accountHrRating.isRatingStage, isTrue);
+      expect(ReviewStage.financeRating.isRatingStage, isTrue);
+      // Management's rework override is a per-KRA score too.
+      expect(ReviewStage.managementReview.isRatingStage, isTrue);
       expect(ReviewStage.incentivePayout.isRatingStage, isFalse);
+      expect(ReviewStage.completed.isRatingStage, isFalse);
+    });
+
+    test('the Review cycle is exactly RM + HR + Finance', () {
+      expect(ReviewStage.reviewRaters, {
+        ReviewStage.reportingManagerRating,
+        ReviewStage.accountHrRating,
+        ReviewStage.financeRating,
+      });
+      expect(ReviewStage.reportingManagerRating.isReviewRater, isTrue);
+      expect(ReviewStage.accountHrRating.isReviewRater, isTrue);
+      expect(ReviewStage.financeRating.isReviewRater, isTrue);
+      expect(ReviewStage.selfRating.isReviewRater, isFalse);
+      expect(ReviewStage.managementReview.isReviewRater, isFalse);
+    });
+
+    test('phaseLabel collapses the three raters into a single "Review"', () {
+      // The dashboard badge shows the conceptual phase, not the individual
+      // rater who is furthest along.
+      expect(ReviewStage.selfRating.phaseLabel, 'Self-Rating');
+      expect(ReviewStage.reportingManagerRating.phaseLabel, 'Review');
+      expect(ReviewStage.accountHrRating.phaseLabel, 'Review');
+      expect(ReviewStage.financeRating.phaseLabel, 'Review');
+      expect(ReviewStage.managementReview.phaseLabel, 'Management Review');
+      expect(ReviewStage.incentivePayout.phaseLabel, 'Incentive Payout');
+      expect(ReviewStage.completed.phaseLabel, 'Completed');
     });
 
     test('actor roles match the agreed stage→role mapping', () {
-      // HR_ADMIN is the live HR persona (fromApi maps HR_ADMIN → hrAdmin),
-      // so it must be able to act on the account/HR and payout stages or the
-      // pipeline stalls there — see docs/BACKEND_HANDOFF.md.
+      // HR is its own Review rater now (Finance is a SEPARATE rater), so the
+      // HR stage is HR / HR_ADMIN only.
       expect(ReviewStage.accountHrRating.actorRoles,
-          containsAll([UserRole.hr, UserRole.hrAdmin, UserRole.finance]));
+          containsAll([UserRole.hr, UserRole.hrAdmin]));
+      expect(ReviewStage.accountHrRating.actorRoles,
+          isNot(contains(UserRole.finance)));
+      // Finance is the third Review rater.
+      expect(
+          ReviewStage.financeRating.actorRoles, contains(UserRole.finance));
       expect(ReviewStage.incentivePayout.actorRoles,
           containsAll([UserRole.finance, UserRole.hr, UserRole.hrAdmin]));
       // Any manager-tier role gets a team roster, so all of them can rate.
@@ -58,9 +95,13 @@ void main() {
           containsAll([UserRole.employee, UserRole.ops]));
     });
 
-    test('fromApi tolerates snake/camel/unknown', () {
+    test('fromApi tolerates snake/camel/aliases/unknown', () {
       expect(ReviewStage.fromApi('ACCOUNT_HR_RATING'),
           ReviewStage.accountHrRating);
+      expect(ReviewStage.fromApi('HR_RATING'), ReviewStage.accountHrRating);
+      expect(ReviewStage.fromApi('FINANCE_RATING'), ReviewStage.financeRating);
+      expect(
+          ReviewStage.fromApi('ACCOUNTS_RATING'), ReviewStage.financeRating);
       expect(ReviewStage.fromApi('reportingManagerRating'),
           ReviewStage.reportingManagerRating);
       expect(

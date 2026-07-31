@@ -28,7 +28,7 @@ class EmployeeListTile extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(color: AppColors.divider, width: 1),
             ),
@@ -46,7 +46,7 @@ class EmployeeListTile extends StatelessWidget {
                       employee.fullName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
@@ -57,7 +57,7 @@ class EmployeeListTile extends StatelessWidget {
                       _subtitle(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
                       ),
@@ -83,11 +83,17 @@ class EmployeeListTile extends StatelessWidget {
 
   String _subtitle() {
     final code = employee.employeeCode.trim();
+    // Show the job designation (title) when set; fall back to the functional
+    // role for older records that don't have one yet.
+    final position = employee.position?.trim();
     final role = employee.role.trim();
     final dept = employee.department?.trim();
     return [
       if (code.isNotEmpty) code,
-      if (role.isNotEmpty) _humanRole(role),
+      if (position != null && position.isNotEmpty)
+        position
+      else if (role.isNotEmpty)
+        _humanRole(role),
       if (dept != null && dept.isNotEmpty) dept,
     ].join(' · ');
   }
@@ -189,7 +195,7 @@ class _OverflowMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: const Icon(
+      icon: Icon(
         Icons.more_vert_rounded,
         color: AppColors.textSecondary,
         size: 20,

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/enums/kra_reviewer.dart';
 import 'package:vistar_app/features/hr/data/models/kra_template_item.dart';
 
 /// Pins the wire contract for KRA template items, in particular the
@@ -110,6 +111,51 @@ void main() {
         'sortOrder': 1,
       });
       expect(item.weightagePercent, closeTo(0.5, 1e-9));
+    });
+
+    test('toJson sends scoreSource in the backend enum vocabulary', () {
+      // The live template API validates scoreSource against
+      // MANAGER/HR_FEED/OPS_FEED/ACCOUNTS_FEED and rejects anything else, so
+      // Accounts MUST serialize as ACCOUNTS_FEED (not "ACCOUNTS") to persist.
+      const item = KraTemplateItem(
+        name: 'Collections',
+        weightage: 40,
+        sortOrder: 0,
+        reviewerGroup: KraReviewer.accounts,
+      );
+      final json = item.toJson();
+      expect(json['scoreSource'], 'ACCOUNTS_FEED');
+      expect(json['reviewerGroup'], 'ACCOUNTS');
+    });
+
+    test('each reviewer maps to its ScoreSourceEnum value', () {
+      String src(KraReviewer r) =>
+          KraTemplateItem(name: 'x', weightage: 1, sortOrder: 0, reviewerGroup: r)
+              .toJson()['scoreSource'] as String;
+      expect(src(KraReviewer.reportingManager), 'MANAGER');
+      expect(src(KraReviewer.hr), 'HR_FEED');
+      expect(src(KraReviewer.accounts), 'ACCOUNTS_FEED');
+    });
+
+    test('toJson omits the reviewer keys when unassigned', () {
+      const item = KraTemplateItem(name: 'Unassigned', weightage: 10, sortOrder: 0);
+      final json = item.toJson();
+      expect(json.containsKey('reviewerGroup'), isFalse);
+      expect(json.containsKey('scoreSource'), isFalse);
+    });
+
+    test('fromJson reads the reviewer from reviewerGroup / score_source', () {
+      expect(
+          KraTemplateItem.fromJson(
+                  {'name': 'A', 'weightage': '0.4', 'reviewerGroup': 'HR'})
+              .reviewerGroup,
+          KraReviewer.hr);
+      // A raw-SQL backend may surface the score_source column instead.
+      expect(
+          KraTemplateItem.fromJson(
+                  {'name': 'A', 'weightage': '0.4', 'score_source': 'MANAGER'})
+              .reviewerGroup,
+          KraReviewer.reportingManager);
     });
 
     test('round trip: internal 0,1,2 → wire 1,2,3 → internal 0,1,2', () {
