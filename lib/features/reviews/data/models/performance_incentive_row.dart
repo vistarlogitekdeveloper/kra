@@ -32,8 +32,12 @@ class PerformanceIncentiveRow {
   /// Payable incentive — quarterly fixed × total %.
   final double payableIncentive;
 
-  /// Derived status remark (NO KRA / KRA Review Pending / Finalized).
+  /// Derived status remark — exactly one of [remarkPaid] / [remarkNotSubmitted].
   final String remark;
+
+  /// The two remark values shown in the sheet.
+  static const String remarkPaid = 'Incentive Paid';
+  static const String remarkNotSubmitted = 'KRA Not Submitted';
 
   const PerformanceIncentiveRow({
     required this.srNo,
@@ -95,13 +99,15 @@ class PerformanceIncentiveRow {
     );
   }
 
-  /// Derives a status remark from the three months.
+  /// Derives the status remark. Only two states are surfaced: the incentive is
+  /// PAID once every month of the quarter has its payout settled; anything short
+  /// of that (a missing month, or any month not yet paid) reads as the KRA not
+  /// being submitted / settled.
   static String _remarkFor(List<MonthlyReviewSummary?> months) {
     final present = months.whereType<MonthlyReviewSummary>().toList();
-    if (present.isEmpty) return 'NO KRA';
-    // Any month whose management review isn't done yet → still pending.
-    final anyPending =
-        present.any((s) => !s.managementReviewDone) || present.length < 3;
-    return anyPending ? 'KRA Review Pending' : 'Finalized';
+    final paid = present.length == months.length &&
+        present.isNotEmpty &&
+        present.every((s) => s.payoutPaid);
+    return paid ? remarkPaid : remarkNotSubmitted;
   }
 }

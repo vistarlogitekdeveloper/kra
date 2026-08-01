@@ -75,12 +75,14 @@ class AppColors {
       _t(const Color(0xFF1D1A33), const Color(0xFFEAE7F4));
 
   // ───── Text ─────
+  // Light-mode text runs darker than a literal palette inversion so it reads
+  // with real contrast on the near-white surfaces (the muted grey especially).
   static Color get textPrimary =>
-      _t(const Color(0xFFF2EEFB), const Color(0xFF181425));
+      _t(const Color(0xFFF2EEFB), const Color(0xFF120F1E));
   static Color get textSecondary =>
-      _t(const Color(0xFFB9B2D6), const Color(0xFF565073));
+      _t(const Color(0xFFB9B2D6), const Color(0xFF362F4A));
   static Color get textMuted =>
-      _t(const Color(0xFF7E769B), const Color(0xFF8C86A2));
+      _t(const Color(0xFF7E769B), const Color(0xFF554F6C));
 
   // ───── Lines / dividers ─────
   static Color get divider =>

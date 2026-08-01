@@ -560,9 +560,9 @@ class AppStrings {
       'Quarterly performance-incentive report — every employee, all months.';
   static const String perfIncentiveReadOnly =
       'Read only · quarterly performance-incentive report';
-  static const String perfIncentiveExport = 'Export to Excel (CSV)';
+  static const String perfIncentiveExport = 'Export to Excel';
   static const String perfIncentiveExported =
-      'Exported — the CSV opens in Excel.';
+      'Exported — opens as a branded Excel document.';
   static const String perfIncentiveExportNothing = 'Nothing to export yet.';
   static const String perfIncentiveExportUnsupported =
       'Export/download is only available in the web app.';
