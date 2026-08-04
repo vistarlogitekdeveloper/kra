@@ -16,9 +16,8 @@ class ManagerModeNotifier extends StateNotifier<ManagerMode> {
   void setMode(ManagerMode mode) => state = mode;
   void toMyTeam() => state = ManagerMode.myTeam;
   void toMyReview() => state = ManagerMode.myReview;
-  void toggle() => state = state == ManagerMode.myTeam
-      ? ManagerMode.myReview
-      : ManagerMode.myTeam;
+  void toggle() => state =
+      state == ManagerMode.myTeam ? ManagerMode.myReview : ManagerMode.myTeam;
 }
 
 final managerModeProvider =

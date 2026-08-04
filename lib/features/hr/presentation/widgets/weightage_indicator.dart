@@ -34,9 +34,7 @@ class WeightageIndicator extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            _isValid
-                ? Icons.check_circle_rounded
-                : Icons.error_outline_rounded,
+            _isValid ? Icons.check_circle_rounded : Icons.error_outline_rounded,
             color: color,
             size: 22,
           ),

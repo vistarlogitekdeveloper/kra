@@ -20,8 +20,7 @@ class ApiAuditLogRepository implements AuditLogRepository {
   final Dio _dio;
   ApiAuditLogRepository({required Dio dio}) : _dio = dio;
 
-  static const String _basePath =
-      '${ApiConstants.hrDashboard}/recent-activity';
+  static const String _basePath = '${ApiConstants.hrDashboard}/recent-activity';
 
   /// Upper bound the temporary endpoint will return. The backend
   /// validator rejects `limit > 50` (VAL_001) — keep this at or below

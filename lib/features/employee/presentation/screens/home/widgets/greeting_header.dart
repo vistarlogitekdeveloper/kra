@@ -48,12 +48,7 @@ class GreetingHeader extends StatelessWidget {
     this.trailing,
   });
 
-  String _greeting(int hour) {
-    if (hour < 12) return AppStrings.greetingMorning;
-    if (hour < 17) return AppStrings.greetingAfternoon;
-    if (hour < 21) return AppStrings.greetingEvening;
-    return AppStrings.greetingNight;
-  }
+  String _greeting(int hour) => AppStrings.greetingForHour(hour);
 
   String _initial() {
     final n = name.trim();

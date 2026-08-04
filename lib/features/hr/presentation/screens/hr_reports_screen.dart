@@ -35,8 +35,7 @@ class HrReportsScreen extends StatelessWidget {
             icon: Icons.receipt_long_rounded,
             iconColor: AppColors.primaryPurple,
             title: AppStrings.auditLogTitle,
-            subtitle:
-                'Every state-changing action across the HR module, '
+            subtitle: 'Every state-changing action across the HR module, '
                 'reverse-chronological.',
             onTap: () => context.push(AppRoutes.hrAuditLog),
           ),

@@ -55,8 +55,7 @@ class _ManagerRateReviewScreenState
       accentColor: AppColors.primaryPurple,
     );
     if (ok != true) return;
-    final response =
-        await ref.read(managerRateProvider.notifier).submit();
+    final response = await ref.read(managerRateProvider.notifier).submit();
     if (!mounted || response == null) {
       // submitError is shown via snackbar by the parent listener.
       final err = ref.read(managerRateProvider).submitError;
@@ -109,8 +108,7 @@ class _ManagerRateReviewScreenState
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           tooltip: AppStrings.managerRateBackToEdit,
-          onPressed: () =>
-              context.go(AppRoutes.managerRate(widget.reviewId)),
+          onPressed: () => context.go(AppRoutes.managerRate(widget.reviewId)),
         ),
       ),
       body: ListView(
@@ -132,8 +130,7 @@ class _ManagerRateReviewScreenState
       bottomNavigationBar: _SubmitBar(
         isSubmitting: state.isSubmitting,
         isOffline: !isOnline,
-        onBackToEdit: () =>
-            context.go(AppRoutes.managerRate(widget.reviewId)),
+        onBackToEdit: () => context.go(AppRoutes.managerRate(widget.reviewId)),
         onSubmit: _onSubmit,
       ),
     );
@@ -210,8 +207,8 @@ class _RowSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasRemark = row.monthlyScores
-        .any((c) => (c.managerRemark ?? '').trim().isNotEmpty);
+    final hasRemark =
+        row.monthlyScores.any((c) => (c.managerRemark ?? '').trim().isNotEmpty);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
@@ -316,9 +313,7 @@ class _MonthValueChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 9.5,
               fontWeight: FontWeight.w800,
-              color: filled
-                  ? AppColors.primaryPurple
-                  : AppColors.textSecondary,
+              color: filled ? AppColors.primaryPurple : AppColors.textSecondary,
               letterSpacing: 0.5,
             ),
           ),
@@ -328,9 +323,7 @@ class _MonthValueChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: filled
-                  ? AppColors.primaryPurpleDark
-                  : AppColors.textMuted,
+              color: filled ? AppColors.primaryPurpleDark : AppColors.textMuted,
               letterSpacing: -0.2,
             ),
           ),

@@ -117,8 +117,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 /// Holds the current login state. The login screen and the router
 /// both watch this provider.
-final authStateProvider =
-    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final notifier = AuthNotifier(ref.read(authRepositoryProvider));
 
   // Bridge the interceptor's forced-logout signal into Riverpod.

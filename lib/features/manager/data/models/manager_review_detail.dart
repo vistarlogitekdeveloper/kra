@@ -45,19 +45,20 @@ class ManagerReviewDetail {
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     return ManagerReviewDetail(
       id: JsonParse.parseString(json['id']) ?? '',
-      state: ReviewState.fromApi(
-          JsonParse.parseString(json['state']) ?? 'DRAFT'),
+      state:
+          ReviewState.fromApi(JsonParse.parseString(json['state']) ?? 'DRAFT'),
       isLocked: JsonParse.parseBool(json['isLocked']) ?? false,
       employee: ManagerReviewEmployee.fromJson(
           JsonParse.parseMap(json['employee']) ?? const {}),
       // Live backend names the cycle block `reviewCycle`; older
       // spec/mock payloads use `cycle`. Accept either.
-      cycle: ManagerReviewCycle.fromJson(JsonParse.parseMap(json['reviewCycle']) ??
-          JsonParse.parseMap(json['cycle']) ??
-          const {}),
+      cycle: ManagerReviewCycle.fromJson(
+          JsonParse.parseMap(json['reviewCycle']) ??
+              JsonParse.parseMap(json['cycle']) ??
+              const {}),
       rows: rows,
-      totals: ReviewTotals.fromJson(
-          JsonParse.parseMap(json['totals']) ?? const {}),
+      totals:
+          ReviewTotals.fromJson(JsonParse.parseMap(json['totals']) ?? const {}),
       previousReviews: JsonParse.parseMapList(json['previousReviews'])
           .map(PreviousReview.fromJson)
           .toList(),
@@ -75,8 +76,7 @@ class ManagerReviewDetail {
         'cycle': cycle.toJson(),
         'rows': rows.map((r) => r.toJson()).toList(),
         'totals': totals.toJson(),
-        'previousReviews':
-            previousReviews.map((p) => p.toJson()).toList(),
+        'previousReviews': previousReviews.map((p) => p.toJson()).toList(),
         'managerComment': managerComment,
         'permissions': permissions.toJson(),
       };
@@ -200,8 +200,7 @@ class ManagerReviewCycle {
         'quarterNum': quarterNum,
         'startDate': startDate?.toIso8601String(),
         'endDate': endDate?.toIso8601String(),
-        'managerReviewDeadline':
-            managerReviewDeadline?.toIso8601String(),
+        'managerReviewDeadline': managerReviewDeadline?.toIso8601String(),
         'months': months.map((m) => m.toJson()).toList(),
       };
 }

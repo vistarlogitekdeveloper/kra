@@ -29,8 +29,7 @@ class ProfileFieldRow extends StatelessWidget {
         border: isLast
             ? null
             : Border(
-                bottom:
-                    BorderSide(color: AppColors.divider, width: 0.6),
+                bottom: BorderSide(color: AppColors.divider, width: 0.6),
               ),
       ),
       child: Row(

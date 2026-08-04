@@ -21,8 +21,7 @@ class FyReviewSummary {
         totalReviews: JsonParse.parseInt(json['totalReviews']) ?? 0,
         finalizedCount: JsonParse.parseInt(json['finalizedCount']) ?? 0,
         pendingCount: JsonParse.parseInt(json['pendingCount']) ?? 0,
-        averageFinalScore:
-            JsonParse.parseDouble(json['averageFinalScore']),
+        averageFinalScore: JsonParse.parseDouble(json['averageFinalScore']),
       );
 
   Map<String, dynamic> toJson() => {

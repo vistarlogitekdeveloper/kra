@@ -25,18 +25,15 @@ class QuarterlyReviewMatrix extends ConsumerWidget {
       children: [
         MatrixViewResponsive(
           review: review,
-          onScoreChanged: (id, rating) => ref
-              .read(managerRateProvider.notifier)
-              .setCellRating(id, rating),
-          onRemarkChanged: (id, remark) => ref
-              .read(managerRateProvider.notifier)
-              .setCellRemark(id, remark),
+          onScoreChanged: (id, rating) =>
+              ref.read(managerRateProvider.notifier).setCellRating(id, rating),
+          onRemarkChanged: (id, remark) =>
+              ref.read(managerRateProvider.notifier).setCellRemark(id, remark),
         ),
         ManagerCommentField(
           value: state.managerComment,
-          onChanged: (v) => ref
-              .read(managerRateProvider.notifier)
-              .setManagerComment(v),
+          onChanged: (v) =>
+              ref.read(managerRateProvider.notifier).setManagerComment(v),
         ),
       ],
     );

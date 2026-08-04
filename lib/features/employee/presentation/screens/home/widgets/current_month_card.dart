@@ -386,8 +386,7 @@ class _SurfaceCard extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primaryPurple,
                   side: BorderSide(
-                    color:
-                        AppColors.primaryPurple.withValues(alpha: 0.40),
+                    color: AppColors.primaryPurple.withValues(alpha: 0.40),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../core/utils/name_format.dart';
 import '../../../../../../../core/constants/app_strings.dart';
 import '../../../../../data/models/team_member.dart';
 
@@ -90,13 +91,6 @@ class _Tile extends StatelessWidget {
   final TeamMember member;
   const _Tile({required this.member});
 
-  String _initials() {
-    final parts = member.fullName.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '·';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -115,7 +109,7 @@ class _Tile extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              _initials(),
+              initialsOf(member.fullName),
               style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,

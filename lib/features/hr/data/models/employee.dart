@@ -76,9 +76,9 @@ class Employee {
       monthlyIncentiveAmount:
           JsonParse.parseDouble(json['monthlyIncentiveAmount']),
       isActive: (json['isActive'] as bool?) ?? true,
-      joinedDate: _parseDate(json['joinedDate']),
-      createdAt: _parseDate(json['createdAt']),
-      updatedAt: _parseDate(json['updatedAt']),
+      joinedDate: JsonParse.parseDate(json['joinedDate']),
+      createdAt: JsonParse.parseDate(json['createdAt']),
+      updatedAt: JsonParse.parseDate(json['updatedAt']),
     );
   }
 
@@ -153,15 +153,6 @@ class Employee {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
-  }
-
-  static DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
-    if (value is String && value.isNotEmpty) {
-      return DateTime.tryParse(value);
-    }
-    return null;
   }
 }
 

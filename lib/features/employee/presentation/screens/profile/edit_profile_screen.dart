@@ -19,8 +19,7 @@ class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  ConsumerState<EditProfileScreen> createState() =>
-      _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
@@ -78,8 +77,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       context.go(AppRoutes.employeeProfile);
       return;
     }
-    final ok =
-        await ref.read(myProfileEditProvider.notifier).save(changes);
+    final ok = await ref.read(myProfileEditProvider.notifier).save(changes);
     if (!mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -166,8 +164,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                          RegExp(r'[0-9 \-+]')),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9 \-+]')),
                       LengthLimitingTextInputFormatter(16),
                     ],
                     validator: _validatePhone,
@@ -180,13 +177,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           horizontal: 14, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                            color: AppColors.divider, width: 1),
+                        borderSide:
+                            BorderSide(color: AppColors.divider, width: 1),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                            color: AppColors.divider, width: 1),
+                        borderSide:
+                            BorderSide(color: AppColors.divider, width: 1),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -209,10 +206,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed:
-                    !_isDirty || edit.isSubmitting || !isOnline
-                        ? null
-                        : _onSave,
+                onPressed: !_isDirty || edit.isSubmitting || !isOnline
+                    ? null
+                    : _onSave,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryPurple,
                   foregroundColor: Colors.white,

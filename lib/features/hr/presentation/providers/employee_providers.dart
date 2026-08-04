@@ -37,9 +37,8 @@ class EmployeeFilter {
     return EmployeeFilter(
       search: search ?? this.search,
       role: identical(role, _sentinel) ? this.role : role as String?,
-      isActive: identical(isActive, _sentinel)
-          ? this.isActive
-          : isActive as bool?,
+      isActive:
+          identical(isActive, _sentinel) ? this.isActive : isActive as bool?,
     );
   }
 

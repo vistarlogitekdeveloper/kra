@@ -29,8 +29,7 @@ class PendingAction {
     this.deadlineRemaining,
   });
 
-  bool get isOverdue =>
-      deadlineRemaining != null && deadlineRemaining! < 0;
+  bool get isOverdue => deadlineRemaining != null && deadlineRemaining! < 0;
 
   factory PendingAction.fromJson(Map<String, dynamic> json) {
     // The live backend nests the employee under an `employee` object;

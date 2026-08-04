@@ -98,8 +98,7 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
             title: AppStrings.errorGeneric,
             message: state.error!,
             actionLabel: AppStrings.commonRetry,
-            onAction: () =>
-                ref.read(auditLogListProvider.notifier).refresh(),
+            onAction: () => ref.read(auditLogListProvider.notifier).refresh(),
           ),
         ],
       );
@@ -165,8 +164,7 @@ class _AuditTile extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: actionColour.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),

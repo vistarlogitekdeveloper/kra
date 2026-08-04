@@ -45,9 +45,8 @@ class MyReviewsHistoryScreen extends ConsumerWidget {
           children: [
             _FilterChipsRow(
               bucket: filter.bucket,
-              onPick: (b) => ref
-                  .read(myReviewListFilterProvider.notifier)
-                  .setBucket(b),
+              onPick: (b) =>
+                  ref.read(myReviewListFilterProvider.notifier).setBucket(b),
             ),
             Expanded(
               child: PagedListView(
@@ -58,17 +57,16 @@ class MyReviewsHistoryScreen extends ConsumerWidget {
                 initialError: state.error,
                 onLoadMore: () =>
                     ref.read(myReviewListProvider.notifier).loadMore(),
-                onRefresh: () async => ref
-                    .read(myReviewListProvider.notifier)
-                    .refresh(),
+                onRefresh: () async =>
+                    ref.read(myReviewListProvider.notifier).refresh(),
                 emptyBuilder: (_) => const _EmptyHistory(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                 itemBuilder: (_, __, review) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: ReviewHistoryCard(
                     review: review,
-                    onTap: () => context
-                        .go(AppRoutes.employeeReviewDetail(review.id)),
+                    onTap: () =>
+                        context.go(AppRoutes.employeeReviewDetail(review.id)),
                   ),
                 ),
               ),

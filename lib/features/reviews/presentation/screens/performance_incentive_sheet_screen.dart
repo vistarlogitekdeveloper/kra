@@ -19,25 +19,6 @@ import '../../data/models/performance_incentive_row.dart';
 import '../providers/monthly_review_providers.dart';
 import '../providers/performance_incentive_providers.dart';
 
-const _monthAbbr = [
-  '',
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-String _shortMonth(ReviewPeriod p) =>
-    "${_monthAbbr[p.month]} '${p.year.toString().substring(2)}";
-
 /// An official-looking Vistar Performance Incentive Sheet as a single-file
 /// spreadsheet (HTML that Excel opens as `.xls`): a branded header band with the
 /// Vistar logo, the report title, the quarter, and the generation date, above a
@@ -65,8 +46,8 @@ String _buildOfficialXls(
     'Name of Employee',
     'Perf. Incentive Amount',
     'Project Location',
-    for (final m in months) 'Self ${_shortMonth(m)}',
-    for (final m in months) 'Mgmt ${_shortMonth(m)}',
+    for (final m in months) 'Self ${m.shortLabel}',
+    for (final m in months) 'Mgmt ${m.shortLabel}',
     'Total',
     'Qtr Fixed Incentive',
     'Payable Incentive',
@@ -101,7 +82,7 @@ String _buildOfficialXls(
       '<td class="plain title" colspan="12">Performance Incentive Sheet</td></tr>');
   b.writeln('<tr><td class="plain sub" colspan="12">'
       'Vistar Logitek &bull; ${esc(anchor.fiscalQuarterLabel)} &bull; '
-      "${_shortMonth(months.first)} – ${_shortMonth(months.last)}</td></tr>");
+      "${months.first.shortLabel} – ${months.last.shortLabel}</td></tr>");
   b.writeln('<tr><td class="plain sub" colspan="12">'
       'Generated on ${esc(generatedOn)} &bull; Read-only report</td></tr>');
   b.writeln('<tr><td class="plain" colspan="$totalCols">&nbsp;</td></tr>');
@@ -115,8 +96,9 @@ String _buildOfficialXls(
 
   // ── Data rows ──
   for (final r in rows) {
+    // Only the paid state is tinted; a blank remark stays an empty, unstyled cell.
     final remarkClass =
-        r.remark == PerformanceIncentiveRow.remarkPaid ? 'paid' : 'notsub';
+        r.remark == PerformanceIncentiveRow.remarkPaid ? 'paid' : '';
     b.write('<tr>');
     b.write('<td class="center">${r.srNo}</td>');
     b.write('<td>${esc(r.employeeCode)}</td>');
@@ -152,10 +134,7 @@ Future<String> _logoDataUri() async {
   }
 }
 
-String _generatedOn() {
-  final now = DateTime.now();
-  return '${now.day} ${_monthAbbr[now.month]} ${now.year}';
-}
+String _generatedOn() => EmployeeFormatters.date(DateTime.now());
 
 /// Quarterly Performance Incentive Sheet — a READ-ONLY report mirroring the
 /// "Performance Incentive" Excel: every column, one row per employee, for the
@@ -261,7 +240,8 @@ class _PerformanceIncentiveSheetScreenState
             child: rowsAsync.when(
               loading: () => const _Skeleton(),
               error: (e, _) => _ErrorView(
-                message: e is ApiError ? e.combinedMessage : AppStrings.errorGeneric,
+                message:
+                    e is ApiError ? e.combinedMessage : AppStrings.errorGeneric,
                 onRetry: () =>
                     ref.invalidate(performanceIncentiveSheetProvider(anchor)),
               ),
@@ -337,7 +317,7 @@ class _QuarterBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_shortMonth(months.first)} – ${_shortMonth(months.last)}',
+                  '${months.first.shortLabel} – ${months.last.shortLabel}',
                   style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9), fontSize: 12),
                 ),
@@ -467,7 +447,8 @@ class _SheetTable extends StatelessWidget {
         fontWeight: FontWeight.w800,
         color: AppColors.textMuted,
         height: 1.2);
-    Widget hc(double w, String label, {Alignment align = Alignment.centerLeft}) =>
+    Widget hc(double w, String label,
+            {Alignment align = Alignment.centerLeft}) =>
         _cell(w, Text(label, style: h, textAlign: _alignToText(align)),
             align: align);
     return Container(
@@ -479,9 +460,9 @@ class _SheetTable extends StatelessWidget {
         hc(_wAmt, AppStrings.perfIncColAmount, align: Alignment.centerRight),
         hc(_wLoc, AppStrings.perfIncColLocation),
         for (final m in months)
-          hc(_wMon, 'Self\n${_shortMonth(m)}', align: Alignment.centerRight),
+          hc(_wMon, 'Self\n${m.shortLabel}', align: Alignment.centerRight),
         for (final m in months)
-          hc(_wMon, 'Mgmt\n${_shortMonth(m)}', align: Alignment.centerRight),
+          hc(_wMon, 'Mgmt\n${m.shortLabel}', align: Alignment.centerRight),
         hc(_wTotal, AppStrings.perfIncColTotal, align: Alignment.centerRight),
         hc(_wFixed, AppStrings.perfIncColFixed, align: Alignment.centerRight),
         hc(_wPayable, AppStrings.perfIncColPayable,
@@ -498,8 +479,7 @@ class _SheetTable extends StatelessWidget {
     return Container(
       color: index.isEven ? AppColors.surface : Colors.transparent,
       child: Row(children: [
-        _cell(_wSr, Text('${r.srNo}', style: tMuted),
-            align: Alignment.center),
+        _cell(_wSr, Text('${r.srNo}', style: tMuted), align: Alignment.center),
         _cell(
             _wCode,
             Text(r.employeeCode,
@@ -573,7 +553,8 @@ class _RemarkChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Two states only: paid → green; not submitted/settled → amber.
+    // Only the paid state gets a chip; anything else is left blank for now.
+    if (remark.isEmpty) return const SizedBox.shrink();
     final color = remark == PerformanceIncentiveRow.remarkPaid
         ? AppColors.success
         : AppColors.warning;
@@ -622,7 +603,8 @@ class _EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.table_chart_outlined, size: 44, color: AppColors.textMuted),
+            Icon(Icons.table_chart_outlined,
+                size: 44, color: AppColors.textMuted),
             const SizedBox(height: 14),
             Text(AppStrings.perfIncentiveEmpty,
                 textAlign: TextAlign.center,

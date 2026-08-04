@@ -19,8 +19,7 @@ class TeamHistoryScreen extends ConsumerStatefulWidget {
   const TeamHistoryScreen({super.key});
 
   @override
-  ConsumerState<TeamHistoryScreen> createState() =>
-      _TeamHistoryScreenState();
+  ConsumerState<TeamHistoryScreen> createState() => _TeamHistoryScreenState();
 }
 
 class _TeamHistoryScreenState extends ConsumerState<TeamHistoryScreen> {
@@ -56,8 +55,7 @@ class _TeamHistoryScreenState extends ConsumerState<TeamHistoryScreen> {
         isLoadingMore: list.isLoadingMore,
         hasMore: list.hasMore,
         initialError: list.error,
-        onLoadMore: () =>
-            ref.read(teamHistoryListProvider.notifier).loadMore(),
+        onLoadMore: () => ref.read(teamHistoryListProvider.notifier).loadMore(),
         onRefresh: () async =>
             ref.read(teamHistoryListProvider.notifier).refresh(),
         emptyBuilder: (_) => const _EmptyHistory(),
@@ -124,8 +122,8 @@ class _EmptyHistory extends StatelessWidget {
                   side: BorderSide(
                     color: AppColors.primaryPurple.withValues(alpha: 0.4),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

@@ -11,10 +11,8 @@ import 'matrix_table_view.dart';
 /// the same width).
 class MatrixViewResponsive extends StatelessWidget {
   final ManagerReviewDetail review;
-  final void Function(String monthlyScoreId, double? rating)
-      onScoreChanged;
-  final void Function(String monthlyScoreId, String? remark)
-      onRemarkChanged;
+  final void Function(String monthlyScoreId, double? rating) onScoreChanged;
+  final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
   static const double _tabletBreakpoint = 720;
 

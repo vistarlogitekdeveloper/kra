@@ -61,8 +61,7 @@ class TeamTrendCard extends StatelessWidget {
                     Expanded(
                       child: _MetricBlock(
                         label: AppStrings.managerDashboardTrendAverage,
-                        value: EmployeeFormatters.percent(
-                            trend.averageScore),
+                        value: EmployeeFormatters.percent(trend.averageScore),
                         accent: AppColors.primaryPurple,
                       ),
                     ),

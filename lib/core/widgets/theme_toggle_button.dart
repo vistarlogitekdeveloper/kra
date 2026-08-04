@@ -20,9 +20,8 @@ class ThemeToggleButton extends ConsumerWidget {
         isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
         color: color,
       ),
-      tooltip: isDark
-          ? AppStrings.themeSwitchToLight
-          : AppStrings.themeSwitchToDark,
+      tooltip:
+          isDark ? AppStrings.themeSwitchToLight : AppStrings.themeSwitchToDark,
       visualDensity: VisualDensity.compact,
       onPressed: () =>
           ref.read(themeModeProvider.notifier).toggle(resolveBrightness(mode)),

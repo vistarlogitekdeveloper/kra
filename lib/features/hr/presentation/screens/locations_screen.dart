@@ -420,8 +420,7 @@ class _LocationSheetState extends ConsumerState<_LocationSheet> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.4,
-                              valueColor:
-                                  AlwaysStoppedAnimation(Colors.white),
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
                           )
                         : const Icon(Icons.check_rounded),

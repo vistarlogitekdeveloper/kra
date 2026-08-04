@@ -59,18 +59,16 @@ class TeamListScreen extends ConsumerWidget {
     if (list.isSelectionMode) {
       appBar = BulkSelectAppBar(
         selectedCount: list.selectedReviewIds.length,
-        onCancel: () => ref
-            .read(managerTeamListProvider.notifier)
-            .clearSelection(),
+        onCancel: () =>
+            ref.read(managerTeamListProvider.notifier).clearSelection(),
         onApprove: list.selectedReviewIds.isEmpty
             ? null
             : () => _openBulkApprove(context, approveTargets),
       );
     } else {
       appBar = _NormalAppBar(
-        onToggleSelect: () => ref
-            .read(managerTeamListProvider.notifier)
-            .toggleSelectionMode(),
+        onToggleSelect: () =>
+            ref.read(managerTeamListProvider.notifier).toggleSelectionMode(),
       );
     }
 
@@ -86,16 +84,14 @@ class TeamListScreen extends ConsumerWidget {
             SearchBarFilter(
               hint: AppStrings.managerTeamSearchHint,
               initialValue: filter.search,
-              onChanged: (v) => ref
-                  .read(managerTeamFilterProvider.notifier)
-                  .setSearch(v),
+              onChanged: (v) =>
+                  ref.read(managerTeamFilterProvider.notifier).setSearch(v),
             ),
           TeamFilterChips(
             active: filter.filter,
             counts: list.filterCounts,
-            onPick: (f) => ref
-                .read(managerTeamFilterProvider.notifier)
-                .setFilter(f),
+            onPick: (f) =>
+                ref.read(managerTeamFilterProvider.notifier).setFilter(f),
           ),
           const SizedBox(height: 6),
           Expanded(
@@ -105,15 +101,12 @@ class TeamListScreen extends ConsumerWidget {
               isLoadingMore: list.isLoadingMore,
               hasMore: list.hasMore,
               initialError: list.error,
-              onLoadMore: () => ref
-                  .read(managerTeamListProvider.notifier)
-                  .loadMore(),
-              onRefresh: () async => ref
-                  .read(managerTeamListProvider.notifier)
-                  .refresh(),
+              onLoadMore: () =>
+                  ref.read(managerTeamListProvider.notifier).loadMore(),
+              onRefresh: () async =>
+                  ref.read(managerTeamListProvider.notifier).refresh(),
               emptyBuilder: (_) => _EmptyForFilter(filter: filter.filter),
-              padding:
-                  const EdgeInsets.fromLTRB(16, 6, 16, 28),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
               itemBuilder: (_, __, member) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: TeamMemberTile(
@@ -137,13 +130,11 @@ class TeamListScreen extends ConsumerWidget {
       m.reviewState == employee_enums.ReviewState.employeeSubmittedAll &&
       m.reviewId != null;
 
-  void _onTileTap(BuildContext context, WidgetRef ref, TeamMember m,
-      bool isSelectionMode) {
+  void _onTileTap(
+      BuildContext context, WidgetRef ref, TeamMember m, bool isSelectionMode) {
     if (isSelectionMode) {
       if (!_isSelectable(m) || m.reviewId == null) return;
-      ref
-          .read(managerTeamListProvider.notifier)
-          .toggleSelected(m.reviewId!);
+      ref.read(managerTeamListProvider.notifier).toggleSelected(m.reviewId!);
       return;
     }
     context.push(AppRoutes.managerTeamMember(m.employeeId));

@@ -44,8 +44,7 @@ class ReviewRow {
 
   /// 0–100 form for the UI regardless of how the backend stored it
   /// (decimal fraction or percent).
-  double get weightagePercent =>
-      weightage <= 1.0 ? weightage * 100 : weightage;
+  double get weightagePercent => weightage <= 1.0 ? weightage * 100 : weightage;
 
   /// True if the row can be edited by the manager at all. `false`
   /// for `FEED` rows or once every cell is LOCKED.

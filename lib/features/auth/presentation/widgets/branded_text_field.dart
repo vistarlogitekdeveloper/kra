@@ -67,9 +67,7 @@ class BrandedTextField extends StatelessWidget {
           ),
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: prefixIcon != null
-                ? Icon(prefixIcon, size: 20)
-                : null,
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
             suffixIcon: suffixIcon,
           ),
         ),

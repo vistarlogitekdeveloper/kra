@@ -58,9 +58,8 @@ class HrFormatters {
 
   static String signedPercent(double value) {
     final fixed = value.abs().toStringAsFixed(1);
-    final stripped = fixed.endsWith('.0')
-        ? fixed.substring(0, fixed.length - 2)
-        : fixed;
+    final stripped =
+        fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;
     if (value > 0) return '+$stripped%';
     if (value < 0) return '−$stripped%';
     return '$stripped%';

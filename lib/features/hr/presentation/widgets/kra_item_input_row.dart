@@ -146,8 +146,7 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
                     ),
                     isDense: true,
                     filled: true,
-                    fillColor:
-                        AppColors.primaryPurple.withValues(alpha: 0.06),
+                    fillColor: AppColors.primaryPurple.withValues(alpha: 0.06),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide.none,
@@ -233,8 +232,7 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
                       controller: widget.targetController,
                       onChanged: (_) => _emitChange(),
                       style: const TextStyle(fontSize: 13.5),
-                      decoration:
-                          _denseDecoration(hint: 'e.g. ₹ 5L revenue'),
+                      decoration: _denseDecoration(hint: 'e.g. ₹ 5L revenue'),
                     ),
                   ),
                 ),
@@ -331,8 +329,9 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color:
-                    selected ? AppColors.primaryPurple : AppColors.textSecondary,
+                color: selected
+                    ? AppColors.primaryPurple
+                    : AppColors.textSecondary,
               ),
             ),
           ],
@@ -349,8 +348,7 @@ class _KraItemInputRowState extends State<KraItemInputRow> {
         fontSize: 13,
       ),
       isDense: true,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       filled: true,
       fillColor: AppColors.background,
       border: OutlineInputBorder(

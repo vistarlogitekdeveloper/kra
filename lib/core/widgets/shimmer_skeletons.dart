@@ -147,11 +147,14 @@ class KraTableSkeleton extends StatelessWidget {
             ),
             child: const Row(
               children: [
-                Expanded(flex: 4, child: ShimmerBox(height: 12, borderRadius: 6)),
+                Expanded(
+                    flex: 4, child: ShimmerBox(height: 12, borderRadius: 6)),
                 SizedBox(width: 8),
-                Expanded(flex: 1, child: ShimmerBox(height: 12, borderRadius: 6)),
+                Expanded(
+                    flex: 1, child: ShimmerBox(height: 12, borderRadius: 6)),
                 SizedBox(width: 8),
-                Expanded(flex: 1, child: ShimmerBox(height: 12, borderRadius: 6)),
+                Expanded(
+                    flex: 1, child: ShimmerBox(height: 12, borderRadius: 6)),
               ],
             ),
           ),
@@ -168,16 +171,13 @@ class KraTableSkeleton extends StatelessWidget {
               child: const Row(
                 children: [
                   Expanded(
-                      flex: 4,
-                      child: ShimmerBox(height: 14, borderRadius: 6)),
+                      flex: 4, child: ShimmerBox(height: 14, borderRadius: 6)),
                   SizedBox(width: 8),
                   Expanded(
-                      flex: 1,
-                      child: ShimmerBox(height: 14, borderRadius: 6)),
+                      flex: 1, child: ShimmerBox(height: 14, borderRadius: 6)),
                   SizedBox(width: 8),
                   Expanded(
-                      flex: 1,
-                      child: ShimmerBox(height: 14, borderRadius: 6)),
+                      flex: 1, child: ShimmerBox(height: 14, borderRadius: 6)),
                 ],
               ),
             ),
@@ -369,8 +369,7 @@ class _SOrbitLoaderState extends State<SOrbitLoader>
                   errorBuilder: (_, __, ___) => Image.asset(
                     AppAssets.logo,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) =>
-                        const SizedBox.shrink(),
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
                 ),
               ),
@@ -416,7 +415,8 @@ class _OrbitRingPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..color = color2;
     canvas.drawArc(rect, startAngle, 3.1415926 * 0.5, false, paint1);
-    canvas.drawArc(rect, startAngle + 3.1415926, 3.1415926 * 0.5, false, paint2);
+    canvas.drawArc(
+        rect, startAngle + 3.1415926, 3.1415926 * 0.5, false, paint2);
   }
 
   @override

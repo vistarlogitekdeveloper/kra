@@ -100,8 +100,7 @@ class ReviewHistoryCard extends StatelessWidget {
                     tone: ScorePillTone.finalised,
                   ),
                   const Spacer(),
-                  if (hasEarned)
-                    _EarnedPill(amount: earned),
+                  if (hasEarned) _EarnedPill(amount: earned),
                 ],
               ),
             ],

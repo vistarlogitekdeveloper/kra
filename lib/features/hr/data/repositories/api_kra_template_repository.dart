@@ -99,7 +99,8 @@ class ApiKraTemplateRepository implements KraTemplateRepository {
   @override
   Future<KraTemplate> clone(String id) async {
     try {
-      final response = await _dio.post('${ApiConstants.kraTemplates}/$id/clone');
+      final response =
+          await _dio.post('${ApiConstants.kraTemplates}/$id/clone');
       return KraTemplate.fromJson(unwrapObject(response));
     } catch (e, st) {
       rethrowAsApiError(e, st);

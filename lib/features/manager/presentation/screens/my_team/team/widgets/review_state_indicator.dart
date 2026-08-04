@@ -28,8 +28,7 @@ class ReviewStateIndicator extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: palette.background,
             borderRadius: BorderRadius.circular(20),
@@ -82,8 +81,7 @@ class ReviewStateIndicator extends StatelessWidget {
         return _StatePalette(
           label: AppStrings.managerTeamStateInProgress,
           foreground: AppColors.accentOrange,
-          background:
-              AppColors.accentOrange.withValues(alpha: 0.12),
+          background: AppColors.accentOrange.withValues(alpha: 0.12),
         );
       case ReviewState.employeeSubmittedAll:
         return _StatePalette(
@@ -110,8 +108,7 @@ class ReviewStateIndicator extends StatelessWidget {
   String? _scoreText() {
     // Show the most-current score the manager cares about, in order
     // of preference: final > manager > self.
-    final score =
-        member.finalTotal ?? member.managerTotal ?? member.selfTotal;
+    final score = member.finalTotal ?? member.managerTotal ?? member.selfTotal;
     if (score == null) return null;
     return EmployeeFormatters.percent(score);
   }

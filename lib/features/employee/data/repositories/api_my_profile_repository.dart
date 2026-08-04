@@ -28,8 +28,7 @@ class ApiMyProfileRepository implements MyProfileRepository {
   }
 
   @override
-  Future<EmployeeProfile> updateMyProfile(
-      Map<String, dynamic> changes) async {
+  Future<EmployeeProfile> updateMyProfile(Map<String, dynamic> changes) async {
     final filtered = <String, dynamic>{
       for (final entry in changes.entries)
         if (_allowedPatchFields.contains(entry.key)) entry.key: entry.value,

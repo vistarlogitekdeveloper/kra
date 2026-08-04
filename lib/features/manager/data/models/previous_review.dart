@@ -56,8 +56,8 @@ class PreviousReview {
           JsonParse.parseString(json['fyLabel']),
       quarterNum: JsonParse.parseInt(cycleMap['quarterNum']) ??
           JsonParse.parseInt(json['quarterNum']),
-      state: ReviewState.fromApi(
-          JsonParse.parseString(json['state']) ?? 'DRAFT'),
+      state:
+          ReviewState.fromApi(JsonParse.parseString(json['state']) ?? 'DRAFT'),
       finalTotal: JsonParse.parseDouble(json['finalTotal']) ??
           JsonParse.parseDouble(json['finalAvgManagerPct']) ??
           JsonParse.parseDouble(json['finalAvgSelfPct']),

@@ -7,8 +7,7 @@ import '../../../../../../../core/constants/app_strings.dart';
 /// Replaces the normal "My Team" AppBar with the selection count, a
 /// Cancel action, and an Approve action that's disabled until at
 /// least one reviewable row is selected.
-class BulkSelectAppBar extends StatelessWidget
-    implements PreferredSizeWidget {
+class BulkSelectAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
   final VoidCallback onCancel;
   final VoidCallback? onApprove;
@@ -45,8 +44,7 @@ class BulkSelectAppBar extends StatelessWidget
           style: TextButton.styleFrom(
             foregroundColor: Colors.white,
             disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
           child: const Text(
             AppStrings.managerTeamBulkApproveCta,

@@ -108,8 +108,7 @@ class MonthlyReviewSummary {
             PayoutStatus.fromApi(JsonParse.parseString(json['payoutStatus'])),
         projectLocation: JsonParse.parseString(json['projectLocation']),
         selfScorePct: JsonParse.parseDouble(json['selfScorePct']),
-        managementReviewPct:
-            JsonParse.parseDouble(json['managementReviewPct']),
+        managementReviewPct: JsonParse.parseDouble(json['managementReviewPct']),
       );
 
   /// Projection from a full review — used by the mock and any backend
@@ -190,6 +189,48 @@ class MonthlyReviewSummary {
 
   /// The incentive has been settled.
   bool get payoutPaid => payoutStatus == PayoutStatus.paid;
+
+  /// The furthest rating stage the summary's SCORES prove was reached, or null
+  /// when nothing beyond Self-Rating has a score yet. Read off the score fields
+  /// the list endpoint carries, so it survives a stage cursor that in-place
+  /// score saves left frozen (the backend advances [currentStage] on a formal
+  /// stage submit, not on an edit-in-place `save-scores`).
+  ///
+  /// `managementReviewPct` is non-null once the Review/Management cycle has any
+  /// score, so it maps to Management Review — the phase a completed Review sits
+  /// at. (The summary can't tell a management override from a Review average, so
+  /// this can read one notch ahead for a still-in-progress Review; that only
+  /// ever applies when the cursor is frozen, and never regresses a live cursor.)
+  ReviewStage? get _scoredStage {
+    if (payoutPaid) return ReviewStage.completed;
+    if (managementReviewPct != null) return ReviewStage.managementReview;
+    if (selfScorePct != null) return ReviewStage.selfRating;
+    return null;
+  }
+
+  /// Stage to SHOW on dashboards. Trusts the backend's stage cursor once it has
+  /// advanced past Self-Rating (it's authoritative then), and only repairs the
+  /// specific frozen-at-Self-Rating case: a review whose scores prove more work
+  /// was done still reads as Self-Rating because the cursor never moved. This
+  /// mirrors the quarterly KRA sheet, which derives the same stage from the full
+  /// review's scores.
+  ReviewStage get displayStage {
+    if (currentStage != ReviewStage.selfRating) return currentStage;
+    final scored = _scoredStage;
+    if (scored == null) return currentStage;
+    return scored.pipelineIndex >= currentStage.pipelineIndex
+        ? scored
+        : currentStage;
+  }
+
+  /// Status of [displayStage]: submitted once the review is terminal/paid or the
+  /// scores prove the shown stage was reached; otherwise the cursor's own status
+  /// (nothing scored yet → still in progress / pending).
+  StageStatus get displayStatus {
+    if (currentStage.isTerminal || payoutPaid) return StageStatus.submitted;
+    if (currentStage != ReviewStage.selfRating) return currentStageStatus;
+    return _scoredStage == null ? currentStageStatus : StageStatus.submitted;
+  }
 
   /// The management review has been done (management scored, or the review has
   /// already moved on to payout / completed) — so the incentive can be settled.

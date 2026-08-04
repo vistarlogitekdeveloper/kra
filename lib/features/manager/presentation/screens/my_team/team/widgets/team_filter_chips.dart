@@ -109,8 +109,7 @@ class _Chip extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -118,8 +117,7 @@ class _Chip extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 12.5,
-                  fontWeight:
-                      isActive ? FontWeight.w800 : FontWeight.w700,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w700,
                   color: fg,
                   letterSpacing: 0.2,
                 ),
@@ -127,13 +125,12 @@ class _Chip extends StatelessWidget {
               if (count > 0) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: isActive
                         ? Colors.white.withValues(alpha: 0.25)
-                        : AppColors.primaryPurple
-                            .withValues(alpha: 0.10),
+                        : AppColors.primaryPurple.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -141,9 +138,7 @@ class _Chip extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w800,
-                      color: isActive
-                          ? Colors.white
-                          : AppColors.primaryPurple,
+                      color: isActive ? Colors.white : AppColors.primaryPurple,
                       letterSpacing: 0.2,
                     ),
                   ),

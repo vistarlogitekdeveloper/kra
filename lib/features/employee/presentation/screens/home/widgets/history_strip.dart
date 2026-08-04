@@ -161,8 +161,7 @@ class _HistoryChip extends StatelessWidget {
     // Prefer the manager's final-avg when present; fall back to the
     // employee's self-avg until the manager passes through.
     final hasFinal = review.finalAvgManagerPct != null;
-    final scoreValue =
-        review.finalAvgManagerPct ?? review.finalAvgSelfPct;
+    final scoreValue = review.finalAvgManagerPct ?? review.finalAvgSelfPct;
     final scoreText = scoreValue == null
         ? AppStrings.homeHistoryStripPending
         : EmployeeFormatters.percent(scoreValue);
@@ -175,8 +174,7 @@ class _HistoryChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Container(
           width: 132,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.divider),
             borderRadius: BorderRadius.circular(14),
@@ -196,8 +194,7 @@ class _HistoryChip extends StatelessWidget {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: _stateColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
@@ -217,9 +214,7 @@ class _HistoryChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: hasFinal
-                      ? AppColors.textPrimary
-                      : AppColors.textMuted,
+                  color: hasFinal ? AppColors.textPrimary : AppColors.textMuted,
                   letterSpacing: -0.2,
                 ),
               ),
