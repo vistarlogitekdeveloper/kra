@@ -76,8 +76,7 @@ class MonthlyScore {
       managerRating: JsonParse.parseDouble(json['managerRating']),
       managerRemark: JsonParse.parseString(json['managerRemark']),
       weightedScore: JsonParse.parseDouble(json['weightedScore']),
-      isNotApplicable:
-          JsonParse.parseBool(json['isNotApplicable']) ?? false,
+      isNotApplicable: JsonParse.parseBool(json['isNotApplicable']) ?? false,
     );
   }
 

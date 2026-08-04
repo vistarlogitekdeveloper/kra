@@ -72,8 +72,7 @@ class _TeamMemberHistoryScreenState
         isLoadingMore: list.isLoadingMore,
         hasMore: list.hasMore,
         initialError: list.error,
-        onLoadMore: () =>
-            ref.read(teamHistoryListProvider.notifier).loadMore(),
+        onLoadMore: () => ref.read(teamHistoryListProvider.notifier).loadMore(),
         onRefresh: () async =>
             ref.read(teamHistoryListProvider.notifier).refresh(),
         emptyBuilder: (_) => const _EmptyHistory(),

@@ -231,7 +231,8 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
 
     // Management review can send the review back a step instead of
     // advancing — clear the reporting-manager record so it re-opens.
-    final returning = stage == ReviewStage.managementReview && approved == false;
+    final returning =
+        stage == ReviewStage.managementReview && approved == false;
     if (returning) {
       records.remove(ReviewStage.reportingManagerRating);
       // Keep WHY it was returned (the comment is mandatory in the UI) so the
@@ -314,6 +315,22 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
             : row,
     ];
     final updated = review.copyWith(rows: rows);
+    _byId[reviewId] = updated;
+    return updated;
+  }
+
+  @override
+  Future<MonthlyReview> lockManagement(String reviewId) async {
+    final review = await getReview(reviewId);
+    final updated = review.copyWith(managementLockedAt: _now);
+    _byId[reviewId] = updated;
+    return updated;
+  }
+
+  @override
+  Future<MonthlyReview> unlockManagement(String reviewId) async {
+    final review = await getReview(reviewId);
+    final updated = review.copyWith(clearManagementLock: true);
     _byId[reviewId] = updated;
     return updated;
   }

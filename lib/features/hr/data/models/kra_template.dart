@@ -1,3 +1,4 @@
+import '../../../../core/api/json_parse.dart';
 import 'kra_template_item.dart';
 
 /// A reusable KRA template for a given role. Editable until cloned or
@@ -74,8 +75,8 @@ class KraTemplate {
       isActive: (json['isActive'] as bool?) ?? true,
       items: items,
       itemCount: parsedItemCount,
-      createdAt: _parseDate(json['createdAt']),
-      updatedAt: _parseDate(json['updatedAt']),
+      createdAt: JsonParse.parseDate(json['createdAt']),
+      updatedAt: JsonParse.parseDate(json['updatedAt']),
     );
   }
 
@@ -112,12 +113,5 @@ class KraTemplate {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
-  }
-
-  static DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
-    if (value is String && value.isNotEmpty) return DateTime.tryParse(value);
-    return null;
   }
 }

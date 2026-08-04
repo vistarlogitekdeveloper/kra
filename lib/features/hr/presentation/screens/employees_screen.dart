@@ -152,8 +152,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
             title: AppStrings.errorGeneric,
             message: state.error!,
             actionLabel: AppStrings.commonRetry,
-            onAction: () =>
-                ref.read(employeeListProvider.notifier).refresh(),
+            onAction: () => ref.read(employeeListProvider.notifier).refresh(),
           ),
         ],
       );
@@ -165,17 +164,15 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
         children: [
           const SizedBox(height: 60),
           EmptyState(
-            icon: isSearching
-                ? Icons.search_off_rounded
-                : Icons.groups_outlined,
+            icon:
+                isSearching ? Icons.search_off_rounded : Icons.groups_outlined,
             title: isSearching
                 ? AppStrings.employeesNoSearchResults
                 : AppStrings.employeesEmptyTitle,
             message: isSearching
                 ? AppStrings.employeesNoSearchHint
                 : AppStrings.employeesEmptyMessage,
-            actionLabel:
-                isSearching ? null : AppStrings.employeesEmptyCta,
+            actionLabel: isSearching ? null : AppStrings.employeesEmptyCta,
             onAction: isSearching
                 ? null
                 : () => context.push(AppRoutes.hrEmployeeNew),
@@ -195,8 +192,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
         final employee = state.employees[index];
         return EmployeeListTile(
           employee: employee,
-          onTap: () =>
-              context.push(AppRoutes.hrEmployeeDetail(employee.id)),
+          onTap: () => context.push(AppRoutes.hrEmployeeDetail(employee.id)),
           onEdit: () => context.push(AppRoutes.hrEmployeeEdit(employee.id)),
           onDeactivate: () => _confirmDeactivate(employee.id),
         );
@@ -223,8 +219,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
               ? AppStrings.employeesDeactivateSuccess
               : AppStrings.employeesDeactivateFailed,
         ),
-        backgroundColor:
-            success ? AppColors.textPrimary : AppColors.error,
+        backgroundColor: success ? AppColors.textPrimary : AppColors.error,
       ),
     );
   }
@@ -252,8 +247,7 @@ class _RoleFilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       tooltip: 'Filter by role',
-      onSelected: (picked) =>
-          onChanged(picked == _allSentinel ? null : picked),
+      onSelected: (picked) => onChanged(picked == _allSentinel ? null : picked),
       itemBuilder: (_) => [
         const PopupMenuItem(
             value: _allSentinel, child: Text(AppStrings.commonAll)),
@@ -262,8 +256,7 @@ class _RoleFilterChip extends StatelessWidget {
         ),
       ],
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
@@ -272,8 +265,7 @@ class _RoleFilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.tune_rounded,
-                color: AppColors.textSecondary, size: 18),
+            Icon(Icons.tune_rounded, color: AppColors.textSecondary, size: 18),
             const SizedBox(width: 6),
             Text(
               value == null

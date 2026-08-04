@@ -35,11 +35,10 @@ class ManagerRateResponse {
         totals: ReviewTotals.fromJson(
             JsonParse.parseMap(json['totals']) ?? const {}),
         transitioned: JsonParse.parseBool(json['transitioned']) ?? false,
-        transitionError:
-            JsonParse.parseMap(json['transitionError']) == null
-                ? null
-                : TransitionError.fromJson(
-                    JsonParse.parseMap(json['transitionError'])!),
+        transitionError: JsonParse.parseMap(json['transitionError']) == null
+            ? null
+            : TransitionError.fromJson(
+                JsonParse.parseMap(json['transitionError'])!),
       );
 
   Map<String, dynamic> toJson() => {

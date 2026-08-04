@@ -204,7 +204,8 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
 
     final records = Map<ReviewStage, StageRecord>.from(review.stageRecords);
 
-    final returning = stage == ReviewStage.managementReview && approved == false;
+    final returning =
+        stage == ReviewStage.managementReview && approved == false;
     if (returning) {
       records.remove(ReviewStage.reportingManagerRating);
       // Keep WHY it was returned (the comment is mandatory in the UI) so the
@@ -287,6 +288,22 @@ class LiveMonthlyReviewRepository implements MonthlyReviewRepository {
             : row,
     ];
     final updated = review.copyWith(rows: rows);
+    _store[reviewId] = updated;
+    return updated;
+  }
+
+  @override
+  Future<MonthlyReview> lockManagement(String reviewId) async {
+    final review = await getReview(reviewId);
+    final updated = review.copyWith(managementLockedAt: _clock());
+    _store[reviewId] = updated;
+    return updated;
+  }
+
+  @override
+  Future<MonthlyReview> unlockManagement(String reviewId) async {
+    final review = await getReview(reviewId);
+    final updated = review.copyWith(clearManagementLock: true);
     _store[reviewId] = updated;
     return updated;
   }

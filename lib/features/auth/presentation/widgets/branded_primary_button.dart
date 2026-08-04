@@ -33,9 +33,7 @@ class BrandedPrimaryButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(11),
         gradient: disabled ? null : AppGradients.ribbon,
         color: disabled ? AppColors.surfaceElevated : null,
-        border: disabled
-            ? Border.all(color: AppColors.divider)
-            : null,
+        border: disabled ? Border.all(color: AppColors.divider) : null,
         boxShadow: disabled
             ? null
             : [
@@ -71,9 +69,7 @@ class BrandedPrimaryButton extends StatelessWidget {
                       Text(
                         label,
                         style: TextStyle(
-                          color: disabled
-                              ? AppColors.textMuted
-                              : Colors.white,
+                          color: disabled ? AppColors.textMuted : Colors.white,
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.2,
@@ -82,9 +78,8 @@ class BrandedPrimaryButton extends StatelessWidget {
                       if (icon != null) ...[
                         const SizedBox(width: 10),
                         Icon(icon,
-                            color: disabled
-                                ? AppColors.textMuted
-                                : Colors.white,
+                            color:
+                                disabled ? AppColors.textMuted : Colors.white,
                             size: 18),
                       ],
                     ],

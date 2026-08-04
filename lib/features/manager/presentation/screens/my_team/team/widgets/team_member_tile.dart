@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../core/utils/name_format.dart';
 import '../../../../../../../core/constants/app_strings.dart';
 import '../../../../../data/models/team_member.dart';
 import 'review_state_indicator.dart';
@@ -51,9 +52,7 @@ class TeamMemberTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected
-                  ? AppColors.primaryPurple
-                  : AppColors.divider,
+              color: isSelected ? AppColors.primaryPurple : AppColors.divider,
               width: isSelected ? 1.5 : 1,
             ),
           ),
@@ -89,8 +88,7 @@ class TeamMemberTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       _MetaRow(member: member),
                       const SizedBox(height: 8),
-                      ThreeMonthTrendStrip(
-                          scores: member.threeMonthTrend),
+                      ThreeMonthTrendStrip(scores: member.threeMonthTrend),
                     ],
                   ),
                 ),
@@ -123,8 +121,7 @@ class _MetaRow extends StatelessWidget {
       member.employeeCode,
       if (member.role != null && member.role!.isNotEmpty)
         member.role!.replaceAll('_', ' '),
-      if (member.projectLocation != null &&
-          member.projectLocation!.isNotEmpty)
+      if (member.projectLocation != null && member.projectLocation!.isNotEmpty)
         member.projectLocation!,
     ];
     return Text(
@@ -144,13 +141,6 @@ class _Avatar extends StatelessWidget {
   final String name;
   const _Avatar({required this.name});
 
-  String _initials() {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '·';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -166,7 +156,7 @@ class _Avatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(
-        _initials(),
+        initialsOf(name),
         style: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w800,
@@ -193,15 +183,11 @@ class _SelectionCheckbox extends StatelessWidget {
       height: 24,
       margin: const EdgeInsets.only(top: 2),
       decoration: BoxDecoration(
-        color: isSelected
-            ? AppColors.primaryPurple
-            : Colors.transparent,
+        color: isSelected ? AppColors.primaryPurple : Colors.transparent,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: enabled
-              ? (isSelected
-                  ? AppColors.primaryPurple
-                  : AppColors.textSecondary)
+              ? (isSelected ? AppColors.primaryPurple : AppColors.textSecondary)
               : AppColors.divider,
           width: 1.5,
         ),

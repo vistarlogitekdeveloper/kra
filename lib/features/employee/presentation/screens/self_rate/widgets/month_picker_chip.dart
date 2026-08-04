@@ -72,9 +72,7 @@ class _Chip extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
         side: BorderSide(
-          color: isActive
-              ? AppColors.primaryPurple
-              : AppColors.divider,
+          color: isActive ? AppColors.primaryPurple : AppColors.divider,
         ),
       ),
       child: InkWell(
@@ -94,8 +92,7 @@ class _Chip extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 12.5,
-                  fontWeight:
-                      isActive ? FontWeight.w800 : FontWeight.w700,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w700,
                   letterSpacing: 0.2,
                   color: fg,
                 ),

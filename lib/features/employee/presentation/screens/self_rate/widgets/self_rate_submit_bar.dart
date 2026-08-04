@@ -46,8 +46,7 @@ class SelfRateSubmitBar extends StatelessWidget {
         disabledBackgroundColor:
             AppColors.primaryPurple.withValues(alpha: 0.25),
         disabledForegroundColor: Colors.white,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),

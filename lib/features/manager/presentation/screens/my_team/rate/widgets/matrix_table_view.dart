@@ -19,10 +19,8 @@ import 'score_cell.dart';
 /// horizontal room to render the columns comfortably.
 class MatrixTableView extends StatelessWidget {
   final ManagerReviewDetail review;
-  final void Function(String monthlyScoreId, double? rating)
-      onScoreChanged;
-  final void Function(String monthlyScoreId, String? remark)
-      onRemarkChanged;
+  final void Function(String monthlyScoreId, double? rating) onScoreChanged;
+  final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
   const MatrixTableView({
     super.key,
@@ -113,10 +111,8 @@ class _DataRow extends StatelessWidget {
   final List<ManagerReviewMonth> months;
   final int rowFlex;
   final int monthFlex;
-  final void Function(String monthlyScoreId, double? rating)
-      onScoreChanged;
-  final void Function(String monthlyScoreId, String? remark)
-      onRemarkChanged;
+  final void Function(String monthlyScoreId, double? rating) onScoreChanged;
+  final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
   const _DataRow({
     required this.row,
@@ -181,8 +177,7 @@ class _RowMeta extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 7, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                 color: AppColors.primaryPurpleSurface,
                 borderRadius: BorderRadius.circular(20),
@@ -230,10 +225,8 @@ class _RowMeta extends StatelessWidget {
 class _CellPicker extends StatelessWidget {
   final ReviewRow row;
   final ManagerReviewMonth month;
-  final void Function(String monthlyScoreId, double? rating)
-      onScoreChanged;
-  final void Function(String monthlyScoreId, String? remark)
-      onRemarkChanged;
+  final void Function(String monthlyScoreId, double? rating) onScoreChanged;
+  final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
   const _CellPicker({
     required this.row,
@@ -270,10 +263,8 @@ class _CellPicker extends StatelessWidget {
       key: ValueKey(cell.monthlyScoreId),
       cell: cell,
       maxScore: row.maxScore,
-      onScoreChanged: (v) =>
-          onScoreChanged(cell.monthlyScoreId, v),
-      onRemarkChanged: (v) =>
-          onRemarkChanged(cell.monthlyScoreId, v),
+      onScoreChanged: (v) => onScoreChanged(cell.monthlyScoreId, v),
+      onRemarkChanged: (v) => onRemarkChanged(cell.monthlyScoreId, v),
     );
   }
 }

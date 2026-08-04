@@ -121,8 +121,7 @@ class MyKraAssignmentItem {
 
   /// Convenience getter — weightage as 0–100 regardless of how the
   /// backend stored it (decimal fraction or percent).
-  double get weightagePercent =>
-      weightage <= 1.0 ? weightage * 100 : weightage;
+  double get weightagePercent => weightage <= 1.0 ? weightage * 100 : weightage;
 
   factory MyKraAssignmentItem.fromJson(Map<String, dynamic> json) {
     return MyKraAssignmentItem(
@@ -262,8 +261,7 @@ class MyKraAssignedByRef {
         email: JsonParse.parseString(json['email']),
       );
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'name': name, 'email': email};
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'email': email};
 
   MyKraAssignedByRef copyWith({
     String? id,

@@ -1,3 +1,4 @@
+import '../../../../core/api/json_parse.dart';
 import 'kra_template_item.dart';
 
 /// An assignment binds an [Employee] to a set of KRA items for a specific
@@ -44,8 +45,8 @@ class KraAssignment {
     return KraAssignment(
       id: json['id'] as String,
       employeeId: (json['employeeId'] ?? '') as String,
-      employeeName: nested(employeeObj, 'name') ??
-          json['employeeName'] as String?,
+      employeeName:
+          nested(employeeObj, 'name') ?? json['employeeName'] as String?,
       cycleId: (json['cycleId'] ?? '') as String,
       cycleName: nested(cycleObj, 'name') ?? json['cycleName'] as String?,
       templateId: nested(templateObj, 'id') ?? json['templateId'] as String?,
@@ -56,8 +57,8 @@ class KraAssignment {
           .map(KraTemplateItem.fromJson)
           .toList(),
       isLocked: (json['isLocked'] as bool?) ?? false,
-      createdAt: _parseDate(json['createdAt']),
-      updatedAt: _parseDate(json['updatedAt']),
+      createdAt: JsonParse.parseDate(json['createdAt']),
+      updatedAt: JsonParse.parseDate(json['updatedAt']),
     );
   }
 
@@ -101,12 +102,5 @@ class KraAssignment {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
-  }
-
-  static DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
-    if (value is String && value.isNotEmpty) return DateTime.tryParse(value);
-    return null;
   }
 }

@@ -221,13 +221,11 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: AppColors.divider, width: 1),
+                borderSide: BorderSide(color: AppColors.divider, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: AppColors.divider, width: 1),
+                borderSide: BorderSide(color: AppColors.divider, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),

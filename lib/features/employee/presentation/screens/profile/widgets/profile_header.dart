@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../../core/constants/app_colors.dart';
+import '../../../../../../core/utils/name_format.dart' as names;
 import '../../../../data/models/employee_profile.dart';
 
 /// Header card on the profile screen — avatar (initials in a coloured
@@ -30,12 +31,7 @@ class ProfileHeader extends StatelessWidget {
     return palette[hash % palette.length];
   }
 
-  static String initialsOf(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '·';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
+  static String initialsOf(String name) => names.initialsOf(name);
 
   @override
   Widget build(BuildContext context) {

@@ -1,4 +1,5 @@
 import 'monthly_review_summary.dart';
+import 'quarter_aggregate.dart';
 
 /// One employee's row in the quarterly Performance Incentive Sheet — a
 /// read-only report that mirrors the "Performance Incentive" Excel: every field
@@ -32,12 +33,15 @@ class PerformanceIncentiveRow {
   /// Payable incentive — quarterly fixed × total %.
   final double payableIncentive;
 
-  /// Derived status remark — exactly one of [remarkPaid] / [remarkNotSubmitted].
+  /// Derived status remark — [remarkPaid] once the incentive is settled, or an
+  /// empty string otherwise (the "not submitted" state is intentionally shown
+  /// blank for now, per product decision).
   final String remark;
 
-  /// The two remark values shown in the sheet.
+  /// The remark values shown in the sheet. Only "Incentive Paid" is surfaced;
+  /// every other state renders blank ([remarkNotSubmitted] is empty for now).
   static const String remarkPaid = 'Incentive Paid';
-  static const String remarkNotSubmitted = 'KRA Not Submitted';
+  static const String remarkNotSubmitted = '';
 
   const PerformanceIncentiveRow({
     required this.srNo,
@@ -61,48 +65,33 @@ class PerformanceIncentiveRow {
     required String employeeId,
     required List<MonthlyReviewSummary?> months,
   }) {
-    // Identity / static fields — take the first month that actually has data.
-    final present = months.whereType<MonthlyReviewSummary>().toList();
-    final ref = present.isNotEmpty ? present.first : null;
-
-    final base = present
-            .map((s) => s.incentiveEligibleAmount ?? 0)
-            .fold<double>(0, (a, b) => a > b ? a : b) // the configured ceiling
-        ;
+    // Shared quarter maths (score total + incentive) so this report and the
+    // Review Dashboard agree exactly. Identity fields come from the first month
+    // that has data.
+    final agg = QuarterAggregate.of(months);
     final selfRatings = [for (final m in months) m?.selfScorePct];
     final managementRatings = [for (final m in months) m?.managementReviewPct];
-
-    // Quarter total = average of the three months' final scores (a missing
-    // month counts as 0), matching the quarterly KRA sheet's payout maths.
-    var sum = 0.0;
-    for (final m in months) {
-      sum += m?.finalScorePct ?? 0;
-    }
-    final total = sum / 3;
-
-    final quarterlyFixed = base * 3;
-    final payable = quarterlyFixed * total / 100;
 
     return PerformanceIncentiveRow(
       srNo: srNo,
       employeeId: employeeId,
-      employeeCode: ref?.employeeCode ?? '',
-      employeeName: ref?.employeeName ?? '',
-      performanceIncentiveAmount: base,
-      projectLocation: ref?.projectLocation,
+      employeeCode: agg.ref?.employeeCode ?? '',
+      employeeName: agg.ref?.employeeName ?? '',
+      performanceIncentiveAmount: agg.base,
+      projectLocation: agg.ref?.projectLocation,
       selfRatings: selfRatings,
       managementRatings: managementRatings,
-      total: total,
-      quarterlyFixedIncentive: quarterlyFixed,
-      payableIncentive: payable,
+      total: agg.totalPct,
+      quarterlyFixedIncentive: agg.quarterlyFixed,
+      payableIncentive: agg.payable,
       remark: _remarkFor(months),
     );
   }
 
-  /// Derives the status remark. Only two states are surfaced: the incentive is
-  /// PAID once every month of the quarter has its payout settled; anything short
-  /// of that (a missing month, or any month not yet paid) reads as the KRA not
-  /// being submitted / settled.
+  /// Derives the status remark. Only the PAID state is surfaced: the incentive
+  /// is "Incentive Paid" once every month of the quarter has its payout settled.
+  /// Anything short of that (a missing month, or any month not yet paid) renders
+  /// blank — the "not submitted" label is intentionally suppressed for now.
   static String _remarkFor(List<MonthlyReviewSummary?> months) {
     final present = months.whereType<MonthlyReviewSummary>().toList();
     final paid = present.length == months.length &&

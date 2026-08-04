@@ -142,8 +142,7 @@ class MyReviewListController extends StateNotifier<MyReviewListState> {
   /// since the per-cycle review record doesn't carry a `finalizedAt`
   /// field at the top level.
   static bool _isFinalized(MyReview r) =>
-      r.state == ReviewState.finalized ||
-      r.state == ReviewState.acknowledged;
+      r.state == ReviewState.finalized || r.state == ReviewState.acknowledged;
 
   List<MyReview> _applyBucket(List<MyReview> input) {
     switch (_filter.bucket) {
@@ -201,15 +200,14 @@ class MyReviewListState {
 
 class MyReviewListFilterController extends StateNotifier<MyReviewListFilter> {
   MyReviewListFilterController() : super(const MyReviewListFilter());
-  void setCycle(String? cycleId) =>
-      state = state.copyWith(cycleId: cycleId);
+  void setCycle(String? cycleId) => state = state.copyWith(cycleId: cycleId);
   void setBucket(MyReviewListBucket bucket) =>
       state = state.copyWith(bucket: bucket);
   void reset() => state = const MyReviewListFilter();
 }
 
-final myReviewListFilterProvider = StateNotifierProvider<
-    MyReviewListFilterController, MyReviewListFilter>(
+final myReviewListFilterProvider =
+    StateNotifierProvider<MyReviewListFilterController, MyReviewListFilter>(
   (ref) => MyReviewListFilterController(),
 );
 

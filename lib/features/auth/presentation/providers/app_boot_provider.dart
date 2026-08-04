@@ -47,8 +47,7 @@ final appBootProvider = FutureProvider<void>((ref) async {
     // a late success would call hydrate() and snap the just-logged-out
     // user back into the app, then bounce them out again once the cleared
     // token starts forcing 401s.
-    if (fresh != null &&
-        ref.read(authStateProvider) is AuthAuthenticated) {
+    if (fresh != null && ref.read(authStateProvider) is AuthAuthenticated) {
       ref.read(authStateProvider.notifier).hydrate(fresh);
     }
   });

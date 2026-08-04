@@ -64,9 +64,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     return AuthScaffold(
       title: AppStrings.forgotTitle,
       subtitle: AppStrings.forgotSubtitle,
-      child: _successMessage != null
-          ? _buildSuccess()
-          : _buildForm(),
+      child: _successMessage != null ? _buildSuccess() : _buildForm(),
     );
   }
 

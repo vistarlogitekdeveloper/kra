@@ -70,8 +70,7 @@ class AuditLogListController extends StateNotifier<AuditLogListState> {
       error: null,
     );
     try {
-      final pageData =
-          await _repo.fetchLogs(page: 1, pageSize: _pageSize);
+      final pageData = await _repo.fetchLogs(page: 1, pageSize: _pageSize);
       state = AuditLogListState(
         entries: pageData.entries,
         page: 1,
@@ -100,8 +99,7 @@ class AuditLogListController extends StateNotifier<AuditLogListState> {
     state = state.copyWith(isLoadingMore: true);
     try {
       final next = state.page + 1;
-      final pageData =
-          await _repo.fetchLogs(page: next, pageSize: _pageSize);
+      final pageData = await _repo.fetchLogs(page: next, pageSize: _pageSize);
       final combined = [...state.entries, ...pageData.entries];
       state = state.copyWith(
         entries: combined,

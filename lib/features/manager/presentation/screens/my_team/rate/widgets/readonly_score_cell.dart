@@ -38,8 +38,7 @@ class ReadonlyScoreCell extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
             color: AppColors.divider.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(10),

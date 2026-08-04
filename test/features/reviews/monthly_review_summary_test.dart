@@ -16,6 +16,8 @@ void main() {
     StageStatus status = StageStatus.inProgress,
     String? managerId,
     PayoutStatus payoutStatus = PayoutStatus.pending,
+    double? selfScorePct,
+    double? managementReviewPct,
   }) {
     return MonthlyReviewSummary(
       id: 'r1',
@@ -29,6 +31,8 @@ void main() {
       currentStage: stage,
       currentStageStatus: status,
       payoutStatus: payoutStatus,
+      selfScorePct: selfScorePct,
+      managementReviewPct: managementReviewPct,
     );
   }
 
@@ -131,6 +135,65 @@ void main() {
       );
       expect(s.payoutPaid, isTrue);
       expect(s.canMarkPaidBy(UserRole.finance), isFalse);
+    });
+  });
+
+  // The dashboard chip reads [displayStage]/[displayStatus], which repair a
+  // stage cursor that in-place score saves left frozen at Self-Rating — while
+  // NEVER regressing (or over-riding) a cursor the backend already advanced.
+  group('MonthlyReviewSummary.displayStage — scores repair a frozen cursor', () {
+    test('cursor stuck at Self-Rating but management scored → Management '
+        'Review (submitted)', () {
+      final s = summary(
+        stage: ReviewStage.selfRating,
+        status: StageStatus.inProgress,
+        selfScorePct: 85,
+        managementReviewPct: 90,
+      );
+      expect(s.displayStage, ReviewStage.managementReview);
+      expect(s.displayStatus, StageStatus.submitted);
+    });
+
+    test('cursor at Self-Rating with only a self score → Self-Rating, but '
+        'submitted (self is in)', () {
+      final s = summary(
+        stage: ReviewStage.selfRating,
+        status: StageStatus.inProgress,
+        selfScorePct: 70,
+      );
+      expect(s.displayStage, ReviewStage.selfRating);
+      expect(s.displayStatus, StageStatus.submitted);
+    });
+
+    test('nothing scored yet → the cursor stage and its own status', () {
+      final s = summary(
+        stage: ReviewStage.selfRating,
+        status: StageStatus.inProgress,
+      );
+      expect(s.displayStage, ReviewStage.selfRating);
+      expect(s.displayStatus, StageStatus.inProgress);
+    });
+
+    test('a cursor already advanced past Self-Rating is authoritative — a '
+        'partial Review average never bumps it to Management Review', () {
+      final s = summary(
+        stage: ReviewStage.reportingManagerRating,
+        status: StageStatus.inProgress,
+        selfScorePct: 80,
+        managementReviewPct: 88, // Review average, management not done yet
+      );
+      expect(s.displayStage, ReviewStage.reportingManagerRating);
+      expect(s.displayStatus, StageStatus.inProgress);
+    });
+
+    test('a completed / paid review shows Completed (submitted)', () {
+      final s = summary(
+        stage: ReviewStage.completed,
+        status: StageStatus.submitted,
+        payoutStatus: PayoutStatus.paid,
+      );
+      expect(s.displayStage, ReviewStage.completed);
+      expect(s.displayStatus, StageStatus.submitted);
     });
   });
 

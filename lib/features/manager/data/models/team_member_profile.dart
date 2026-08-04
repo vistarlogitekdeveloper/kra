@@ -43,8 +43,7 @@ class TeamMemberProfile {
   factory TeamMemberProfile.fromJson(Map<String, dynamic> json) =>
       TeamMemberProfile(
         employeeId: JsonParse.parseString(json['employeeId']) ?? '',
-        employeeCode:
-            JsonParse.parseString(json['employeeCode']) ?? '',
+        employeeCode: JsonParse.parseString(json['employeeCode']) ?? '',
         fullName: JsonParse.parseString(json['fullName']) ?? '',
         email: JsonParse.parseString(json['email']) ?? '',
         phone: JsonParse.parseString(json['phone']),
@@ -52,18 +51,15 @@ class TeamMemberProfile {
         department: JsonParse.parseString(json['department']),
         grade: JsonParse.parseString(json['grade']),
         position: JsonParse.parseString(json['position']),
-        projectLocation:
-            JsonParse.parseString(json['projectLocation']),
+        projectLocation: JsonParse.parseString(json['projectLocation']),
         joinedDate: JsonParse.parseDate(json['joinedDate']),
         monthlyIncentiveAmount:
             JsonParse.parseDouble(json['monthlyIncentiveAmount']),
-        fyReviewSummary:
-            JsonParse.parseMap(json['fyReviewSummary']) == null
-                ? null
-                : FyReviewSummary.fromJson(
-                    JsonParse.parseMap(json['fyReviewSummary'])!),
-        currentReviewId:
-            JsonParse.parseString(json['currentReviewId']),
+        fyReviewSummary: JsonParse.parseMap(json['fyReviewSummary']) == null
+            ? null
+            : FyReviewSummary.fromJson(
+                JsonParse.parseMap(json['fyReviewSummary'])!),
+        currentReviewId: JsonParse.parseString(json['currentReviewId']),
       );
 
   Map<String, dynamic> toJson() => {

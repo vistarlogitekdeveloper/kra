@@ -31,8 +31,7 @@ class KraTemplateFormScreen extends ConsumerStatefulWidget {
       _KraTemplateFormScreenState();
 }
 
-class _KraTemplateFormScreenState
-    extends ConsumerState<KraTemplateFormScreen> {
+class _KraTemplateFormScreenState extends ConsumerState<KraTemplateFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -92,9 +91,7 @@ class _KraTemplateFormScreenState
     if (_hydrated) return;
     _nameController.text = template.name;
     _descriptionController.text = template.description ?? '';
-    _items = template.items
-        .map((e) => e.copyWith())
-        .toList(growable: true);
+    _items = template.items.map((e) => e.copyWith()).toList(growable: true);
     // Dispose any controllers from a previous hydrate (defensive).
     for (final c in _itemControllers) {
       c.dispose();
@@ -177,11 +174,14 @@ class _KraTemplateFormScreenState
   // Every named KRA must be assigned to a reviewer. Gated in the button state
   // (not only post-tap) so it's consistent with the name/weightage gating and
   // the unselected reviewer chips visibly signal what's missing.
-  bool get _allItemsReviewed => _items
-      .every((i) => i.name.trim().isEmpty || i.reviewerGroup != null);
+  bool get _allItemsReviewed =>
+      _items.every((i) => i.name.trim().isEmpty || i.reviewerGroup != null);
 
   bool get _canSubmit =>
-      _hasValidWeightage && _allItemsNamed && _allItemsReviewed && !_isSubmitting;
+      _hasValidWeightage &&
+      _allItemsNamed &&
+      _allItemsReviewed &&
+      !_isSubmitting;
 
   Future<bool> _confirmDiscard() async {
     if (!_isDirty) return true;
@@ -206,11 +206,10 @@ class _KraTemplateFormScreenState
     }
     // Every named KRA must be assigned to a reviewer — that assignment is what
     // routes each KRA to the right person in the Review cycle.
-    final anyNamedMissingReviewer = _items.any(
-        (i) => i.name.trim().isNotEmpty && i.reviewerGroup == null);
+    final anyNamedMissingReviewer =
+        _items.any((i) => i.name.trim().isNotEmpty && i.reviewerGroup == null);
     if (anyNamedMissingReviewer) {
-      setState(
-          () => _serverError = AppStrings.kraTemplateFormReviewerRequired);
+      setState(() => _serverError = AppStrings.kraTemplateFormReviewerRequired);
       return;
     }
 
@@ -268,9 +267,7 @@ class _KraTemplateFormScreenState
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
         ),
-        body: widget.isEdit && !_hydrated
-            ? _buildEditLoader()
-            : _buildBody(),
+        body: widget.isEdit && !_hydrated ? _buildEditLoader() : _buildBody(),
       ),
     );
   }
@@ -379,8 +376,7 @@ class _KraTemplateFormScreenState
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primaryPurple,
                     side: BorderSide(
-                      color: AppColors.primaryPurple
-                          .withValues(alpha: 0.4),
+                      color: AppColors.primaryPurple.withValues(alpha: 0.4),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -489,7 +485,9 @@ class _ItemControllers {
       target: TextEditingController(text: item.target ?? ''),
       tracking: TextEditingController(text: item.trackingMethod ?? ''),
       weightage: TextEditingController(
-        text: w == 0 ? '' : (w == w.roundToDouble() ? w.toInt().toString() : w.toString()),
+        text: w == 0
+            ? ''
+            : (w == w.roundToDouble() ? w.toInt().toString() : w.toString()),
       ),
     );
   }

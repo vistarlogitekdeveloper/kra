@@ -77,8 +77,7 @@ class LocationHeatmap extends ConsumerWidget {
             ),
           ),
           TextButton(
-            onPressed: () =>
-                ref.invalidate(hrLocationHeatmapProvider(cycleId)),
+            onPressed: () => ref.invalidate(hrLocationHeatmapProvider(cycleId)),
             child: const Text(
               AppStrings.commonRetry,
               style: TextStyle(
@@ -218,8 +217,7 @@ class _LocationRow extends StatelessWidget {
             ),
             for (final m in months)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
                 child: _HeatCell(cell: _cellFor(m.id)),
               ),
           ],
@@ -265,8 +263,7 @@ Future<void> _showLocationSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (sheetContext) {
-      final maxHeight =
-          MediaQuery.of(sheetContext).size.height * 0.85;
+      final maxHeight = MediaQuery.of(sheetContext).size.height * 0.85;
       return SafeArea(
         top: false,
         child: ConstrainedBox(
@@ -407,9 +404,8 @@ class _MonthBreakdownTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color: pct == null
-                  ? AppColors.textMuted
-                  : AppColors.primaryPurple,
+              color:
+                  pct == null ? AppColors.textMuted : AppColors.primaryPurple,
               letterSpacing: -0.2,
             ),
           ),
@@ -448,9 +444,8 @@ class _HeatCell extends StatelessWidget {
     final colour =
         isEmpty ? AppColors.divider.withValues(alpha: 0.7) : _colourFor(pct);
     final label = isEmpty ? '—' : pct.toStringAsFixed(0);
-    final textColour = isEmpty || pct < 50
-        ? AppColors.textPrimary
-        : Colors.white;
+    final textColour =
+        isEmpty || pct < 50 ? AppColors.textPrimary : Colors.white;
 
     return Tooltip(
       message: cell == null

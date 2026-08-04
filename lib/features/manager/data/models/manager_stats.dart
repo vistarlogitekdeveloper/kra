@@ -17,14 +17,12 @@ class ManagerStats {
 
   /// True if the manager has any pending work right now — used by the
   /// "My Team" mode pill's notification badge.
-  bool get hasPendingWork =>
-      pendingMyReview > 0 || overdueReviews > 0;
+  bool get hasPendingWork => pendingMyReview > 0 || overdueReviews > 0;
 
   factory ManagerStats.fromJson(Map<String, dynamic> json) => ManagerStats(
         totalReports: JsonParse.parseInt(json['totalReports']) ?? 0,
         pendingMyReview: JsonParse.parseInt(json['pendingMyReview']) ?? 0,
-        completedThisMonth:
-            JsonParse.parseInt(json['completedThisMonth']) ?? 0,
+        completedThisMonth: JsonParse.parseInt(json['completedThisMonth']) ?? 0,
         overdueReviews: JsonParse.parseInt(json['overdueReviews']) ?? 0,
       );
 

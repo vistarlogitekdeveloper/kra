@@ -82,22 +82,15 @@ class ApiError implements Exception {
 
   // ───── Backend code → user-friendly message ─────
   static const Map<String, String> _codeMessages = {
-    'INVALID_CREDENTIALS':
-        'The email or password you entered is incorrect.',
-    'ACCOUNT_INACTIVE':
-        'Your account is inactive. Please contact HR.',
-    'TOKEN_INVALID':
-        'Your session has ended. Please sign in again.',
-    'REFRESH_TOKEN_REUSE':
-        'Your session has ended. Please sign in again.',
-    'TOKEN_EXPIRED':
-        'Your session has ended. Please sign in again.',
-    'RATE_LIMITED':
-        'Too many attempts. Please wait a minute and try again.',
+    'INVALID_CREDENTIALS': 'The email or password you entered is incorrect.',
+    'ACCOUNT_INACTIVE': 'Your account is inactive. Please contact HR.',
+    'TOKEN_INVALID': 'Your session has ended. Please sign in again.',
+    'REFRESH_TOKEN_REUSE': 'Your session has ended. Please sign in again.',
+    'TOKEN_EXPIRED': 'Your session has ended. Please sign in again.',
+    'RATE_LIMITED': 'Too many attempts. Please wait a minute and try again.',
     'VALIDATION_ERROR':
         'Some of the information you entered isn\'t valid. Please check and try again.',
-    'NOT_FOUND':
-        'We couldn\'t find what you were looking for.',
+    'NOT_FOUND': 'We couldn\'t find what you were looking for.',
   };
 
   /// Builds a typed [ApiError] from any [DioException], handling:
@@ -180,7 +173,8 @@ class ApiError implements Exception {
       return ApiError(
         type: ApiErrorType.server,
         code: backendCode ?? 'SERVER_ERROR',
-        message: 'Our servers are having trouble. Please try again in a moment.',
+        message:
+            'Our servers are having trouble. Please try again in a moment.',
         technicalMessage: backendMessage ?? 'HTTP $status',
         statusCode: status,
         fieldErrors: fieldErrors,

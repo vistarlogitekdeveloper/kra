@@ -153,9 +153,9 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     setState(() {
       // Prefer the stored designation; if an older record has none, leave it
       // empty (HR picks one) rather than guessing from the functional role.
-      _designation = (e.position?.trim().isEmpty ?? true) ? '' : e.position!.trim();
-      _department =
-          (e.department?.isEmpty ?? true) ? null : e.department;
+      _designation =
+          (e.position?.trim().isEmpty ?? true) ? '' : e.position!.trim();
+      _department = (e.department?.isEmpty ?? true) ? null : e.department;
       _projectLocationId = e.projectLocationId;
       _managerId = e.managerId;
       _joinedDate = e.joinedDate;
@@ -228,8 +228,9 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           ? (_original?.role ?? 'EMPLOYEE')
           : _roleFromDesignation(designation);
       if (widget.isEdit) {
-        final grade =
-            _gradeController.text.trim().isEmpty ? null : _gradeController.text.trim();
+        final grade = _gradeController.text.trim().isEmpty
+            ? null
+            : _gradeController.text.trim();
         // Send only the fields that actually changed. Re-sending an
         // untouched record clobbers nullable columns needlessly (and used
         // to 500 on a null incentive); a field the user deliberately
@@ -282,8 +283,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           monthlyIncentiveAmount: monthlyIncentive,
           joinedDate: _joinedDate,
           password: passwordText.isEmpty ? null : passwordText,
-          forcePasswordReset:
-              passwordText.isEmpty ? null : _forcePasswordReset,
+          forcePasswordReset: passwordText.isEmpty ? null : _forcePasswordReset,
         );
         ref.read(employeeListProvider.notifier).prependCreated(created);
         if (!mounted) return;
@@ -804,7 +804,8 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(false),
+          onPressed:
+              _submitting ? null : () => Navigator.of(context).pop(false),
           child: const Text('Cancel'),
         ),
         FilledButton(

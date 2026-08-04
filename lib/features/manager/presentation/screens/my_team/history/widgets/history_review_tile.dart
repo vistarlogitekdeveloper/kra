@@ -80,8 +80,7 @@ class HistoryReviewTile extends StatelessWidget {
                         if (review.finalTotal != null) ...[
                           const SizedBox(width: 8),
                           Text(
-                            EmployeeFormatters.percent(
-                                review.finalTotal!),
+                            EmployeeFormatters.percent(review.finalTotal!),
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w800,

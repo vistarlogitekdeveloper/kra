@@ -10,6 +10,7 @@ import '../../../manager/presentation/providers/manager_team_providers.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
+import '../../data/models/quarterly_review_summary.dart';
 import '../../data/repositories/api_monthly_review_repository.dart';
 import '../../data/repositories/live_monthly_review_repository.dart';
 import '../../data/repositories/monthly_review_repository.dart';
@@ -220,6 +221,57 @@ final monthlyReviewListProvider = FutureProvider.autoDispose
       );
 });
 
+/// One employee's three monthly summaries for the quarter that contains
+/// [anchor] — `[m0, m1, m2]`, null where a month has no review — ordered by
+/// employee name.
+///
+/// Shared by the Performance Incentive Sheet and the quarter-level Review
+/// Dashboard so they aggregate the exact same source (fetch three months in
+/// parallel via the cached list provider, then group by employee). The
+/// `ref.watch`es run before the first await, so Riverpod still tracks the
+/// dependency and rebuilds when any month changes.
+Future<List<({String employeeId, List<MonthlyReviewSummary?> months})>>
+    quarterSummariesByEmployee(Ref ref, ReviewPeriod anchor) async {
+  final months = quarterMonthsFor(anchor);
+  final lists = await Future.wait([
+    for (final m in months) ref.watch(monthlyReviewListProvider(m).future),
+  ]);
+
+  final byEmp = <String, List<MonthlyReviewSummary?>>{};
+  final names = <String, String>{};
+  for (var i = 0; i < lists.length; i++) {
+    for (final s in lists[i]) {
+      byEmp.putIfAbsent(s.employeeId,
+          () => List<MonthlyReviewSummary?>.filled(3, null))[i] = s;
+      names[s.employeeId] = s.employeeName;
+    }
+  }
+
+  final ids = byEmp.keys.toList()
+    ..sort((a, b) => (names[a] ?? '')
+        .toLowerCase()
+        .compareTo((names[b] ?? '').toLowerCase()));
+  return [for (final id in ids) (employeeId: id, months: byEmp[id]!)];
+}
+
+/// The quarter-level Review Dashboard: one [QuarterlyReviewSummary] per
+/// employee, aggregated from the three monthly review lists of the quarter that
+/// contains [anchor]. Role-scoped by the underlying list provider (an employee
+/// sees only their own; a manager their reports; HR / Accounts / Management the
+/// whole org). Built the same way as the Performance Incentive Sheet so the
+/// dashboard's score and incentive figures line up with that report.
+final quarterlyReviewDashboardProvider = FutureProvider.autoDispose
+    .family<List<QuarterlyReviewSummary>, ReviewPeriod>((ref, anchor) async {
+  ref.keepAlive();
+  final scope = ref.watch(currentReviewScopeProvider);
+  if (scope == null) return const [];
+  final groups = await quarterSummariesByEmployee(ref, anchor);
+  return [
+    for (final g in groups)
+      QuarterlyReviewSummary.build(employeeId: g.employeeId, months: g.months),
+  ];
+});
+
 /// The signed-in user's OWN monthly review summary for [period], or null when
 /// none has been generated.
 ///
@@ -236,12 +288,13 @@ final myMonthlyReviewProvider = FutureProvider.autoDispose
     .family<MonthlyReviewSummary?, ReviewPeriod>((ref, period) async {
   final scope = ref.watch(currentReviewScopeProvider);
   if (scope == null) return null;
-  final list = await ref.read(monthlyReviewRepositoryProvider).listMonthlyReviews(
-        year: period.year,
-        month: period.month,
-        mine: true,
-        scopeRole: scope.role,
-      );
+  final list =
+      await ref.read(monthlyReviewRepositoryProvider).listMonthlyReviews(
+            year: period.year,
+            month: period.month,
+            mine: true,
+            scopeRole: scope.role,
+          );
   for (final s in list) {
     if (s.employeeId == scope.userId) return s;
   }
@@ -297,9 +350,9 @@ final quarterlySheetProvider = FutureProvider.autoDispose.family<
       mine: isOwnSheet,
       scopeRole: scope?.role,
     );
-    final matches =
-        list.where((s) => s.employeeId == args.employeeId).toList();
-    reviews.add(matches.isEmpty ? null : await repo.getReview(matches.first.id));
+    final matches = list.where((s) => s.employeeId == args.employeeId).toList();
+    reviews
+        .add(matches.isEmpty ? null : await repo.getReview(matches.first.id));
   }
   return (months: months, reviews: reviews);
 });

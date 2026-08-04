@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../../core/constants/app_colors.dart';
+import '../../../../../../core/utils/name_format.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
 import '../../../../../../core/utils/monthly_deadlines.dart';
@@ -110,13 +111,6 @@ class _Header extends StatelessWidget {
   final ManagerReviewDetail review;
   const _Header({required this.review});
 
-  String _initialsOf(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '·';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     final totals = review.totals;
@@ -148,7 +142,7 @@ class _Header extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    _initialsOf(review.employee.name),
+                    initialsOf(review.employee.name),
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,

@@ -275,7 +275,8 @@ class AppStrings {
   static const String kraTemplatesDeleteAllCta = 'Delete all';
   static const String kraTemplatesDeleteAllResultTitle = 'Delete all templates';
   static const String kraTemplatesDeleteAllNone = 'No templates to delete.';
-  static const String kraTemplatesArchiveConfirmTitle = 'Archive this template?';
+  static const String kraTemplatesArchiveConfirmTitle =
+      'Archive this template?';
   static const String kraTemplatesArchiveCta = 'Archive instead';
   static const String kraTemplatesArchiveSuccess =
       'Template archived. It\'s hidden from lists and assignment, and its '
@@ -474,6 +475,15 @@ class AppStrings {
   static const String greetingEvening = 'Good evening';
   static const String greetingNight = 'Good night';
 
+  /// The time-of-day greeting for [hour] (0–23) — one source for every
+  /// dashboard's header so the thresholds never drift apart.
+  static String greetingForHour(int hour) {
+    if (hour < 12) return greetingMorning;
+    if (hour < 17) return greetingAfternoon;
+    if (hour < 21) return greetingEvening;
+    return greetingNight;
+  }
+
   // ───── Home — current month card ─────
   static const String homeCurrentMonthTitle = 'Current month';
   static const String homeCurrentMonthSelfPending = 'Self-rating pending';
@@ -491,8 +501,7 @@ class AppStrings {
   // ───── Home — KRAs summary ─────
   static const String homeMyKrasTitle = 'My KRAs';
   static const String homeMyKrasViewAll = 'View all';
-  static const String homeMyKrasEmpty =
-      'No KRAs assigned yet. Contact HR.';
+  static const String homeMyKrasEmpty = 'No KRAs assigned yet. Contact HR.';
   static const String homeMyKrasItemsCountSingular = '1 item';
   // Plural form composed at the call-site: "$count items"
 
@@ -545,7 +554,8 @@ class AppStrings {
   static const String monthlyReviewPaid = 'Incentive marked as paid.';
   static const String monthlyReviewPaidBadge = 'Paid';
   static const String monthlyReviewMarkPaidTooltip = 'Mark incentive paid';
-  static const String monthlyReviewMarkPaidConfirmTitle = 'Mark incentive paid?';
+  static const String monthlyReviewMarkPaidConfirmTitle =
+      'Mark incentive paid?';
   static const String monthlyReviewMarkPaidConfirmMessage =
       'Confirm the incentive payout has been settled. This finalizes the '
       'review and can\'t be undone.';

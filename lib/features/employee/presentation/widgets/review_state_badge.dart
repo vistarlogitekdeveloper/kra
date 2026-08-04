@@ -27,8 +27,7 @@ class ReviewStateBadge extends StatelessWidget {
     final fontSize = compact ? 10.5 : 11.5;
 
     return Container(
-      padding:
-          EdgeInsets.symmetric(horizontal: horizontal, vertical: vertical),
+      padding: EdgeInsets.symmetric(horizontal: horizontal, vertical: vertical),
       decoration: BoxDecoration(
         color: palette.background,
         borderRadius: BorderRadius.circular(20),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../../core/constants/app_colors.dart';
+import '../../../../../../core/utils/name_format.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
 import '../../../../../../core/widgets/adaptive_leading.dart';
@@ -38,8 +39,7 @@ class ManagerProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
-    final user =
-        authState is AuthAuthenticated ? authState.user : null;
+    final user = authState is AuthAuthenticated ? authState.user : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -97,13 +97,6 @@ class _IdentityHeader extends StatelessWidget {
   final String role;
   const _IdentityHeader({required this.name, required this.role});
 
-  String _initials() {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '·';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     final swatch = ProfileHeader.colourFor(name);
@@ -129,7 +122,7 @@ class _IdentityHeader extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              _initials(),
+              initialsOf(name),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -157,8 +150,8 @@ class _IdentityHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.primaryPurple.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(20),

@@ -37,9 +37,8 @@ class DeadlineBanner extends StatelessWidget {
 
   String _message() {
     if (isOverdue) return AppStrings.deadlineOverdue;
-    final unit = daysRemaining == 1
-        ? AppStrings.deadlineDay
-        : AppStrings.deadlineDays;
+    final unit =
+        daysRemaining == 1 ? AppStrings.deadlineDay : AppStrings.deadlineDays;
     return '${AppStrings.deadlineSelfRatingClosesIn} $daysRemaining $unit';
   }
 
@@ -54,8 +53,7 @@ class DeadlineBanner extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
                 Icon(_icon, color: Colors.white, size: 20),

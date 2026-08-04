@@ -29,8 +29,7 @@ class SelfRateLockedScreen extends ConsumerStatefulWidget {
       _SelfRateLockedScreenState();
 }
 
-class _SelfRateLockedScreenState
-    extends ConsumerState<SelfRateLockedScreen> {
+class _SelfRateLockedScreenState extends ConsumerState<SelfRateLockedScreen> {
   @override
   void initState() {
     super.initState();
@@ -148,8 +147,8 @@ class _SelfRateLockedScreenState
               if (review != null) ...[
                 const SizedBox(height: 10),
                 OutlinedButton(
-                  onPressed: () => context
-                      .go(AppRoutes.employeeReviewDetail(review.id)),
+                  onPressed: () =>
+                      context.go(AppRoutes.employeeReviewDetail(review.id)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textPrimary,
                     side: BorderSide(color: AppColors.divider),

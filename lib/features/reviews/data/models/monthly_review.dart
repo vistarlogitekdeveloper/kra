@@ -38,6 +38,12 @@ class ReviewPeriod {
   String get label => '${(month >= 1 && month <= 12) ? _names[month] : ''} '
       '$year';
 
+  /// Compact "Jul '26" — a 3-letter month + 2-digit year for tight table
+  /// headers and month chips.
+  String get shortLabel =>
+      "${(month >= 1 && month <= 12) ? _names[month].substring(0, 3) : ''} "
+      "'${year.toString().substring(2)}";
+
   /// India's fiscal-year quarter this month falls in:
   ///   Q1 = Apr–Jun, Q2 = Jul–Sep, Q3 = Oct–Dec, Q4 = Jan–Mar.
   int get fiscalQuarter {
@@ -102,6 +108,11 @@ class MonthlyReview {
 
   final IncentiveSnapshot incentive;
 
+  /// When set, management has committed the review: the incentive is locked to
+  /// the management scores and the Management column is read-only until it is
+  /// reopened. Null while the management review is still open.
+  final DateTime? managementLockedAt;
+
   const MonthlyReview({
     required this.id,
     required this.employeeId,
@@ -115,12 +126,16 @@ class MonthlyReview {
     this.stageRecords = const {},
     this.rows = const [],
     this.incentive = const IncentiveSnapshot(),
+    this.managementLockedAt,
   });
 
   // ── Incentive convenience (delegates to [incentive]) ──────────────────
   double get eligibleAmount => incentive.eligibleAmount;
   PayoutStatus get payoutStatus => incentive.payoutStatus;
   DateTime? get paidAt => incentive.paidAt;
+
+  /// True once management has locked the review (see [managementLockedAt]).
+  bool get isManagementLocked => managementLockedAt != null;
 
   StageRecord? recordFor(ReviewStage stage) => stageRecords[stage];
 
@@ -386,6 +401,7 @@ class MonthlyReview {
           .map(MonthlyKraRow.fromJson)
           .toList(),
       incentive: incentive,
+      managementLockedAt: JsonParse.parseDate(json['managementLockedAt']),
     );
   }
 
@@ -403,6 +419,7 @@ class MonthlyReview {
             stageRecords.map((k, v) => MapEntry(k.toApiString(), v.toJson())),
         'rows': rows.map((r) => r.toJson()).toList(),
         'incentive': incentive.toJson(),
+        'managementLockedAt': managementLockedAt?.toIso8601String(),
       };
 
   MonthlyReview copyWith({
@@ -418,6 +435,8 @@ class MonthlyReview {
     Map<ReviewStage, StageRecord>? stageRecords,
     List<MonthlyKraRow>? rows,
     IncentiveSnapshot? incentive,
+    DateTime? managementLockedAt,
+    bool clearManagementLock = false,
   }) {
     return MonthlyReview(
       id: id ?? this.id,
@@ -432,6 +451,9 @@ class MonthlyReview {
       stageRecords: stageRecords ?? this.stageRecords,
       rows: rows ?? this.rows,
       incentive: incentive ?? this.incentive,
+      managementLockedAt: clearManagementLock
+          ? null
+          : (managementLockedAt ?? this.managementLockedAt),
     );
   }
 }

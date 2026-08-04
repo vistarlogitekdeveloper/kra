@@ -127,8 +127,7 @@ class KraTemplatesScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _clone(
-      BuildContext context, WidgetRef ref, String id) async {
+  Future<void> _clone(BuildContext context, WidgetRef ref, String id) async {
     try {
       await ref.read(kraTemplateActionsProvider).clone(id);
       if (!context.mounted) return;
@@ -145,8 +144,7 @@ class KraTemplatesScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _delete(
-      BuildContext context, WidgetRef ref, String id) async {
+  Future<void> _delete(BuildContext context, WidgetRef ref, String id) async {
     final ok = await ConfirmActionDialog.show(
       context,
       title: AppStrings.kraTemplatesDeleteConfirmTitle,
@@ -248,8 +246,7 @@ class KraTemplatesScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               const Text(
                 'Skipped — the backend protects these:',
-                style: TextStyle(
-                    fontSize: 12.5, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               ...result.failed.map(

@@ -130,9 +130,7 @@ class _Bar extends StatelessWidget {
         SizedBox(
           width: 50,
           child: Text(
-            value <= 0
-                ? '—'
-                : EmployeeFormatters.scoreOutOf(value, maxValue),
+            value <= 0 ? '—' : EmployeeFormatters.scoreOutOf(value, maxValue),
             textAlign: TextAlign.right,
             style: TextStyle(
               fontSize: 11.5,

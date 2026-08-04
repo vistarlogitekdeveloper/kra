@@ -8,8 +8,7 @@ import '../../data/models/previous_review.dart';
 import '../../data/repositories/api_team_history_repository.dart';
 import '../../data/repositories/team_history_repository.dart';
 
-final teamHistoryRepositoryProvider =
-    Provider<TeamHistoryRepository>((ref) {
+final teamHistoryRepositoryProvider = Provider<TeamHistoryRepository>((ref) {
   return ApiTeamHistoryRepository(dio: ref.read(dioProvider));
 });
 
@@ -30,9 +29,8 @@ class TeamHistoryFilter {
       employeeId: identical(employeeId, _sentinel)
           ? this.employeeId
           : employeeId as String?,
-      cycleId: identical(cycleId, _sentinel)
-          ? this.cycleId
-          : cycleId as String?,
+      cycleId:
+          identical(cycleId, _sentinel) ? this.cycleId : cycleId as String?,
     );
   }
 
@@ -52,8 +50,7 @@ class TeamHistoryFilterNotifier extends StateNotifier<TeamHistoryFilter> {
   TeamHistoryFilterNotifier() : super(const TeamHistoryFilter());
   void setEmployee(String? employeeId) =>
       state = state.copyWith(employeeId: employeeId);
-  void setCycle(String? cycleId) =>
-      state = state.copyWith(cycleId: cycleId);
+  void setCycle(String? cycleId) => state = state.copyWith(cycleId: cycleId);
   void reset() => state = const TeamHistoryFilter();
 }
 

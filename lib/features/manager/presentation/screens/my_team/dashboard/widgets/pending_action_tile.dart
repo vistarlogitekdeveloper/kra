@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../core/utils/name_format.dart';
 import '../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../employee/presentation/widgets/_formatters.dart';
 import '../../../../../../employee/presentation/widgets/deadline_chip.dart';
@@ -97,13 +98,6 @@ class _Avatar extends StatelessWidget {
   final String name;
   const _Avatar({required this.name});
 
-  String _initials() {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '·';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -119,7 +113,7 @@ class _Avatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(
-        _initials(),
+        initialsOf(name),
         style: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w800,

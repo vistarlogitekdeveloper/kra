@@ -29,8 +29,7 @@ class ReviewPermissions {
       deadlineRemaining! >= 0 &&
       deadlineRemaining! <= 3;
 
-  bool get isOverdue =>
-      deadlineRemaining != null && deadlineRemaining! < 0;
+  bool get isOverdue => deadlineRemaining != null && deadlineRemaining! < 0;
 
   factory ReviewPermissions.fromJson(Map<String, dynamic> json) =>
       ReviewPermissions(

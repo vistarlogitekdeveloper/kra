@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/name_format.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../data/models/employee.dart';
 
@@ -114,7 +115,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = _initialsFor(name);
+    final initials = initialsOf(name);
     return Container(
       width: 44,
       height: 44,
@@ -145,14 +146,6 @@ class _Avatar extends StatelessWidget {
       ),
     );
   }
-
-  String _initialsFor(String full) {
-    final parts = full.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first)
-        .toUpperCase();
-  }
 }
 
 class _ActivePill extends StatelessWidget {
@@ -165,9 +158,8 @@ class _ActivePill extends StatelessWidget {
     final bg = isActive
         ? AppColors.success.withValues(alpha: 0.10)
         : AppColors.divider;
-    final label = isActive
-        ? AppStrings.employeesActive
-        : AppStrings.employeesInactive;
+    final label =
+        isActive ? AppStrings.employeesActive : AppStrings.employeesInactive;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(

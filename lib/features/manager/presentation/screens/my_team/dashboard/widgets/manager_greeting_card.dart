@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../../core/constants/app_colors.dart';
+import '../../../../../../../core/constants/app_strings.dart';
+import '../../../../../../../core/utils/name_format.dart';
 import '../../../../../data/models/manager_dashboard.dart';
 
 /// Brand-gradient greeting card on the manager dashboard. Mirrors the
@@ -11,19 +13,7 @@ class ManagerGreetingCard extends StatelessWidget {
   final ManagerCardUser manager;
   const ManagerGreetingCard({super.key, required this.manager});
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    if (h < 21) return 'Good evening';
-    return 'Good night';
-  }
-
-  String _firstName(String full) {
-    final t = full.trim();
-    if (t.isEmpty) return 'there';
-    return t.split(RegExp(r'\s+')).first;
-  }
+  String _greeting() => AppStrings.greetingForHour(DateTime.now().hour);
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +43,7 @@ class ManagerGreetingCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${_greeting()}, ${_firstName(manager.name)}',
+            '${_greeting()}, ${firstNameOf(manager.name)}',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 22,

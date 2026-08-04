@@ -251,8 +251,7 @@ class _ReviewList extends ConsumerWidget {
     final listAsync = ref.watch(monthlyReviewListProvider(period));
     return RefreshIndicator(
       color: AppColors.primaryPurple,
-      onRefresh: () async =>
-          ref.invalidate(monthlyReviewListProvider(period)),
+      onRefresh: () async => ref.invalidate(monthlyReviewListProvider(period)),
       child: listAsync.when(
         loading: () => const _DashboardSkeleton(),
         error: (e, _) {
@@ -320,8 +319,7 @@ class _ReviewList extends ConsumerWidget {
             final cols = w >= 1080 ? 3 : (w >= 680 ? 2 : 1);
             const gap = 10.0;
             final inner = w - 32; // horizontal padding (16 each side)
-            final tileW =
-                cols == 1 ? inner : (inner - gap * (cols - 1)) / cols;
+            final tileW = cols == 1 ? inner : (inner - gap * (cols - 1)) / cols;
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
@@ -408,7 +406,7 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
   Widget build(BuildContext context) {
     final needsYou =
         role != null && summary.needsActionBy(role!, userId: userId);
-    final completed = summary.currentStage.isTerminal;
+    final completed = summary.displayStage.isTerminal;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
@@ -448,10 +446,10 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                     Row(
                       children: [
                         StagePill(
-                          stage: summary.currentStage,
+                          stage: summary.displayStage,
                           status: completed
                               ? StageStatus.submitted
-                              : summary.currentStageStatus,
+                              : summary.displayStatus,
                         ),
                         if (needsYou) ...[
                           const SizedBox(width: 8),
@@ -504,8 +502,7 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                 busy: _payingOut,
                 onMarkPaid: _markPaid,
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textMuted),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             ],
           ),
         ),
@@ -540,10 +537,12 @@ class _PayoutControl extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+            border:
+                Border.all(color: AppColors.success.withValues(alpha: 0.35)),
           ),
           child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
+            Icon(Icons.check_circle_rounded,
+                size: 14, color: AppColors.success),
             SizedBox(width: 4),
             Text(AppStrings.monthlyReviewPaidBadge,
                 style: TextStyle(

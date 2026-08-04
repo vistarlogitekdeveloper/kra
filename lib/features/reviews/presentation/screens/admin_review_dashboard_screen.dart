@@ -10,7 +10,7 @@ import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../auth/data/models/user.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
-import '../../data/models/monthly_review_summary.dart';
+import '../../data/models/quarterly_review_summary.dart';
 import '../providers/monthly_review_providers.dart';
 import '../widgets/monthly_review_widgets.dart';
 
@@ -35,7 +35,7 @@ class _AdminReviewDashboardScreenState
     final userId = scope?.userId;
     final periods = ref.watch(availablePeriodsProvider);
     final selected = ref.watch(selectedPeriodProvider) ?? periods.first;
-    final listAsync = ref.watch(monthlyReviewListProvider(selected));
+    final listAsync = ref.watch(quarterlyReviewDashboardProvider(selected));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -53,7 +53,8 @@ class _AdminReviewDashboardScreenState
         loading: () => const _Skeleton(),
         error: (e, _) => _ErrorView(
           message: e.toString(),
-          onRetry: () => ref.invalidate(monthlyReviewListProvider(selected)),
+          onRetry: () =>
+              ref.invalidate(quarterlyReviewDashboardProvider(selected)),
         ),
         data: (items) => _Content(
           items: items,
@@ -68,7 +69,7 @@ class _AdminReviewDashboardScreenState
 }
 
 class _Content extends StatelessWidget {
-  final List<MonthlyReviewSummary> items;
+  final List<QuarterlyReviewSummary> items;
   final UserRole? role;
 
   /// Signed-in user id — resolves the relationship rating stages (own review /
@@ -150,14 +151,14 @@ const double _wideBreakpoint = 720;
 
 // Every review opens in the quarterly KRA sheet — the single place to view and
 // act on it, whatever its stage.
-void _openReview(BuildContext context, MonthlyReviewSummary s) =>
+void _openReview(BuildContext context, QuarterlyReviewSummary s) =>
     context.push(AppRoutes.reviewsQuarterlyFor(s.employeeId));
 
 /// Responsive review list. A width-filling table on wide screens (no more
 /// horizontal scroll), one card per employee on phones — same columns, same
 /// data, laid out to fit the viewport.
 class _ReviewList extends StatelessWidget {
-  final List<MonthlyReviewSummary> items;
+  final List<QuarterlyReviewSummary> items;
   final UserRole? role;
   final String? userId;
   const _ReviewList({
@@ -166,7 +167,7 @@ class _ReviewList extends StatelessWidget {
     required this.userId,
   });
 
-  bool _needs(MonthlyReviewSummary s) =>
+  bool _needs(QuarterlyReviewSummary s) =>
       role != null && s.needsActionBy(role!, userId: userId);
 
   @override
@@ -210,8 +211,7 @@ Widget _locationText(String? location) {
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(Icons.location_on_rounded,
-          size: 13, color: AppColors.textMuted),
+      Icon(Icons.location_on_rounded, size: 13, color: AppColors.textMuted),
       const SizedBox(width: 4),
       Flexible(
         child: Text(l,
@@ -259,10 +259,19 @@ class _WideHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          Expanded(flex: _flexEmployee, child: Text(AppStrings.adminDashColEmployee, style: h)),
-          Expanded(flex: _flexLocation, child: Text(AppStrings.adminDashColLocation, style: h)),
-          Expanded(flex: _flexGrade, child: Center(child: Text(AppStrings.adminDashColGrade, style: h))),
-          Expanded(flex: _flexStage, child: Text(AppStrings.adminDashColStage, style: h)),
+          Expanded(
+              flex: _flexEmployee,
+              child: Text(AppStrings.adminDashColEmployee, style: h)),
+          Expanded(
+              flex: _flexLocation,
+              child: Text(AppStrings.adminDashColLocation, style: h)),
+          Expanded(
+              flex: _flexGrade,
+              child:
+                  Center(child: Text(AppStrings.adminDashColGrade, style: h))),
+          Expanded(
+              flex: _flexStage,
+              child: Text(AppStrings.adminDashColStage, style: h)),
           Expanded(
               flex: _flexScore,
               child: Text(AppStrings.adminDashColScore,
@@ -281,7 +290,7 @@ class _WideHeader extends StatelessWidget {
 /// the performance-based PAYABLE amount as the headline, with the fixed
 /// quarterly incentive (the ceiling) beneath it.
 class _IncentiveCell extends StatelessWidget {
-  final MonthlyReviewSummary summary;
+  final QuarterlyReviewSummary summary;
   const _IncentiveCell({required this.summary});
 
   @override
@@ -313,7 +322,7 @@ class _IncentiveCell extends StatelessWidget {
 }
 
 class _WideRow extends StatelessWidget {
-  final MonthlyReviewSummary summary;
+  final QuarterlyReviewSummary summary;
   final bool needsReview;
   const _WideRow({required this.summary, required this.needsReview});
 
@@ -331,7 +340,8 @@ class _WideRow extends StatelessWidget {
             children: [
               Expanded(
                 flex: _flexEmployee,
-                child: _EmployeeCell(summary: summary, needsReview: needsReview),
+                child:
+                    _EmployeeCell(summary: summary, needsReview: needsReview),
               ),
               Expanded(
                 flex: _flexLocation,
@@ -345,14 +355,13 @@ class _WideRow extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: StagePill(
-                      stage: summary.currentStage,
-                      status: summary.currentStageStatus),
+                      stage: summary.stage, status: summary.stageStatus),
                 ),
               ),
               Expanded(
                 flex: _flexScore,
                 child: Text(
-                  EmployeeFormatters.percent(summary.finalScorePct),
+                  EmployeeFormatters.percent(summary.scorePct),
                   textAlign: TextAlign.right,
                   style: const TextStyle(
                       fontSize: 14,
@@ -373,7 +382,7 @@ class _WideRow extends StatelessWidget {
 }
 
 class _ReviewCard extends StatelessWidget {
-  final MonthlyReviewSummary summary;
+  final QuarterlyReviewSummary summary;
   final bool needsReview;
   const _ReviewCard({required this.summary, required this.needsReview});
 
@@ -420,13 +429,12 @@ class _ReviewCard extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: StagePill(
-                          stage: summary.currentStage,
-                          status: summary.currentStageStatus),
+                          stage: summary.stage, status: summary.stageStatus),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    EmployeeFormatters.percent(summary.finalScorePct),
+                    EmployeeFormatters.percent(summary.scorePct),
                     style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -445,7 +453,7 @@ class _ReviewCard extends StatelessWidget {
 }
 
 class _EmployeeCell extends StatelessWidget {
-  final MonthlyReviewSummary summary;
+  final QuarterlyReviewSummary summary;
   final bool needsReview;
   const _EmployeeCell({required this.summary, required this.needsReview});
 

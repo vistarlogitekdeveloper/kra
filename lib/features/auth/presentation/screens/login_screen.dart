@@ -353,8 +353,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   width: 22,
                   child: Checkbox(
                     value: _rememberMe,
-                    onChanged: (v) =>
-                        setState(() => _rememberMe = v ?? false),
+                    onChanged: (v) => setState(() => _rememberMe = v ?? false),
                     activeColor: AppColors.primaryPurple,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,

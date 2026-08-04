@@ -61,8 +61,8 @@ class PendingActionsList extends StatelessWidget {
                 onPressed: () => context.go(AppRoutes.managerTeamList),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primaryPurple,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 ),
                 child: Text(
                   '${AppStrings.managerDashboardViewAll} ($overflow)',
@@ -88,8 +88,7 @@ class _AllCaughtUp extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.success.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: AppColors.success.withValues(alpha: 0.35)),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
         ),
         child: Row(
           children: [

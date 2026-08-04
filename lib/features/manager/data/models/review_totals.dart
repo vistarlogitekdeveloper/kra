@@ -60,9 +60,8 @@ class ReviewTotals {
       managerTotal: identical(managerTotal, _sentinel)
           ? this.managerTotal
           : managerTotal as double?,
-      opsTotal: identical(opsTotal, _sentinel)
-          ? this.opsTotal
-          : opsTotal as double?,
+      opsTotal:
+          identical(opsTotal, _sentinel) ? this.opsTotal : opsTotal as double?,
       financeTotal: identical(financeTotal, _sentinel)
           ? this.financeTotal
           : financeTotal as double?,

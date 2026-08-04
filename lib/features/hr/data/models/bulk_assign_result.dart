@@ -1,3 +1,4 @@
+import '../../../../core/api/json_parse.dart';
 import 'kra_assignment.dart';
 import 'review_generation.dart';
 
@@ -49,21 +50,16 @@ class BulkAssignResult {
         : const <String>[];
     final rawReviewGen = json['reviewGeneration'];
     return BulkAssignResult(
-      createdCount: _asInt(json['createdCount']) ?? createdList.length,
-      updatedCount: _asInt(json['updatedCount']) ?? 0,
-      skippedCount: _asInt(json['skippedCount']) ?? skippedList.length,
+      createdCount:
+          JsonParse.parseInt(json['createdCount']) ?? createdList.length,
+      updatedCount: JsonParse.parseInt(json['updatedCount']) ?? 0,
+      skippedCount:
+          JsonParse.parseInt(json['skippedCount']) ?? skippedList.length,
       skippedEmployeeIds: skippedList,
       created: createdList,
       reviewGeneration: rawReviewGen is Map<String, dynamic>
           ? ReviewGeneration.fromJson(rawReviewGen)
           : null,
     );
-  }
-
-  static int? _asInt(dynamic v) {
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    if (v is String) return int.tryParse(v);
-    return null;
   }
 }
