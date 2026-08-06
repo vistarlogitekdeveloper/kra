@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/constants/feature_flags.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_review_summary.dart';
@@ -18,10 +19,12 @@ void main() {
     PayoutStatus payoutStatus = PayoutStatus.pending,
     double? selfScorePct,
     double? managementReviewPct,
+    double finalScorePct = 0,
+    String employeeId = 'emp1',
   }) {
     return MonthlyReviewSummary(
       id: 'r1',
-      employeeId: 'emp1',
+      employeeId: employeeId,
       employeeName: 'Asha',
       employeeCode: 'VIS-1',
       managerId: managerId,
@@ -30,6 +33,7 @@ void main() {
       monthLabel: 'June 2026',
       currentStage: stage,
       currentStageStatus: status,
+      finalScorePct: finalScorePct,
       payoutStatus: payoutStatus,
       selfScorePct: selfScorePct,
       managementReviewPct: managementReviewPct,
@@ -197,6 +201,83 @@ void main() {
     });
   });
 
+  // The monthly dashboard opens on the newest month worth showing rather than
+  // blindly on the current calendar month — otherwise, early in a month, every
+  // row reads "Self-Rating / 0%" and the whole quarter looks like it never
+  // started (which is exactly how a manager misread a real review as untouched
+  // while HR's quarter-aggregated dashboard showed it mid-pipeline).
+  group('MonthlyReviewSummary.hasRatingActivity — has this month started?', () {
+    test('a freshly generated month with nothing rated has no activity', () {
+      expect(summary(stage: ReviewStage.selfRating).hasRatingActivity, isFalse);
+    });
+
+    test('a saved self-rating counts as activity', () {
+      final s = summary(stage: ReviewStage.selfRating, selfScorePct: 70);
+      expect(s.hasRatingActivity, isTrue);
+    });
+
+    test('a non-zero agreed score counts, even with the cursor at Self-Rating',
+        () {
+      final s = summary(stage: ReviewStage.selfRating, finalScorePct: 96);
+      expect(s.hasRatingActivity, isTrue);
+    });
+
+    test('any stage past Self-Rating counts', () {
+      final s = summary(stage: ReviewStage.reportingManagerRating);
+      expect(s.hasRatingActivity, isTrue);
+    });
+
+    test('a completed / paid month counts', () {
+      final s = summary(
+        stage: ReviewStage.completed,
+        status: StageStatus.submitted,
+        payoutStatus: PayoutStatus.paid,
+      );
+      expect(s.hasRatingActivity, isTrue);
+    });
+  });
+
+  group('MonthlyReviewSummary.anyWorthLanding — which month to open on', () {
+    test('an untouched month is not worth landing on for a manager', () {
+      final rows = [summary(stage: ReviewStage.selfRating, managerId: 'mgr1')];
+      expect(
+        MonthlyReviewSummary.anyWorthLanding(rows,
+            roles: {UserRole.manager}, userId: 'mgr1'),
+        isFalse,
+      );
+    });
+
+    test('an untouched month IS worth landing on for the employee who still '
+        'owes the self-rating — never skip past their pending work', () {
+      final rows = [summary(stage: ReviewStage.selfRating)];
+      expect(
+        MonthlyReviewSummary.anyWorthLanding(rows,
+            roles: {UserRole.employee}, userId: 'emp1'),
+        isTrue,
+      );
+    });
+
+    test('one rated row makes the month worth landing on for everybody', () {
+      final rows = [
+        summary(stage: ReviewStage.selfRating, employeeId: 'emp1'),
+        summary(stage: ReviewStage.managementReview, employeeId: 'emp2'),
+      ];
+      expect(
+        MonthlyReviewSummary.anyWorthLanding(rows,
+            roles: {UserRole.manager}, userId: 'mgr1'),
+        isTrue,
+      );
+    });
+
+    test('a month with no reviews at all is never worth landing on', () {
+      expect(
+        MonthlyReviewSummary.anyWorthLanding(const [],
+            roles: {UserRole.hrAdmin}, userId: 'hr1'),
+        isFalse,
+      );
+    });
+  });
+
   group('MonthlyReviewSummary.needsActionBy — org-level stages', () {
     test('still light up for exactly the roles agreed in the pipeline spec, '
         'independent of any reporting relationship', () {
@@ -206,8 +287,18 @@ void main() {
           UserRole.hr,
           UserRole.hrAdmin,
         },
-        ReviewStage.financeRating: {UserRole.finance},
-        ReviewStage.managementReview: {UserRole.admin, UserRole.hrAdmin},
+        // HR_ADMIN holds the Accounts seat too — one UserRole can't say
+        // "HR Admin AND Accounts", and that post covers both.
+        ReviewStage.financeRating: {UserRole.finance, UserRole.hrAdmin},
+        // Management approval/override. MANAGEMENT is the intended holder;
+        // HR_ADMIN is here only until the backend's employees enum can store
+        // MANAGEMENT, at which point it drops out. See ReviewStage.actorRoles.
+        ReviewStage.managementReview: {
+          UserRole.management,
+          // HR_ADMIN shares the seat only while the backend cannot store
+          // MANAGEMENT — see FeatureFlags.roleTiers.
+          if (!FeatureFlags.roleTiers) UserRole.hrAdmin,
+        },
         ReviewStage.incentivePayout: {
           UserRole.finance,
           UserRole.hr,

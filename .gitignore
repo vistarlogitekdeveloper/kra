@@ -50,9 +50,18 @@ app.*.map.json
 # Stray nested clone
 /kra/
 
-# wrangler files
+# Local secrets + wrangler state. Both branches added these independently after
+# they went missing from the ignore list, which left .env / .dev.vars files
+# untracked-but-not-ignored — one `git add -A` away from committing credentials.
+# The negations keep the checked-in examples visible.
+#
+# `.wrangler` is broader than the `/.wrangler/` rule above (it matches at any
+# depth); both are kept so neither branch loses coverage.
 .wrangler
 .dev.vars*
 !.dev.vars.example
 .env*
 !.env.example
+
+# Kotlin incremental-compile session files (build artifacts, not source).
+android/.kotlin/

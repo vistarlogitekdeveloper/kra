@@ -164,7 +164,14 @@ class MonthlyReviewSummary {
   /// [userId] resolves them against this row: self-rating belongs to
   /// [employeeId], reporting-manager rating to [managerId] — whatever either
   /// party's role happens to be. Org-level stages stay role-gated.
-  bool needsActionBy(UserRole role, {String? userId}) {
+  bool needsActionBy(UserRole role, {String? userId}) =>
+      needsActionByAny({role}, userId: userId);
+
+  /// Multi-role form of [needsActionBy]: true when ANY of [roles] is asked to
+  /// act. The relationship stages are unaffected — they answer to
+  /// [employeeId] / [managerId], never to a role — so only the org-level tail
+  /// consults the set.
+  bool needsActionByAny(Set<UserRole> roles, {String? userId}) {
     if (currentStage.isTerminal) return false;
     if (currentStageStatus == StageStatus.submitted) return false;
     if (currentStage == ReviewStage.selfRating) {
@@ -173,7 +180,7 @@ class MonthlyReviewSummary {
     if (currentStage == ReviewStage.reportingManagerRating) {
       return userId != null && managerId != null && userId == managerId;
     }
-    return currentStage.isActionableBy(role);
+    return currentStage.isActionableByAny(roles);
   }
 
   /// The FIXED incentive for the whole quarter — the monthly eligible ceiling
@@ -231,6 +238,35 @@ class MonthlyReviewSummary {
     if (currentStage != ReviewStage.selfRating) return currentStageStatus;
     return _scoredStage == null ? currentStageStatus : StageStatus.submitted;
   }
+
+  /// True when this month's review carries real rating ACTIVITY — a score
+  /// exists somewhere, or the pipeline has moved past Self-Rating. A freshly
+  /// generated month (the row exists, nobody has rated yet) is false.
+  ///
+  /// This is what tells "this month hasn't started" apart from "this month is
+  /// at Self-Rating with the self-rating already in" — a distinction the stage
+  /// chip alone can't express, since both read "Self-Rating".
+  bool get hasRatingActivity =>
+      finalScorePct > 0 ||
+      selfScorePct != null ||
+      managementReviewPct != null ||
+      displayStage != ReviewStage.selfRating ||
+      displayStatus == StageStatus.submitted;
+
+  /// True when a month's [summaries] are worth LANDING on: somebody has rated
+  /// something, or a row still awaits this caller's own action.
+  ///
+  /// The "needs my action" half matters as much as the activity half. An
+  /// employee whose current month is untouched still owes a self-rating there,
+  /// so the dashboard must never skip past it to an older, busier month and
+  /// hide the one thing they have to do.
+  static bool anyWorthLanding(
+    Iterable<MonthlyReviewSummary> summaries, {
+    Set<UserRole> roles = const {},
+    String? userId,
+  }) =>
+      summaries.any((s) =>
+          s.hasRatingActivity || s.needsActionByAny(roles, userId: userId));
 
   /// The management review has been done (management scored, or the review has
   /// already moved on to payout / completed) — so the incentive can be settled.

@@ -33,12 +33,22 @@ final monthlyBackendEnabledProvider = Provider<bool>(
 class ReviewScope {
   final String userId;
   final String userName;
+
+  /// Primary role — drives roster scoping (which employees this user sees).
   final UserRole role;
+
+  /// Every role held. Review AUTHORITY is checked against this, so someone
+  /// holding both the HR and Accounts seats can act on either.
+  final Set<UserRole> roles;
   const ReviewScope({
     required this.userId,
     required this.userName,
     required this.role,
+    this.roles = const {},
   });
+
+  /// [roles], or `{role}` when only a scalar role is known.
+  Set<UserRole> get effectiveRoles => roles.isEmpty ? {role} : roles;
 }
 
 /// Data layer for monthly reviews.
@@ -102,6 +112,9 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.finance:
     case UserRole.admin:
     case UserRole.hrAdmin:
+    // Management reviews the whole org, so it gets the full roster too — the
+    // Management approval is the last gate before payout on every review.
+    case UserRole.management:
       // Fetch the roster and every assignment concurrently, then join the
       // real KRA rows onto each employee by id. 200 is the backend's max
       // page size (larger → 400); fine for the current headcount.
@@ -178,6 +191,7 @@ final currentReviewScopeProvider = Provider<ReviewScope?>((ref) {
     userId: auth.user.id,
     userName: auth.user.fullName,
     role: auth.user.role,
+    roles: auth.user.effectiveRoles,
   );
 });
 
@@ -219,6 +233,47 @@ final monthlyReviewListProvider = FutureProvider.autoDispose
         month: period.month,
         scopeRole: scope.role,
       );
+});
+
+/// The month the monthly dashboard should LAND on before the user picks one:
+/// the newest period worth showing, or null when none is (caller then falls
+/// back to the newest period).
+///
+/// The monthly list is a single-month snapshot, so early in a month it reads
+/// "Self-Rating / 0%" for everybody and looks as though no review had ever
+/// happened — the same confusion [quarterlyReviewDashboardProvider] aggregates
+/// away for HR. This view is deliberately per-month, so instead of aggregating
+/// it walks the picker's months newest-first and stops at the first one with
+/// real activity (or with work awaiting this caller — see
+/// [MonthlyReviewSummary.anyWorthLanding], which keeps an employee on the month
+/// they still owe a self-rating for).
+///
+/// The walk short-circuits, so the usual cost is one request (current month is
+/// live) or two (current month untouched → previous month). Only the newest
+/// month is `watch`ed — it's the list the screen renders by default; the older
+/// months are `read`, because the landing month only matters on first paint and
+/// shouldn't re-resolve every time some past month's data changes.
+final defaultReviewPeriodProvider =
+    FutureProvider.autoDispose<ReviewPeriod?>((ref) async {
+  ref.keepAlive();
+  final scope = ref.watch(currentReviewScopeProvider);
+  final periods = ref.watch(availablePeriodsProvider);
+  if (scope == null || periods.isEmpty) return null;
+
+  bool worthLanding(List<MonthlyReviewSummary> list) =>
+      MonthlyReviewSummary.anyWorthLanding(list,
+          roles: scope.effectiveRoles, userId: scope.userId);
+
+  final newest =
+      await ref.watch(monthlyReviewListProvider(periods.first).future);
+  if (worthLanding(newest)) return periods.first;
+
+  for (final period in periods.skip(1)) {
+    if (worthLanding(await ref.read(monthlyReviewListProvider(period).future))) {
+      return period;
+    }
+  }
+  return null;
 });
 
 /// One employee's three monthly summaries for the quarter that contains
