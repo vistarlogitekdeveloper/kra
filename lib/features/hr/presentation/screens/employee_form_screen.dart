@@ -40,9 +40,30 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   // separate "reset password" flow if it ships later.
   final _passwordController = TextEditingController();
 
-  // The selected job designation (title). The functional access role is
-  // DERIVED from it (see [_roleFromDesignation]); HR only picks a designation.
+  // The selected job designation (title). The functional access role defaults
+  // to whatever [_roleFromDesignation] infers from it.
   String _designation = '';
+
+  /// Explicit access role, overriding the designation-derived default. Null =
+  /// follow the designation.
+  ///
+  /// Access and job title are genuinely separate axes: a "Commercial Manager"
+  /// may administer HR, and a founder needs the management-review seat no title
+  /// rule should have to guess at. Deriving the role from the title alone made
+  /// HR_ADMIN and ADMIN unreachable — no designation produced them — so those
+  /// grants were impossible to make from this form at all.
+  String? _roleOverride;
+
+  /// Access roles HR can grant explicitly. Wire values, matching
+  /// `UserRole.fromApi`.
+  static const _accessRoles = [
+    'EMPLOYEE',
+    'MANAGER',
+    'HR',
+    'FINANCE',
+    'HR_ADMIN',
+    'ADMIN',
+  ];
   String? _department;
   String? _projectLocationId;
   String? _managerId;
@@ -69,6 +90,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   /// [_roleFromDesignation], so reviews + permissions keep working while HR
   /// works purely in org titles.
   static const _designations = [
+    'Founder & CEO',
+    'Director',
     'Manager',
     'Assistant Manager',
     'Cluster Manager',
@@ -85,12 +108,27 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   ];
 
   /// Maps a designation to the functional role that drives access + reviews:
+  ///   * Founder / CEO / Director  → ADMIN (the management-review tier)
   ///   * "…-Hr" / anything HR      → HR (reviews HR-assigned KRAs)
   ///   * "…Accountant" / Finance   → FINANCE (reviews Accounts-assigned KRAs)
   ///   * any Manager / Incharge    → MANAGER
   ///   * everything else           → EMPLOYEE
+  ///
+  /// This is only a DEFAULT. A title can't express every access grant — a
+  /// Commercial Manager who also administers HR is a real case — so HR can
+  /// override the result per person via the Access role field
+  /// ([_roleOverride]). Management titles are matched first: the management
+  /// tier is the narrowest, highest-privilege seat, and an unmatched title
+  /// silently falling through to EMPLOYEE is how a founder ended up with no
+  /// management-review access at all.
   static String _roleFromDesignation(String designation) {
     final d = designation.toUpperCase();
+    if (d.contains('CEO') ||
+        d.contains('FOUNDER') ||
+        d.contains('DIRECTOR') ||
+        d.contains('CHAIRMAN')) {
+      return 'ADMIN';
+    }
     if (d.contains('HR')) return 'HR';
     if (d.contains('ACCOUNT') || d.contains('FINANCE')) return 'FINANCE';
     if (d.contains('MANAGER') ||
@@ -155,6 +193,14 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       // empty (HR picks one) rather than guessing from the functional role.
       _designation =
           (e.position?.trim().isEmpty ?? true) ? '' : e.position!.trim();
+      // An access role the title would NOT produce is shown as an explicit
+      // override — otherwise editing an unrelated field would silently reset
+      // it to the derived default on save (e.g. demoting an HR-admin
+      // Commercial Manager back to MANAGER).
+      final derived =
+          _designation.isEmpty ? null : _roleFromDesignation(_designation);
+      final stored = e.role.trim().toUpperCase();
+      _roleOverride = (stored.isEmpty || stored == derived) ? null : stored;
       _department = (e.department?.isEmpty ?? true) ? null : e.department;
       _projectLocationId = e.projectLocationId;
       _managerId = e.managerId;
@@ -224,9 +270,12 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       // manager just because the title wasn't set yet.
       final designation = _designation.trim();
       final position = designation.isEmpty ? null : designation;
-      final role = designation.isEmpty
-          ? (_original?.role ?? 'EMPLOYEE')
-          : _roleFromDesignation(designation);
+      // An explicit Access role wins; otherwise fall back to the designation's
+      // default (and, with no designation, to whatever the record already had).
+      final role = _roleOverride ??
+          (designation.isEmpty
+              ? (_original?.role ?? 'EMPLOYEE')
+              : _roleFromDesignation(designation));
       if (widget.isEdit) {
         final grade = _gradeController.text.trim().isEmpty
             ? null
@@ -513,6 +562,18 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               // The reporting line is independent of the designation — changing
               // someone's title must NOT clear who they report to.
               _designation = v;
+              _isDirty = true;
+            }),
+          ),
+          const SizedBox(height: 14),
+          _AccessRoleDropdown(
+            value: _roleOverride,
+            roles: _accessRoles,
+            derived: _designation.trim().isEmpty
+                ? null
+                : _roleFromDesignation(_designation.trim()),
+            onChanged: (v) => setState(() {
+              _roleOverride = v;
               _isDirty = true;
             }),
           ),
@@ -905,6 +966,83 @@ class _RoleDropdown extends StatelessWidget {
               },
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Access-role picker — the permissions/review seat this person holds.
+///
+/// Separate from the designation on purpose. A job title can't express every
+/// grant (a Commercial Manager who also administers HR), and inferring the role
+/// from the title alone left HR_ADMIN and ADMIN unreachable entirely. Defaults
+/// to "Auto", which follows the designation, so the common case stays a
+/// one-field decision for HR.
+class _AccessRoleDropdown extends StatelessWidget {
+  /// The explicit override, or null to follow the designation.
+  final String? value;
+  final List<String> roles;
+
+  /// What the current designation would infer — shown on the Auto option so HR
+  /// can see what they get without having to know the mapping.
+  final String? derived;
+  final ValueChanged<String?> onChanged;
+  const _AccessRoleDropdown({
+    required this.value,
+    required this.roles,
+    required this.derived,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // A legacy record may carry a role outside our list (e.g. 'Ops_excellence');
+    // surface it so DropdownButton doesn't assert on an unmatched value.
+    final hasOrphan = value != null && !roles.contains(value);
+    final autoLabel = derived == null
+        ? AppStrings.employeeFormAccessRoleAuto
+        : '${AppStrings.employeeFormAccessRoleAuto} — $derived';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppStrings.employeeFormAccessRole,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InputDecorator(
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.verified_user_outlined, size: 20),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              value: value,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              items: [
+                DropdownMenuItem(value: null, child: Text(autoLabel)),
+                if (hasOrphan)
+                  DropdownMenuItem(
+                    value: value,
+                    child: Text('$value (current)'),
+                  ),
+                for (final r in roles)
+                  DropdownMenuItem(value: r, child: Text(r)),
+              ],
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          AppStrings.employeeFormAccessRoleHelp,
+          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
         ),
       ],
     );

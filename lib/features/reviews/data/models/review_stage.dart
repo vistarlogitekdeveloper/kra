@@ -7,7 +7,8 @@ import '../../../auth/data/models/user.dart';
 ///   2. **Review** — three INDEPENDENT ratings entered in parallel by the
 ///      reporting manager, HR and Finance. Their per-KRA average is the
 ///      Review score (see [MonthlyReview.reviewAvgPct]).
-///   3. **Management** — HR either approves (the Review average stands) or, on
+///   3. **Management** — management (the founder/CEO tier, held as
+///      [UserRole.admin]) either approves (the Review average stands) or, on
 ///      rework, enters a rating that OVERRIDES it and becomes final.
 ///   4. **Payout** — Finance/HR mark the incentive paid.
 ///
@@ -204,11 +205,16 @@ enum ReviewStage {
         // The HR rater in the Review cycle.
         return const {UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.financeRating:
-        // The Finance / Accounts rater in the Review cycle.
-        return const {UserRole.finance};
+        // The Finance / Accounts rater in the Review cycle. HR_ADMIN holds this
+        // seat too: the commercial/HR-admin post covers Accounts rating as well,
+        // and a single [UserRole] can't express "HR Admin AND Accounts".
+        return const {UserRole.finance, UserRole.hrAdmin};
       case ReviewStage.managementReview:
-        // Management review is done by HR (approve, or override on rework).
-        return const {UserRole.hrAdmin, UserRole.admin};
+        // MANAGEMENT ONLY — the founder/CEO tier, held as ADMIN. Deliberately
+        // NOT hrAdmin: HR administers the cycle and rates its HR seat, but the
+        // management approval/override is the final word on an employee's score
+        // and incentive, so it stays with management alone.
+        return const {UserRole.admin};
       case ReviewStage.incentivePayout:
         return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.completed:

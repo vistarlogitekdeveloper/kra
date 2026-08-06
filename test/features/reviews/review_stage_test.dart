@@ -73,9 +73,10 @@ void main() {
           containsAll([UserRole.hr, UserRole.hrAdmin]));
       expect(ReviewStage.accountHrRating.actorRoles,
           isNot(contains(UserRole.finance)));
-      // Finance is the third Review rater.
-      expect(
-          ReviewStage.financeRating.actorRoles, contains(UserRole.finance));
+      // Finance is the third Review rater — and HR_ADMIN holds that Accounts
+      // seat too, since one UserRole can't say "HR Admin AND Accounts".
+      expect(ReviewStage.financeRating.actorRoles,
+          containsAll([UserRole.finance, UserRole.hrAdmin]));
       expect(ReviewStage.incentivePayout.actorRoles,
           containsAll([UserRole.finance, UserRole.hr, UserRole.hrAdmin]));
       // Any manager-tier role gets a team roster, so all of them can rate.
@@ -86,8 +87,12 @@ void main() {
             UserRole.bdManager,
             UserRole.warehouseMgr,
           ]));
+      // Management review is the founder/CEO tier ALONE (held as ADMIN): the
+      // approval/override is the final word on a score and its incentive, so
+      // neither HR admin nor a reporting manager may perform it.
+      expect(ReviewStage.managementReview.actorRoles, {UserRole.admin});
       expect(ReviewStage.managementReview.actorRoles,
-          containsAll([UserRole.admin, UserRole.hrAdmin]));
+          isNot(contains(UserRole.hrAdmin)));
       expect(ReviewStage.managementReview.actorRoles,
           isNot(contains(UserRole.manager)));
       // Self-rating is owner-scoped; ops holds its own review too.

@@ -126,10 +126,14 @@ void main() {
   });
 
   group('MonthlyReview.isActionableBy — org-level stages stay role-gated', () {
-    test('management review is for admin/HR-admin, not a relationship', () {
+    test('management review is management-only (ADMIN), not a relationship '
+        'and NOT HR admin', () {
       final r = reviewAt(ReviewStage.managementReview, managerId: 'mgr1');
       expect(r.isActionableBy(UserRole.admin, userId: 'anyone'), isTrue);
-      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'anyone'), isTrue);
+      // HR administers the cycle but must not hold the final word on a score
+      // and its incentive — that approval/override is management's alone.
+      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'anyone'), isFalse);
+      expect(r.isActionableBy(UserRole.hr, userId: 'anyone'), isFalse);
       // Being the reporting manager does NOT grant management review.
       expect(r.isActionableBy(UserRole.manager, userId: 'mgr1'), isFalse);
     });

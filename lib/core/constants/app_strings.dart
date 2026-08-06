@@ -238,6 +238,11 @@ class AppStrings {
   static const String employeeFormRole = 'Role';
   static const String employeeFormDesignation = 'Designation';
   static const String employeeFormDesignationHint = 'Select designation';
+  static const String employeeFormAccessRole = 'Access role';
+  static const String employeeFormAccessRoleAuto = 'Auto (from designation)';
+  static const String employeeFormAccessRoleHelp =
+      'Controls permissions and which review seat this person holds. Leave on '
+      'Auto unless someone needs access their job title does not imply.';
   static const String employeeFormDepartment = 'Department';
   static const String employeeFormProjectLocation = 'Project location';
   static const String employeeFormManager = 'Reporting manager';
