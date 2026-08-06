@@ -102,6 +102,9 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.finance:
     case UserRole.admin:
     case UserRole.hrAdmin:
+    // Management reviews the whole org, so it gets the full roster too — the
+    // Management approval is the last gate before payout on every review.
+    case UserRole.management:
       // Fetch the roster and every assignment concurrently, then join the
       // real KRA rows onto each employee by id. 200 is the backend's max
       // page size (larger → 400); fine for the current headcount.

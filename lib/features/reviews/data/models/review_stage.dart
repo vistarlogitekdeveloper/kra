@@ -220,11 +220,10 @@ enum ReviewStage {
         // assignable tier, so management approvers hold that for now — which
         // means every HR admin shares the seat.
         //
-        // To make this exclusive again, the backend needs one more enum value
-        // (MANAGEMENT or ADMIN); then this returns {UserRole.admin} and only the
-        // founder tier holds it. Alternatively gate it per-person on user id,
-        // like the relationship stages do.
-        return const {UserRole.hrAdmin};
+        // [UserRole.management] is listed so holders work the day the backend's
+        // employees enum gains `MANAGEMENT`. Exclusivity is then one edit:
+        // drop hrAdmin from this set, and only the founder tier signs off.
+        return const {UserRole.management, UserRole.hrAdmin};
       case ReviewStage.incentivePayout:
         return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.completed:

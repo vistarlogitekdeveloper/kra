@@ -14,7 +14,18 @@ enum UserRole {
   hr,
   finance,
   bdManager,
-  warehouseMgr;
+  warehouseMgr,
+
+  /// The management tier (founder / CEO / director) — holds the Management
+  /// review, the approval/override that is the final word on a score and its
+  /// incentive.
+  ///
+  /// Deliberately separate from [hrAdmin]: HR administers the cycle and rates
+  /// the HR seat, but must not also sign off on it. Recognised here ahead of the
+  /// backend so that the day its employees enum gains `MANAGEMENT`, holders are
+  /// read correctly instead of falling through [fromApi]'s default to
+  /// [employee] — which would silently demote the founder to a plain employee.
+  management;
 
   /// Tolerates "ADMIN" / "Admin" / "admin" / "EMPLOYEE" / "HR_ADMIN" etc.
   /// and falls back to [employee] on any unknown value rather than
@@ -31,6 +42,8 @@ enum UserRole {
         return UserRole.admin;
       case 'HR_ADMIN':
         return UserRole.hrAdmin;
+      case 'MANAGEMENT':
+        return UserRole.management;
       case 'HR':
         return UserRole.hr;
       case 'MANAGER':
@@ -85,6 +98,8 @@ enum UserRole {
         return 'BD Manager';
       case UserRole.warehouseMgr:
         return 'Warehouse Manager';
+      case UserRole.management:
+        return 'Management';
     }
   }
 }

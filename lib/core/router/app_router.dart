@@ -181,7 +181,11 @@ class AppRoutes {
       role == UserRole.hr ||
       role == UserRole.finance ||
       role == UserRole.hrAdmin ||
-      role == UserRole.admin;
+      role == UserRole.admin ||
+      // Management performs the Management review, so it needs the Reviews
+      // workspace — but NOT the HR console (see [canAccessHr]): signing off on
+      // reviews is not the same authority as administering employees.
+      role == UserRole.management;
 
   /// True if [role] may access any `/manager/*` route. Drives the
   /// router's role-guard redirect.

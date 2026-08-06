@@ -289,9 +289,13 @@ void main() {
         // HR_ADMIN holds the Accounts seat too — one UserRole can't say
         // "HR Admin AND Accounts", and that post covers both.
         ReviewStage.financeRating: {UserRole.finance, UserRole.hrAdmin},
-        // Management approval/override — HR_ADMIN for now, since the backend's
-        // employees enum has no ADMIN to assign. See ReviewStage.actorRoles.
-        ReviewStage.managementReview: {UserRole.hrAdmin},
+        // Management approval/override. MANAGEMENT is the intended holder;
+        // HR_ADMIN is here only until the backend's employees enum can store
+        // MANAGEMENT, at which point it drops out. See ReviewStage.actorRoles.
+        ReviewStage.managementReview: {
+          UserRole.management,
+          UserRole.hrAdmin,
+        },
         ReviewStage.incentivePayout: {
           UserRole.finance,
           UserRole.hr,
