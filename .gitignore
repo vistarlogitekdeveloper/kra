@@ -49,3 +49,14 @@ app.*.map.json
 
 # Stray nested clone
 /kra/
+
+# Local secrets. These were dropped from this branch's ignore list, which left
+# .env / .dev.vars files untracked-but-not-ignored — one `git add -A` from being
+# committed. The negations keep the checked-in examples visible.
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+
+# Kotlin incremental-compile session files (build artifacts, not source).
+android/.kotlin/
