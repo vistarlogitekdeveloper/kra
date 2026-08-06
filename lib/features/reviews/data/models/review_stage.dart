@@ -294,6 +294,11 @@ enum ReviewStage {
   /// ([isRelationshipStage]) see [MonthlyReview.isActionableBy].
   bool isActionableBy(UserRole role) => actorRoles.contains(role);
 
+  /// True when ANY of [roles] may act on this stage — the multi-role form.
+  /// Someone holding both the HR and Accounts seats can act on either.
+  bool isActionableByAny(Set<UserRole> roles) =>
+      roles.any(actorRoles.contains);
+
   /// Stages decided by WHO the caller is to a review rather than by role:
   ///   * [selfRating] — the review's owner, whatever their role.
   ///   * [reportingManagerRating] — the review's reporting manager, whatever

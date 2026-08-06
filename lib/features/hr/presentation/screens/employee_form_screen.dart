@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/widgets/branded_primary_button.dart';
 import '../../../auth/presentation/widgets/branded_text_field.dart';
 import '../../data/models/employee.dart';
@@ -44,15 +45,33 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   // to whatever [_roleFromDesignation] infers from it.
   String _designation = '';
 
-  /// Explicit access role, overriding the designation-derived default. Null =
+  /// Explicit access roles, overriding the designation-derived default. Empty =
   /// follow the designation.
+  ///
+  /// A set because one post can hold several review seats (HR admin who also
+  /// rates the Accounts seat). Only the FIRST is sent as the scalar `role`; the
+  /// rest ride along in `roles`, which the backend does not accept yet — so
+  /// picking more than one is inert until it does (the form says so).
+  final Set<String> _rolesOverride = {};
+
+  /// The PRIMARY overridden role — the scalar the API actually stores. Null when
+  /// nothing is overridden, so the designation's default applies.
   ///
   /// Access and job title are genuinely separate axes: a "Commercial Manager"
   /// may administer HR, and a founder needs the management-review seat no title
   /// rule should have to guess at. Deriving the role from the title alone made
-  /// HR_ADMIN and ADMIN unreachable — no designation produced them — so those
-  /// grants were impossible to make from this form at all.
-  String? _roleOverride;
+  /// HR_ADMIN unreachable — no designation produced it — so that grant was
+  /// impossible to make from this form at all.
+  String? get _roleOverride =>
+      _rolesOverride.isEmpty ? null : _rolesOverride.first;
+
+  /// Whether the signed-in user may GRANT roles. See [User.isSuperAdmin] — HR
+  /// admins can edit everything else about an employee, but not who holds which
+  /// access, themselves included.
+  bool get _isSuperAdmin {
+    final auth = ref.watch(authStateProvider);
+    return auth is AuthAuthenticated && auth.user.isSuperAdmin;
+  }
 
   /// Access roles HR can grant explicitly.
   ///
@@ -211,8 +230,18 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       // Commercial Manager back to MANAGER).
       final derived =
           _designation.isEmpty ? null : _roleFromDesignation(_designation);
-      final stored = e.role.trim().toUpperCase();
-      _roleOverride = (stored.isEmpty || stored == derived) ? null : stored;
+      // Prefer the multi-role list when the API supplies one; otherwise the
+      // scalar. Either way, a set matching the designation's default stays
+      // "Auto" so the field only shows an override when there really is one.
+      final stored = <String>{
+        for (final r in e.roles) r.trim().toUpperCase(),
+        if (e.roles.isEmpty) e.role.trim().toUpperCase(),
+      }..removeWhere((r) => r.isEmpty);
+      _rolesOverride
+        ..clear()
+        ..addAll(
+          stored.length == 1 && stored.first == derived ? const {} : stored,
+        );
       _department = (e.department?.isEmpty ?? true) ? null : e.department;
       _projectLocationId = e.projectLocationId;
       _managerId = e.managerId;
@@ -577,18 +606,32 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               _isDirty = true;
             }),
           ),
-          const SizedBox(height: 14),
-          _AccessRoleDropdown(
-            value: _roleOverride,
-            roles: _accessRoles,
-            derived: _designation.trim().isEmpty
-                ? null
-                : _roleFromDesignation(_designation.trim()),
-            onChanged: (v) => setState(() {
-              _roleOverride = v;
-              _isDirty = true;
-            }),
-          ),
+          // Access roles are SUPER-ADMIN only. HR admins maintain employee
+          // records, but handing out roles — including their own — is a
+          // privilege-escalation path, so the field is hidden (and never sent)
+          // for anyone below that tier.
+          if (_isSuperAdmin) ...[
+            const SizedBox(height: 14),
+            _AccessRolesField(
+              selected: _rolesOverride,
+              roles: _accessRoles,
+              derived: _designation.trim().isEmpty
+                  ? null
+                  : _roleFromDesignation(_designation.trim()),
+              onToggle: (role, on) => setState(() {
+                if (on) {
+                  _rolesOverride.add(role);
+                } else {
+                  _rolesOverride.remove(role);
+                }
+                _isDirty = true;
+              }),
+              onClear: () => setState(() {
+                _rolesOverride.clear();
+                _isDirty = true;
+              }),
+            ),
+          ],
           // Shown for every role: managers report to senior managers and HR
           // admins report to someone too. Whoever is selected here is the one
           // who rates this person.
@@ -984,37 +1027,40 @@ class _RoleDropdown extends StatelessWidget {
   }
 }
 
-/// Access-role picker — the permissions/review seat this person holds.
+
+/// Access-role picker — which permissions/review seats this person holds.
 ///
-/// Separate from the designation on purpose. A job title can't express every
-/// grant (a Commercial Manager who also administers HR), and inferring the role
-/// from the title alone left HR_ADMIN and ADMIN unreachable entirely. Defaults
-/// to "Auto", which follows the designation, so the common case stays a
-/// one-field decision for HR.
-class _AccessRoleDropdown extends StatelessWidget {
-  /// The explicit override, or null to follow the designation.
-  final String? value;
+/// Multi-select, and separate from the designation on purpose. A job title can't
+/// express every grant (a Commercial Manager who also administers HR), and
+/// inferring the role from the title alone left HR_ADMIN unreachable entirely.
+/// Selecting nothing means "Auto" — follow the designation — so the common case
+/// stays a one-field decision for HR.
+///
+/// Super-admin only; the caller gates rendering.
+class _AccessRolesField extends StatelessWidget {
+  /// Explicitly granted roles. Empty = follow the designation.
+  final Set<String> selected;
   final List<String> roles;
 
-  /// What the current designation would infer — shown on the Auto option so HR
-  /// can see what they get without having to know the mapping.
+  /// What the current designation would infer — shown so HR can see what Auto
+  /// gives them without having to know the mapping.
   final String? derived;
-  final ValueChanged<String?> onChanged;
-  const _AccessRoleDropdown({
-    required this.value,
+  final void Function(String role, bool selected) onToggle;
+  final VoidCallback onClear;
+  const _AccessRolesField({
+    required this.selected,
     required this.roles,
     required this.derived,
-    required this.onChanged,
+    required this.onToggle,
+    required this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
-    // A legacy record may carry a role outside our list (e.g. 'Ops_excellence');
-    // surface it so DropdownButton doesn't assert on an unmatched value.
-    final hasOrphan = value != null && !roles.contains(value);
-    final autoLabel = derived == null
-        ? AppStrings.employeeFormAccessRoleAuto
-        : '${AppStrings.employeeFormAccessRoleAuto} — $derived';
+    // Legacy records can carry a role outside the list (e.g. 'Ops_excellence');
+    // show it as a chip so it's visible rather than silently dropped on save.
+    final orphans = selected.where((r) => !roles.contains(r)).toList();
+    final isAuto = selected.isEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1028,34 +1074,43 @@ class _AccessRoleDropdown extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        InputDecorator(
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.verified_user_outlined, size: 20),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String?>(
-              value: value,
-              isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded),
-              items: [
-                DropdownMenuItem(value: null, child: Text(autoLabel)),
-                if (hasOrphan)
-                  DropdownMenuItem(
-                    value: value,
-                    child: Text('$value (current)'),
-                  ),
-                for (final r in roles)
-                  DropdownMenuItem(value: r, child: Text(r)),
-              ],
-              onChanged: onChanged,
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              label: Text(derived == null
+                  ? AppStrings.employeeFormAccessRoleAuto
+                  : '${AppStrings.employeeFormAccessRoleAuto} — $derived'),
+              selected: isAuto,
+              onSelected: (_) => onClear(),
             ),
-          ),
+            for (final r in [...orphans, ...roles])
+              FilterChip(
+                label: Text(r),
+                selected: selected.contains(r),
+                onSelected: (on) => onToggle(r, on),
+              ),
+          ],
         ),
         const SizedBox(height: 6),
         Text(
           AppStrings.employeeFormAccessRoleHelp,
           style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
         ),
+        // Multi-role can't persist yet: the API stores a single `role`. Say so
+        // where the choice is made rather than letting a silent 400 explain it.
+        if (selected.length > 1) ...[
+          const SizedBox(height: 6),
+          const Text(
+            AppStrings.employeeFormAccessRoleMultiPending,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.accentOrange,
+            ),
+          ),
+        ],
       ],
     );
   }

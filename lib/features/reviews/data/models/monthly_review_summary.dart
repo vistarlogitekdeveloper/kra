@@ -164,7 +164,14 @@ class MonthlyReviewSummary {
   /// [userId] resolves them against this row: self-rating belongs to
   /// [employeeId], reporting-manager rating to [managerId] — whatever either
   /// party's role happens to be. Org-level stages stay role-gated.
-  bool needsActionBy(UserRole role, {String? userId}) {
+  bool needsActionBy(UserRole role, {String? userId}) =>
+      needsActionByAny({role}, userId: userId);
+
+  /// Multi-role form of [needsActionBy]: true when ANY of [roles] is asked to
+  /// act. The relationship stages are unaffected — they answer to
+  /// [employeeId] / [managerId], never to a role — so only the org-level tail
+  /// consults the set.
+  bool needsActionByAny(Set<UserRole> roles, {String? userId}) {
     if (currentStage.isTerminal) return false;
     if (currentStageStatus == StageStatus.submitted) return false;
     if (currentStage == ReviewStage.selfRating) {
@@ -173,7 +180,7 @@ class MonthlyReviewSummary {
     if (currentStage == ReviewStage.reportingManagerRating) {
       return userId != null && managerId != null && userId == managerId;
     }
-    return currentStage.isActionableBy(role);
+    return currentStage.isActionableByAny(roles);
   }
 
   /// The FIXED incentive for the whole quarter — the monthly eligible ceiling
@@ -255,12 +262,11 @@ class MonthlyReviewSummary {
   /// hide the one thing they have to do.
   static bool anyWorthLanding(
     Iterable<MonthlyReviewSummary> summaries, {
-    UserRole? role,
+    Set<UserRole> roles = const {},
     String? userId,
   }) =>
       summaries.any((s) =>
-          s.hasRatingActivity ||
-          (role != null && s.needsActionBy(role, userId: userId)));
+          s.hasRatingActivity || s.needsActionByAny(roles, userId: userId));
 
   /// The management review has been done (management scored, or the review has
   /// already moved on to payout / completed) — so the incentive can be settled.

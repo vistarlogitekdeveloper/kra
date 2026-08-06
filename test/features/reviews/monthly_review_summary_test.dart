@@ -241,7 +241,7 @@ void main() {
       final rows = [summary(stage: ReviewStage.selfRating, managerId: 'mgr1')];
       expect(
         MonthlyReviewSummary.anyWorthLanding(rows,
-            role: UserRole.manager, userId: 'mgr1'),
+            roles: {UserRole.manager}, userId: 'mgr1'),
         isFalse,
       );
     });
@@ -251,7 +251,7 @@ void main() {
       final rows = [summary(stage: ReviewStage.selfRating)];
       expect(
         MonthlyReviewSummary.anyWorthLanding(rows,
-            role: UserRole.employee, userId: 'emp1'),
+            roles: {UserRole.employee}, userId: 'emp1'),
         isTrue,
       );
     });
@@ -263,7 +263,7 @@ void main() {
       ];
       expect(
         MonthlyReviewSummary.anyWorthLanding(rows,
-            role: UserRole.manager, userId: 'mgr1'),
+            roles: {UserRole.manager}, userId: 'mgr1'),
         isTrue,
       );
     });
@@ -271,7 +271,7 @@ void main() {
     test('a month with no reviews at all is never worth landing on', () {
       expect(
         MonthlyReviewSummary.anyWorthLanding(const [],
-            role: UserRole.hrAdmin, userId: 'hr1'),
+            roles: {UserRole.hrAdmin}, userId: 'hr1'),
         isFalse,
       );
     });

@@ -33,12 +33,22 @@ final monthlyBackendEnabledProvider = Provider<bool>(
 class ReviewScope {
   final String userId;
   final String userName;
+
+  /// Primary role — drives roster scoping (which employees this user sees).
   final UserRole role;
+
+  /// Every role held. Review AUTHORITY is checked against this, so someone
+  /// holding both the HR and Accounts seats can act on either.
+  final Set<UserRole> roles;
   const ReviewScope({
     required this.userId,
     required this.userName,
     required this.role,
+    this.roles = const {},
   });
+
+  /// [roles], or `{role}` when only a scalar role is known.
+  Set<UserRole> get effectiveRoles => roles.isEmpty ? {role} : roles;
 }
 
 /// Data layer for monthly reviews.
@@ -181,6 +191,7 @@ final currentReviewScopeProvider = Provider<ReviewScope?>((ref) {
     userId: auth.user.id,
     userName: auth.user.fullName,
     role: auth.user.role,
+    roles: auth.user.effectiveRoles,
   );
 });
 
@@ -251,7 +262,7 @@ final defaultReviewPeriodProvider =
 
   bool worthLanding(List<MonthlyReviewSummary> list) =>
       MonthlyReviewSummary.anyWorthLanding(list,
-          role: scope.role, userId: scope.userId);
+          roles: scope.effectiveRoles, userId: scope.userId);
 
   final newest =
       await ref.watch(monthlyReviewListProvider(periods.first).future);

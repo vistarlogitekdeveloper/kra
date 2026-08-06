@@ -12,9 +12,18 @@ class Employee {
   final String fullName;
   final String email;
 
-  /// Functional access role (EMPLOYEE / MANAGER / HR / FINANCE / …) — drives
-  /// permissions + review routing. Derived from [position] at save time.
+  /// PRIMARY functional access role (EMPLOYEE / MANAGER / HR / FINANCE / …) —
+  /// drives permissions + review routing. Defaults to what [position] implies,
+  /// but HR can set it explicitly (access and job title are separate axes).
   final String role;
+
+  /// EVERY access role held, when the backend supplies them. One post can carry
+  /// several review seats — HR admin who also rates the Accounts seat — which a
+  /// single [role] cannot express.
+  ///
+  /// Empty when the API returns only the scalar `role`, which is the case today;
+  /// callers should fall back to `[role]`.
+  final List<String> roles;
 
   /// Job designation / title (e.g. "Cluster Manager", "Sr. Accountant"). This
   /// is what HR picks; [role] is inferred from it. Stored in the backend's
@@ -43,6 +52,7 @@ class Employee {
     required this.fullName,
     required this.email,
     required this.role,
+    this.roles = const [],
     this.position,
     this.department,
     this.projectLocation,
@@ -64,6 +74,13 @@ class Employee {
       fullName: (json['fullName'] ?? json['name'] ?? '') as String,
       email: (json['email'] ?? '') as String,
       role: (json['role'] ?? 'EMPLOYEE') as String,
+      // Multi-role shape, absent on the current API — empty list, callers fall
+      // back to [role].
+      roles: (json['roles'] as List?)
+              ?.map((r) => r?.toString())
+              .whereType<String>()
+              .toList() ??
+          const [],
       position: json['position'] as String?,
       department: json['department'] as String?,
       projectLocation: _readNestedName(json['projectLocation']),

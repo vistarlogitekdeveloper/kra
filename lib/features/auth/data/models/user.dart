@@ -113,7 +113,20 @@ class User {
   final String id;
   final String email;
   final String fullName;
+
+  /// PRIMARY role — the one used for display and for the single-role decisions
+  /// that predate multi-role (a user's "home" workspace, for instance). Always
+  /// a member of [roles].
   final UserRole role;
+
+  /// EVERY role this user holds. One post can carry several responsibilities —
+  /// the commercial/HR-admin who also rates the Accounts seat — and a single
+  /// enum value cannot say that.
+  ///
+  /// Falls back to `{role}` when the backend sends only the scalar `role`, which
+  /// is the case today, so every permission check below behaves exactly as it
+  /// did before until a `roles` array actually arrives.
+  final Set<UserRole> roles;
   final String organizationId;
   final String? projectLocationId;
   final bool hasReports;
@@ -123,10 +136,32 @@ class User {
     required this.email,
     required this.fullName,
     required this.role,
+    Set<UserRole>? roles,
     required this.organizationId,
     this.projectLocationId,
     this.hasReports = false,
-  });
+  }) : roles = roles ?? const {};
+
+  /// True when the user holds [r] — checks the whole set, not just [role].
+  bool hasRole(UserRole r) => effectiveRoles.contains(r);
+
+  /// True when the user holds ANY of [candidates]. The workhorse for permission
+  /// checks, which are all "is one of these seats mine?".
+  bool hasAnyRole(Set<UserRole> candidates) =>
+      effectiveRoles.intersection(candidates).isNotEmpty;
+
+  /// [roles], or `{role}` when the backend sent only the scalar. Never empty, so
+  /// callers never have to special-case a role-less user.
+  Set<UserRole> get effectiveRoles =>
+      roles.isEmpty ? {role} : {role, ...roles};
+
+  /// The super-admin tier: the only one that may change other people's access.
+  ///
+  /// [UserRole.admin] is that tier — the backend's `ADMIN` / `SUPER_ADMIN` both
+  /// map to it. Deliberately NOT [UserRole.hrAdmin]: HR admins administer
+  /// employee records, but handing out roles (including their own) is a
+  /// privilege-escalation path, so it stays above them.
+  bool get isSuperAdmin => hasRole(UserRole.admin);
 
   factory User.fromJson(Map<String, dynamic> json) {
     // The login endpoint returns `name`; /auth/me returns `fullName`.
@@ -137,11 +172,26 @@ class User {
     // login (or a wiped cache on boot), with no clue to the real cause.
     final displayName =
         JsonParse.parseString(json['fullName'] ?? json['name']) ?? '';
+    // `roles` is the multi-role shape; absent today, so fall back to the scalar
+    // `role`. Unknown strings resolve to EMPLOYEE via fromApi rather than
+    // throwing, so a role added server-side can't take out login.
+    final rawRoles = json['roles'];
+    final parsedRoles = rawRoles is List
+        ? rawRoles
+            .map((r) => JsonParse.parseString(r))
+            .whereType<String>()
+            .map(UserRole.fromApi)
+            .toSet()
+        : <UserRole>{};
     return User(
       id: JsonParse.parseString(json['id']) ?? '',
       email: JsonParse.parseString(json['email']) ?? '',
       fullName: displayName,
-      role: UserRole.fromApi(JsonParse.parseString(json['role']) ?? 'EMPLOYEE'),
+      role: UserRole.fromApi(JsonParse.parseString(json['role']) ??
+          (parsedRoles.isNotEmpty
+              ? parsedRoles.first.toApiString()
+              : 'EMPLOYEE')),
+      roles: parsedRoles,
       organizationId: JsonParse.parseString(json['organizationId']) ?? '',
       projectLocationId: JsonParse.parseString(json['projectLocationId']),
       hasReports: json['hasReports'] as bool? ?? false,
@@ -153,6 +203,7 @@ class User {
         'email': email,
         'fullName': fullName,
         'role': role.toApiString(),
+        'roles': [for (final r in effectiveRoles) r.toApiString()],
         'organizationId': organizationId,
         'projectLocationId': projectLocationId,
         'hasReports': hasReports,
@@ -163,6 +214,7 @@ class User {
     String? email,
     String? fullName,
     UserRole? role,
+    Set<UserRole>? roles,
     String? organizationId,
     String? projectLocationId,
     bool? hasReports,
@@ -172,6 +224,7 @@ class User {
       email: email ?? this.email,
       fullName: fullName ?? this.fullName,
       role: role ?? this.role,
+      roles: roles ?? this.roles,
       organizationId: organizationId ?? this.organizationId,
       projectLocationId: projectLocationId ?? this.projectLocationId,
       hasReports: hasReports ?? this.hasReports,

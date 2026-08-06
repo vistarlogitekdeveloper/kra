@@ -240,6 +240,9 @@ class AppStrings {
   static const String employeeFormDesignationHint = 'Select designation';
   static const String employeeFormAccessRole = 'Access role';
   static const String employeeFormAccessRoleAuto = 'Auto (from designation)';
+  static const String employeeFormAccessRoleMultiPending =
+      'Only the first role will be saved — the API stores one role per person. '
+      'Multiple roles need backend support.';
   static const String employeeFormAccessRoleHelp =
       'Controls permissions and which review seat this person holds. Leave on '
       'Auto unless someone needs access their job title does not imply.';
