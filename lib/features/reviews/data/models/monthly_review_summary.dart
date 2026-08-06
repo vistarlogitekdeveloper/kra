@@ -232,6 +232,36 @@ class MonthlyReviewSummary {
     return _scoredStage == null ? currentStageStatus : StageStatus.submitted;
   }
 
+  /// True when this month's review carries real rating ACTIVITY — a score
+  /// exists somewhere, or the pipeline has moved past Self-Rating. A freshly
+  /// generated month (the row exists, nobody has rated yet) is false.
+  ///
+  /// This is what tells "this month hasn't started" apart from "this month is
+  /// at Self-Rating with the self-rating already in" — a distinction the stage
+  /// chip alone can't express, since both read "Self-Rating".
+  bool get hasRatingActivity =>
+      finalScorePct > 0 ||
+      selfScorePct != null ||
+      managementReviewPct != null ||
+      displayStage != ReviewStage.selfRating ||
+      displayStatus == StageStatus.submitted;
+
+  /// True when a month's [summaries] are worth LANDING on: somebody has rated
+  /// something, or a row still awaits this caller's own action.
+  ///
+  /// The "needs my action" half matters as much as the activity half. An
+  /// employee whose current month is untouched still owes a self-rating there,
+  /// so the dashboard must never skip past it to an older, busier month and
+  /// hide the one thing they have to do.
+  static bool anyWorthLanding(
+    Iterable<MonthlyReviewSummary> summaries, {
+    UserRole? role,
+    String? userId,
+  }) =>
+      summaries.any((s) =>
+          s.hasRatingActivity ||
+          (role != null && s.needsActionBy(role, userId: userId)));
+
   /// The management review has been done (management scored, or the review has
   /// already moved on to payout / completed) — so the incentive can be settled.
   bool get managementReviewDone {

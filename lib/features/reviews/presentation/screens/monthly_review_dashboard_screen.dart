@@ -75,7 +75,17 @@ class _MonthlyReviewDashboardScreenState
     final role = scope?.role;
     final userId = scope?.userId;
     final periods = ref.watch(availablePeriodsProvider);
-    final selected = ref.watch(selectedPeriodProvider) ?? periods.first;
+    // Land on the newest month that actually has something to show rather than
+    // blindly on the current one, which early in a month is untouched and reads
+    // as though no review had ever happened. An explicit pick always wins, and
+    // if the probe fails we simply fall back to the newest month.
+    final picked = ref.watch(selectedPeriodProvider);
+    final landing = ref.watch(defaultReviewPeriodProvider);
+    final selected = picked ?? landing.valueOrNull ?? periods.first;
+    // Hold the skeleton while the landing month resolves: rendering the current
+    // month meanwhile would flash the very "everyone at 0%" snapshot this is
+    // meant to avoid, then jump.
+    final resolvingLanding = picked == null && landing.isLoading;
     // HR / Accounts land here as their home and have no bottom-nav Profile to
     // log out from, so surface logout in the app bar for those review roles.
     final reviewOnly = role == UserRole.hr || role == UserRole.finance;
@@ -158,13 +168,15 @@ class _MonthlyReviewDashboardScreenState
             ),
           ),
           Expanded(
-            child: _ReviewList(
-              period: selected,
-              role: role,
-              userId: userId,
-              search: _search,
-              awaitingMine: _awaitingMine,
-            ),
+            child: resolvingLanding
+                ? const _DashboardSkeleton()
+                : _ReviewList(
+                    period: selected,
+                    role: role,
+                    userId: userId,
+                    search: _search,
+                    awaitingMine: _awaitingMine,
+                  ),
           ),
         ],
       ),

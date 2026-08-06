@@ -221,6 +221,47 @@ final monthlyReviewListProvider = FutureProvider.autoDispose
       );
 });
 
+/// The month the monthly dashboard should LAND on before the user picks one:
+/// the newest period worth showing, or null when none is (caller then falls
+/// back to the newest period).
+///
+/// The monthly list is a single-month snapshot, so early in a month it reads
+/// "Self-Rating / 0%" for everybody and looks as though no review had ever
+/// happened — the same confusion [quarterlyReviewDashboardProvider] aggregates
+/// away for HR. This view is deliberately per-month, so instead of aggregating
+/// it walks the picker's months newest-first and stops at the first one with
+/// real activity (or with work awaiting this caller — see
+/// [MonthlyReviewSummary.anyWorthLanding], which keeps an employee on the month
+/// they still owe a self-rating for).
+///
+/// The walk short-circuits, so the usual cost is one request (current month is
+/// live) or two (current month untouched → previous month). Only the newest
+/// month is `watch`ed — it's the list the screen renders by default; the older
+/// months are `read`, because the landing month only matters on first paint and
+/// shouldn't re-resolve every time some past month's data changes.
+final defaultReviewPeriodProvider =
+    FutureProvider.autoDispose<ReviewPeriod?>((ref) async {
+  ref.keepAlive();
+  final scope = ref.watch(currentReviewScopeProvider);
+  final periods = ref.watch(availablePeriodsProvider);
+  if (scope == null || periods.isEmpty) return null;
+
+  bool worthLanding(List<MonthlyReviewSummary> list) =>
+      MonthlyReviewSummary.anyWorthLanding(list,
+          role: scope.role, userId: scope.userId);
+
+  final newest =
+      await ref.watch(monthlyReviewListProvider(periods.first).future);
+  if (worthLanding(newest)) return periods.first;
+
+  for (final period in periods.skip(1)) {
+    if (worthLanding(await ref.read(monthlyReviewListProvider(period).future))) {
+      return period;
+    }
+  }
+  return null;
+});
+
 /// One employee's three monthly summaries for the quarter that contains
 /// [anchor] — `[m0, m1, m2]`, null where a month has no review — ordered by
 /// employee name.
