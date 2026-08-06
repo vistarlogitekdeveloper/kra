@@ -87,12 +87,14 @@ void main() {
             UserRole.bdManager,
             UserRole.warehouseMgr,
           ]));
-      // Management review is the founder/CEO tier ALONE (held as ADMIN): the
-      // approval/override is the final word on a score and its incentive, so
-      // neither HR admin nor a reporting manager may perform it.
-      expect(ReviewStage.managementReview.actorRoles, {UserRole.admin});
+      // Management review is HR_ADMIN for now. It SHOULD be the founder tier
+      // alone, but the backend's employees endpoint rejects any role outside
+      // its enum (no ADMIN), so gating on ADMIN left the stage with no
+      // assignable actor. Flip this to {UserRole.admin} once the backend gains
+      // a MANAGEMENT/ADMIN value.
       expect(ReviewStage.managementReview.actorRoles,
-          isNot(contains(UserRole.hrAdmin)));
+          contains(UserRole.hrAdmin));
+      // A reporting manager never gets management review, whatever happens.
       expect(ReviewStage.managementReview.actorRoles,
           isNot(contains(UserRole.manager)));
       // Self-rating is owner-scoped; ops holds its own review too.

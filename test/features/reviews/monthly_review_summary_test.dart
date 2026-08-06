@@ -289,9 +289,9 @@ void main() {
         // HR_ADMIN holds the Accounts seat too — one UserRole can't say
         // "HR Admin AND Accounts", and that post covers both.
         ReviewStage.financeRating: {UserRole.finance, UserRole.hrAdmin},
-        // Management approval/override is the founder/CEO tier alone (ADMIN).
-        // HR_ADMIN administers the cycle but must NOT have the final word.
-        ReviewStage.managementReview: {UserRole.admin},
+        // Management approval/override — HR_ADMIN for now, since the backend's
+        // employees enum has no ADMIN to assign. See ReviewStage.actorRoles.
+        ReviewStage.managementReview: {UserRole.hrAdmin},
         ReviewStage.incentivePayout: {
           UserRole.finance,
           UserRole.hr,

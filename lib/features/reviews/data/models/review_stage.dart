@@ -210,11 +210,21 @@ enum ReviewStage {
         // and a single [UserRole] can't express "HR Admin AND Accounts".
         return const {UserRole.finance, UserRole.hrAdmin};
       case ReviewStage.managementReview:
-        // MANAGEMENT ONLY — the founder/CEO tier, held as ADMIN. Deliberately
-        // NOT hrAdmin: HR administers the cycle and rates its HR seat, but the
-        // management approval/override is the final word on an employee's score
-        // and incentive, so it stays with management alone.
-        return const {UserRole.admin};
+        // INTERIM — see the note below. This SHOULD be management alone (the
+        // founder/CEO tier), but the backend's employees API rejects any role
+        // outside
+        //   EMPLOYEE | MANAGER | OPS_EXCELLENCE | OPS | HR | HR_ADMIN |
+        //   FINANCE | BD_MANAGER | WAREHOUSE_MGR
+        // with VAL_001, so ADMIN cannot be assigned to anyone and gating on it
+        // left this stage with no eligible actor at all. HR_ADMIN is the closest
+        // assignable tier, so management approvers hold that for now — which
+        // means every HR admin shares the seat.
+        //
+        // To make this exclusive again, the backend needs one more enum value
+        // (MANAGEMENT or ADMIN); then this returns {UserRole.admin} and only the
+        // founder tier holds it. Alternatively gate it per-person on user id,
+        // like the relationship stages do.
+        return const {UserRole.hrAdmin};
       case ReviewStage.incentivePayout:
         return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.completed:

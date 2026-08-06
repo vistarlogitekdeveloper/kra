@@ -54,15 +54,21 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   /// grants were impossible to make from this form at all.
   String? _roleOverride;
 
-  /// Access roles HR can grant explicitly. Wire values, matching
-  /// `UserRole.fromApi`.
+  /// Access roles HR can grant explicitly.
+  ///
+  /// EXACTLY the values the backend's employees endpoint accepts — anything else
+  /// comes back as `VAL_001 Validation failed`. Notably there is no ADMIN:
+  /// offering it only produced a 400 on save.
   static const _accessRoles = [
     'EMPLOYEE',
     'MANAGER',
+    'BD_MANAGER',
+    'WAREHOUSE_MGR',
+    'OPS',
+    'OPS_EXCELLENCE',
     'HR',
-    'FINANCE',
     'HR_ADMIN',
-    'ADMIN',
+    'FINANCE',
   ];
   String? _department;
   String? _projectLocationId;
@@ -108,7 +114,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   ];
 
   /// Maps a designation to the functional role that drives access + reviews:
-  ///   * Founder / CEO / Director  → ADMIN (the management-review tier)
+  ///   * Founder / CEO / Director  → HR_ADMIN (the management-review tier; see
+  ///     below — ADMIN would be correct but the backend rejects it)
   ///   * "…-Hr" / anything HR      → HR (reviews HR-assigned KRAs)
   ///   * "…Accountant" / Finance   → FINANCE (reviews Accounts-assigned KRAs)
   ///   * any Manager / Incharge    → MANAGER
@@ -123,11 +130,16 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   /// management-review access at all.
   static String _roleFromDesignation(String designation) {
     final d = designation.toUpperCase();
+    // Management tier. HR_ADMIN, not ADMIN: the backend's employees endpoint
+    // accepts only EMPLOYEE | MANAGER | OPS_EXCELLENCE | OPS | HR | HR_ADMIN |
+    // FINANCE | BD_MANAGER | WAREHOUSE_MGR, and anything else 400s with
+    // VAL_001. Once the backend gains a MANAGEMENT/ADMIN value this should
+    // return it, so the founder tier stops sharing a role with HR admins.
     if (d.contains('CEO') ||
         d.contains('FOUNDER') ||
         d.contains('DIRECTOR') ||
         d.contains('CHAIRMAN')) {
-      return 'ADMIN';
+      return 'HR_ADMIN';
     }
     if (d.contains('HR')) return 'HR';
     if (d.contains('ACCOUNT') || d.contains('FINANCE')) return 'FINANCE';
