@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/constants/feature_flags.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 
@@ -87,13 +88,16 @@ void main() {
             UserRole.bdManager,
             UserRole.warehouseMgr,
           ]));
-      // Management review is HR_ADMIN for now. It SHOULD be the founder tier
-      // alone, but the backend's employees endpoint rejects any role outside
-      // its enum (no ADMIN), so gating on ADMIN left the stage with no
-      // assignable actor. Flip this to {UserRole.admin} once the backend gains
-      // a MANAGEMENT/ADMIN value.
+      // Management sign-off belongs to the management tier. HR_ADMIN shares it
+      // ONLY while the backend cannot store MANAGEMENT — gating on a role
+      // nobody can hold would leave the stage with no actor at all.
       expect(ReviewStage.managementReview.actorRoles,
-          contains(UserRole.hrAdmin));
+          contains(UserRole.management));
+      expect(
+        ReviewStage.managementReview.actorRoles.contains(UserRole.hrAdmin),
+        !FeatureFlags.roleTiers,
+        reason: 'HR must lose the sign-off seat once MANAGEMENT is assignable',
+      );
       // A reporting manager never gets management review, whatever happens.
       expect(ReviewStage.managementReview.actorRoles,
           isNot(contains(UserRole.manager)));

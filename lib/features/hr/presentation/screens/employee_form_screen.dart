@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/feature_flags.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
+import '../../../auth/data/models/user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/widgets/branded_primary_button.dart';
 import '../../../auth/presentation/widgets/branded_text_field.dart';
@@ -65,19 +67,31 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   String? get _roleOverride =>
       _rolesOverride.isEmpty ? null : _rolesOverride.first;
 
-  /// Whether the signed-in user may GRANT roles. See [User.isSuperAdmin] — HR
-  /// admins can edit everything else about an employee, but not who holds which
-  /// access, themselves included.
-  bool get _isSuperAdmin {
+  /// Whether the signed-in user may GRANT roles.
+  ///
+  /// The target is super admin ONLY: an HR admin who can edit roles can grant
+  /// themselves any role, which is a privilege-escalation path, so the authority
+  /// sits a tier above them ([User.isSuperAdmin]).
+  ///
+  /// Until the backend can store `SUPER_ADMIN` nobody holds that tier, and
+  /// restricting the field to it would leave NO ONE able to assign roles at all
+  /// — including the assignments needed to bootstrap the tier itself. So while
+  /// [FeatureFlags.roleTiers] is off, HR admins keep the ability they have
+  /// today.
+  bool get _canGrantRoles {
     final auth = ref.watch(authStateProvider);
-    return auth is AuthAuthenticated && auth.user.isSuperAdmin;
+    if (auth is! AuthAuthenticated) return false;
+    if (auth.user.isSuperAdmin) return true;
+    return !FeatureFlags.roleTiers &&
+        auth.user.hasAnyRole({UserRole.hrAdmin});
   }
 
   /// Access roles HR can grant explicitly.
   ///
   /// EXACTLY the values the backend's employees endpoint accepts — anything else
-  /// comes back as `VAL_001 Validation failed`. Notably there is no ADMIN:
-  /// offering it only produced a 400 on save.
+  /// comes back as `VAL_001 Validation failed`, so offering an unsupported value
+  /// would only ever produce a 400 on save. `MANAGEMENT` / `SUPER_ADMIN` appear
+  /// once the server accepts them ([FeatureFlags.roleTiers]).
   static const _accessRoles = [
     'EMPLOYEE',
     'MANAGER',
@@ -88,6 +102,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     'HR',
     'HR_ADMIN',
     'FINANCE',
+    if (FeatureFlags.roleTiers) ...['MANAGEMENT', 'SUPER_ADMIN'],
   ];
   String? _department;
   String? _projectLocationId;
@@ -133,8 +148,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   ];
 
   /// Maps a designation to the functional role that drives access + reviews:
-  ///   * Founder / CEO / Director  → HR_ADMIN (the management-review tier; see
-  ///     below — ADMIN would be correct but the backend rejects it)
+  ///   * Founder / CEO / Director  → MANAGEMENT, the management-review tier
+  ///     (HR_ADMIN until the backend accepts it — see [FeatureFlags.roleTiers])
   ///   * "…-Hr" / anything HR      → HR (reviews HR-assigned KRAs)
   ///   * "…Accountant" / Finance   → FINANCE (reviews Accounts-assigned KRAs)
   ///   * any Manager / Incharge    → MANAGER
@@ -149,16 +164,14 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   /// management-review access at all.
   static String _roleFromDesignation(String designation) {
     final d = designation.toUpperCase();
-    // Management tier. HR_ADMIN, not ADMIN: the backend's employees endpoint
-    // accepts only EMPLOYEE | MANAGER | OPS_EXCELLENCE | OPS | HR | HR_ADMIN |
-    // FINANCE | BD_MANAGER | WAREHOUSE_MGR, and anything else 400s with
-    // VAL_001. Once the backend gains a MANAGEMENT/ADMIN value this should
-    // return it, so the founder tier stops sharing a role with HR admins.
+    // Management tier. Falls back to HR_ADMIN while the backend's employees
+    // endpoint rejects MANAGEMENT (VAL_001) — sending it would 400 every save
+    // for these titles. See [FeatureFlags.roleTiers].
     if (d.contains('CEO') ||
         d.contains('FOUNDER') ||
         d.contains('DIRECTOR') ||
         d.contains('CHAIRMAN')) {
-      return 'HR_ADMIN';
+      return FeatureFlags.roleTiers ? 'MANAGEMENT' : 'HR_ADMIN';
     }
     if (d.contains('HR')) return 'HR';
     if (d.contains('ACCOUNT') || d.contains('FINANCE')) return 'FINANCE';
@@ -317,6 +330,12 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           (designation.isEmpty
               ? (_original?.role ?? 'EMPLOYEE')
               : _roleFromDesignation(designation));
+      // Full grant set — only sent once the server accepts it. While it doesn't,
+      // an unrecognised `roles` field would 400 EVERY save, single-role ones
+      // included, so the scalar `role` above carries the primary alone.
+      final roles = FeatureFlags.multiRole && _rolesOverride.isNotEmpty
+          ? _rolesOverride.toList()
+          : null;
       if (widget.isEdit) {
         final grade = _gradeController.text.trim().isEmpty
             ? null
@@ -333,6 +352,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
           role: role,
+          roles: roles,
           position: position,
           department: _department,
           projectLocationId: _projectLocationId,
@@ -363,6 +383,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           fullName: _nameController.text.trim(),
           email: _emailController.text.trim(),
           role: role,
+          roles: roles,
           position: position,
           department: _department,
           projectLocationId: _projectLocationId,
@@ -423,6 +444,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     required String name,
     required String email,
     required String role,
+    required List<String>? roles,
     required String? position,
     required String? department,
     required String? projectLocationId,
@@ -438,6 +460,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
         'name': name,
         'email': email,
         'role': role,
+        if (roles != null && roles.isNotEmpty) 'roles': roles,
         'position': position,
         'department': department,
         'projectLocationId': projectLocationId,
@@ -456,6 +479,11 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     if (name != o.fullName) changes['name'] = name;
     if (email != o.email) changes['email'] = email;
     if (role != o.role) changes['role'] = role;
+    // Compare as sets — grant order carries no meaning, so a reordered list is
+    // not a change worth PATCHing.
+    if (roles != null && roles.toSet() != o.roles.toSet()) {
+      changes['roles'] = roles;
+    }
     if (position != oPosition) changes['position'] = position;
     if (department != oDept) changes['department'] = department;
     if (projectLocationId != o.projectLocationId) {
@@ -610,7 +638,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           // records, but handing out roles — including their own — is a
           // privilege-escalation path, so the field is hidden (and never sent)
           // for anyone below that tier.
-          if (_isSuperAdmin) ...[
+          if (_canGrantRoles) ...[
             const SizedBox(height: 14),
             _AccessRolesField(
               selected: _rolesOverride,
@@ -1098,9 +1126,10 @@ class _AccessRolesField extends StatelessWidget {
           AppStrings.employeeFormAccessRoleHelp,
           style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
         ),
-        // Multi-role can't persist yet: the API stores a single `role`. Say so
-        // where the choice is made rather than letting a silent 400 explain it.
-        if (selected.length > 1) ...[
+        // Multi-role can't persist until the server accepts a `roles` array:
+        // the API stores a single `role`. Say so where the choice is made rather
+        // than letting a silent 400 explain it.
+        if (!FeatureFlags.multiRole && selected.length > 1) ...[
           const SizedBox(height: 6),
           const Text(
             AppStrings.employeeFormAccessRoleMultiPending,

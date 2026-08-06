@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/constants/feature_flags.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_review_summary.dart';
@@ -294,7 +295,9 @@ void main() {
         // MANAGEMENT, at which point it drops out. See ReviewStage.actorRoles.
         ReviewStage.managementReview: {
           UserRole.management,
-          UserRole.hrAdmin,
+          // HR_ADMIN shares the seat only while the backend cannot store
+          // MANAGEMENT — see FeatureFlags.roleTiers.
+          if (!FeatureFlags.roleTiers) UserRole.hrAdmin,
         },
         ReviewStage.incentivePayout: {
           UserRole.finance,

@@ -1,3 +1,4 @@
+import '../../../../core/constants/feature_flags.dart';
 import '../../../auth/data/models/user.dart';
 
 /// Stages of a single monthly review.
@@ -210,20 +211,17 @@ enum ReviewStage {
         // and a single [UserRole] can't express "HR Admin AND Accounts".
         return const {UserRole.finance, UserRole.hrAdmin};
       case ReviewStage.managementReview:
-        // INTERIM — see the note below. This SHOULD be management alone (the
-        // founder/CEO tier), but the backend's employees API rejects any role
-        // outside
-        //   EMPLOYEE | MANAGER | OPS_EXCELLENCE | OPS | HR | HR_ADMIN |
-        //   FINANCE | BD_MANAGER | WAREHOUSE_MGR
-        // with VAL_001, so ADMIN cannot be assigned to anyone and gating on it
-        // left this stage with no eligible actor at all. HR_ADMIN is the closest
-        // assignable tier, so management approvers hold that for now — which
-        // means every HR admin shares the seat.
+        // The management tier signs off (approve, or override per KRA on
+        // rework) — the last gate before the incentive is paid, so it is
+        // deliberately NOT the same seat as the HR rater: HR would otherwise
+        // approve its own input.
         //
-        // [UserRole.management] is listed so holders work the day the backend's
-        // employees enum gains `MANAGEMENT`. Exclusivity is then one edit:
-        // drop hrAdmin from this set, and only the founder tier signs off.
-        return const {UserRole.management, UserRole.hrAdmin};
+        // Until the backend's employees enum accepts `MANAGEMENT`, nobody can
+        // be assigned it and gating on it alone would leave this stage with no
+        // eligible actor, so HR_ADMIN shares it. See [FeatureFlags.roleTiers].
+        return FeatureFlags.roleTiers
+            ? const {UserRole.management}
+            : const {UserRole.management, UserRole.hrAdmin};
       case ReviewStage.incentivePayout:
         return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.completed:

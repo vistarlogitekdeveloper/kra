@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/constants/feature_flags.dart';
 import 'package:vistar_app/core/enums/kra_reviewer.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
@@ -129,9 +130,13 @@ void main() {
     test('management review is role-gated to the management tier, never a '
         'relationship', () {
       final r = reviewAt(ReviewStage.managementReview, managerId: 'mgr1');
-      // HR_ADMIN holds this seat while the backend has no MANAGEMENT/ADMIN role
-      // to assign (its employees enum rejects ADMIN outright).
-      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'anyone'), isTrue);
+      expect(r.isActionableBy(UserRole.management, userId: 'anyone'), isTrue);
+      // HR_ADMIN holds this seat only while the backend cannot store
+      // MANAGEMENT — see FeatureFlags.roleTiers.
+      expect(
+        r.isActionableBy(UserRole.hrAdmin, userId: 'anyone'),
+        !FeatureFlags.roleTiers,
+      );
       // Plain HR rates the HR seat but never approves/overrides.
       expect(r.isActionableBy(UserRole.hr, userId: 'anyone'), isFalse);
       // Being the reporting manager does NOT grant management review.

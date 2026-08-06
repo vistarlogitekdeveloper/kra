@@ -54,6 +54,7 @@ class ApiEmployeeRepository implements EmployeeRepository {
     required String fullName,
     required String email,
     required String role,
+    List<String>? roles,
     String? position,
     String? department,
     String? projectLocationId,
@@ -72,6 +73,10 @@ class ApiEmployeeRepository implements EmployeeRepository {
           'name': fullName,
           'email': email,
           'role': role,
+          // Multi-role grant set. Omitted unless the caller supplies one, since
+          // an unrecognised field would 400 every create on a server that only
+          // knows the scalar `role`.
+          if (roles != null && roles.isNotEmpty) 'roles': roles,
           if (position != null) 'position': position,
           if (department != null) 'department': department,
           if (projectLocationId != null) 'projectLocationId': projectLocationId,
