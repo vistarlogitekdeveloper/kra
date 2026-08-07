@@ -25,54 +25,55 @@ const PASSWORD = process.env.KRA_PASSWORD;
 const APPLY = process.argv.includes('--apply');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The master sheet. `incentive` is the monthly Performance Incentive.
+// The master sheet, in sheet column order. `incentive` is the monthly
+// Performance Incentive; `joined` is JOINING DATE as ISO (YYYY-MM-DD).
 //
-// joinedDate is deliberately ABSENT: 26 of the 38 rows were column-truncated to
-// "########" in the source, and the visible ones are ambiguous (4/8/2026 could be
-// 4 Aug or 8 Apr). Guessing would write wrong employment records, so dates are
-// left for a follow-up with unambiguous values.
+// The source prints dates as M/D/YYYY. That is not a guess: rows carry 21 and 27
+// in the SECOND position (12/21/2020, 9/27/2021, 10/21/2024, 4/21/2026), which
+// cannot be a month, while no row exceeds 12 in the FIRST position. So
+// 4/8/2026 is 8 April 2026, not 4 August.
 // ─────────────────────────────────────────────────────────────────────────────
 const EMPLOYEES = [
-  ['VLPL0002', 'Chetan Bhagwat Bhangale', 'chetan.bhangale@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Cluster Manager-Tpt', 'Transportation', 'Prashant Ramchandra Tamhankar', 8000],
-  ['VLPL0003', 'Pravin Suryakant Wakchware', 'manager.endurance@vistarlogitek.com', 'A4', 'Endurance B-22, Chakan', 'Manager', 'Wh-Operation', 'Amol Laxman Veer', 10000],
-  ['VLPL0008', 'Govind Bapurao Tapkeer', 'manager.bekaert@vistarlogitek.com', 'A4', 'Bekaert, Ranjangaon', 'Manager', 'Wh-Operation', 'Dattatray Dadabhau Zanjad', 2000],
-  ['VLPL0099', 'Sagar Ananda Sasane', 'manager.commercial@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Commercial Manager', 'Accounts & Finance', 'Prashant Ramchandra Tamhankar', 8000],
-  ['VLPL0107', 'Muralidharan Krishnan', 'muralidharan.k@vistarlogitek.com', 'M1', 'Head Office, Pune', 'Regional Manager-Ka', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 4000],
-  ['VLPL0123', 'Amol Laxman Veer', 'amol.veer@vistarlogitek.com', 'M1', 'Head Office, Pune', 'Regional Manager', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 12000],
-  ['VLPL0156', 'Dinesh Dnyaneshwar Gawade', 'manager.eaton@vistarlogitek.com', 'A4', 'Eaton, Ranjangaon', 'Manager', 'Wh-Operation', 'Dattatray Dadabhau Zanjad', 5000],
-  ['VLPL0242', 'Vikram Vilas Desai', 'vikramdesai955@gmail.com', 'A2', 'Karl Dungs, Hinjewadi', 'Project Incharge', 'Wh-Operation', 'Prakash Haibatrao Shivale', 3000],
-  ['VLPL0375', 'Sameer Suresh Shinde', 'sameer.shinde@vistarlogitek.com', 'A4', 'Eaton, Magarpatta', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
-  ['VLPL0389', 'Ravish N', 'manager.ss@vistarlogitek.com', 'A2', 'Schwing Stetter, Bangalore', 'Project Incharge', 'Wh-Operation', 'Muralidharan Krishnan', 3000],
-  ['VLPL0413', 'Ravikumar M', 'smartravi220@gmail.com', 'A2', 'Bosch, Bangalore', 'Project Incharge', 'Wh-Operation', 'Sajith Vasu', 2000],
-  ['VLPL0419', 'Pradeep P', 'manager.vst@vistarlogitek.com', 'A2', 'Vst, Bangalore', 'Project Incharge', 'Wh-Operation', 'Sajith Vasu', 2500],
-  ['VLPL0469', 'Sajith Vasu', 'sajith.v@vistarlogitek.com', 'A4', 'Vst, Bangalore', 'Cluster Manager', 'Wh-Operation', 'Muralidharan Krishnan', 7000],
-  ['VLPL0527', 'Manojkumar Foran Singh', 'mfsingh97@gmail.com', 'A2', 'Grupo, Sanand', 'Project Incharge', 'Wh-Operation', 'Balasaheb Shivaji Chavan', 3000],
-  ['VLPL0591', 'Bholenath Prakash Sagat', 'manager.adept@vistarlogitek.com', 'A4', 'Adept, Pune', 'Manager', 'Wh-Operation', 'Prakash Haibatrao Shivale', 4000],
-  ['VLPL0610', 'Swati Raghunath Kotkar', 'hr@vistarlogitek.com', 'A2', 'Head Office, Pune', 'Senior Officer-Hr', 'HR', 'Sagar Ananda Sasane', 5000],
-  ['VLPL0648', 'Shivaraja V', 'shivaraja.gowda.104@gmail.com', 'A2', 'Chai Point, Bangalore', 'Senior Officer', 'Wh-Operation', 'Sajith Vasu', 2000],
-  ['VLPL0718', 'Pravin Vilas Lole', 'pravin.lole@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Manager', 'Wh-Operation', 'Mariappan Mookiah Acharya', 7000],
-  ['VLPL0752', 'Rajesh Subhash Wagh', 'rajesh.wagh@vistarlogitek.com', 'A4', 'Cnh, Chakan', 'Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
-  ['VLPL0767', 'Milind Vijay Ingole', 'managercp.pune@vistarlogitek.com', 'A2', 'Chai Point, Pune', 'Project Incharge', 'Wh-Operation', 'Amol Laxman Veer', 1000],
-  ['VLPL0830', 'Mahendra Sahebrao Mahajan', 'manager.danfoss@vistarlogitek.com', 'A3', 'Danfoss, Magarpatta', 'Assistant Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
-  ['VLPL0872', 'Kishor Yashwant Bhalerao', 'manager.maxion@vistarlogitek.com', 'A2', 'Maxion, Khed', 'Senior Officer', 'Wh-Operation', 'Amol Laxman Veer', 3000],
-  ['VLPL0883', 'Dattatray Dadabhau Zanjad', 'dattatray.zanjad@vistarlogitek.com', 'A4', 'Eaton, Ranjangaon', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
-  ['VLPL1170', 'Manoj Dattatray Kedari', 'manager.sspune@vistarlogitek.com', 'A2', 'Schwing Stetter, Pune', 'Project Incharge', 'Wh-Operation', 'Amol Laxman Veer', 4000],
-  ['VLPL1223', 'Balasaheb Shivaji Chavan', 'balasaheb.chavan@vistarlogitek.com', 'M1', 'Head Office, Pune', 'Regional Manager', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 10000],
-  ['VLPL1285', 'Poonam Dnyandev Pawar', 'accounts@vistarlogitek.com', 'A2', 'Head Office, Pune', 'Sr. Accountant', 'Accounts & Finance', 'Sagar Ananda Sasane', 2000],
-  ['VLPL1300', 'Ganga Jha', 'jha.gangaa@gmail.com', 'A2', 'Knorr Bremse, Hinjewadi', 'Senior Officer', 'Wh-Operation', 'Prakash Haibatrao Shivale', 2000],
-  ['VLPL1329', 'Prakash Haibatrao Shivale', 'prakash.shivale@vistarlogitek.com', 'A4', 'Knorr Bremse, Hinjewadi', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
-  ['VLPL1414', 'Parveez', 'manager.cpblr@vistarlogitek.com', 'A3', 'Chai Point, Bangalore', 'Assistant Manager', 'Wh-Operation', 'Sajith Vasu', 2000],
-  ['VLPL1430', 'Sunil Subhash Bhutkar', 'sunilbhutkar786@gmail.com', 'A4', 'Schwing Stetter, Turbhe', 'Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
-  ['VLPL1432', 'Yash Ramesh Thikekar', 'Flutter.developer@vistarlogitek.com', 'A2', 'Head Office, Pune', 'Software Developer', 'IT Department', 'Swati Raghunath Kotkar', 3000],
-  ['VLPL1436', 'Dattatraya Somnath Bamankar', 'dattatraya.bamankar@vistarlogitek.com', 'M2', 'Head Office, Pune', 'Sr. General Manager', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 40000],
-  ['VLPL1443', 'Ganesh Dadarao Wani', 'ganesh.wani@vistarlogitek.com', 'A4', 'Maxion, Khed', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
-  ['VLPL1447', 'Rahamat Ali', 'manager.kb@vistarlogitek.com', 'A4', 'Knorr Bremse, Hinjewadi', 'Manager', 'Wh-Operation', 'Prakash Haibatrao Shivale', 3000],
-  ['VLPL1463', 'Amit Ramchandra Mane', 'amitmane1534@gmail.com', 'A4', 'Knorr Bremse, Hinjewadi', 'Manager', 'Wh-Operation', 'Prakash Haibatrao Shivale', 5000],
-  ['VLPL1473', 'Atul Bhimrao Barge', 'atulbarge07@gmail.com', 'A2', 'Maxion, Khed', 'Project Incharge', 'Wh-Operation', 'Amol Laxman Veer', 5000],
-  ['VLPL1474', 'Suraj Bharat Tithe', 'rst2118@gmail.com', 'A1', 'Maxion, Khed', 'Administrative Staff', 'Wh-Operation', 'Amol Laxman Veer', 1000],
-  ['VLPL1633', 'Kisan Bhagvat Bhosale', 'kisan.bhosale@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
-].map(([code, name, email, grade, location, designation, department, manager, incentive]) =>
-  ({ code, name, email, grade, location, designation, department, manager, incentive }));
+  ['VLPL0002', '2015-09-01', 'Chetan Bhagwat Bhangale', 'chetan.bhangale@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Cluster Manager-Tpt', 'Transportation', 'Prashant Ramchandra Tamhankar', 8000],
+  ['VLPL0003', '2024-01-12', 'Pravin Suryakant Wakchware', 'manager.endurance@vistarlogitek.com', 'A4', 'Endurance B-22, Chakan', 'Manager', 'Wh-Operation', 'Amol Laxman Veer', 10000],
+  ['VLPL0008', '2020-12-21', 'Govind Bapurao Tapkeer', 'manager.bekaert@vistarlogitek.com', 'A4', 'Bekaert, Ranjangaon', 'Manager', 'Wh-Operation', 'Dattatray Dadabhau Zanjad', 2000],
+  ['VLPL0099', '2019-09-01', 'Sagar Ananda Sasane', 'manager.commercial@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Commercial Manager', 'Accounts & Finance', 'Prashant Ramchandra Tamhankar', 8000],
+  ['VLPL0107', '2018-03-20', 'Muralidharan Krishnan', 'muralidharan.k@vistarlogitek.com', 'M1', 'Head Office, Pune', 'Regional Manager-Ka', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 4000],
+  ['VLPL0123', '2018-10-15', 'Amol Laxman Veer', 'amol.veer@vistarlogitek.com', 'M1', 'Head Office, Pune', 'Regional Manager', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 12000],
+  ['VLPL0156', '2018-11-16', 'Dinesh Dnyaneshwar Gawade', 'manager.eaton@vistarlogitek.com', 'A4', 'Eaton, Ranjangaon', 'Manager', 'Wh-Operation', 'Dattatray Dadabhau Zanjad', 5000],
+  ['VLPL0242', '2020-07-20', 'Vikram Vilas Desai', 'vikramdesai955@gmail.com', 'A2', 'Karl Dungs, Hinjewadi', 'Project Incharge', 'Wh-Operation', 'Prakash Haibatrao Shivale', 3000],
+  ['VLPL0375', '2021-09-27', 'Sameer Suresh Shinde', 'sameer.shinde@vistarlogitek.com', 'A4', 'Eaton, Magarpatta', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
+  ['VLPL0389', '2021-10-01', 'Ravish N', 'manager.ss@vistarlogitek.com', 'A2', 'Schwing Stetter, Bangalore', 'Project Incharge', 'Wh-Operation', 'Muralidharan Krishnan', 3000],
+  ['VLPL0413', '2024-09-02', 'Ravikumar M', 'smartravi220@gmail.com', 'A2', 'Bosch, Bangalore', 'Project Incharge', 'Wh-Operation', 'Sajith Vasu', 2000],
+  ['VLPL0419', '2024-09-24', 'Pradeep P', 'manager.vst@vistarlogitek.com', 'A2', 'Vst, Bangalore', 'Project Incharge', 'Wh-Operation', 'Sajith Vasu', 2500],
+  ['VLPL0469', '2021-12-15', 'Sajith Vasu', 'sajith.v@vistarlogitek.com', 'A4', 'Vst, Bangalore', 'Cluster Manager', 'Wh-Operation', 'Muralidharan Krishnan', 7000],
+  ['VLPL0527', '2024-10-21', 'Manojkumar Foran Singh', 'mfsingh97@gmail.com', 'A2', 'Grupo, Sanand', 'Project Incharge', 'Wh-Operation', 'Balasaheb Shivaji Chavan', 3000],
+  ['VLPL0591', '2022-08-17', 'Bholenath Prakash Sagat', 'manager.adept@vistarlogitek.com', 'A4', 'Adept, Pune', 'Manager', 'Wh-Operation', 'Prakash Haibatrao Shivale', 4000],
+  ['VLPL0610', '2022-09-12', 'Swati Raghunath Kotkar', 'hr@vistarlogitek.com', 'A2', 'Head Office, Pune', 'Senior Officer-Hr', 'HR', 'Sagar Ananda Sasane', 5000],
+  ['VLPL0648', '2022-12-12', 'Shivaraja V', 'shivaraja.gowda.104@gmail.com', 'A2', 'Chai Point, Bangalore', 'Senior Officer', 'Wh-Operation', 'Sajith Vasu', 2000],
+  ['VLPL0718', '2023-06-01', 'Pravin Vilas Lole', 'pravin.lole@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Manager', 'Wh-Operation', 'Mariappan Mookiah Acharya', 7000],
+  ['VLPL0752', '2023-08-07', 'Rajesh Subhash Wagh', 'rajesh.wagh@vistarlogitek.com', 'A4', 'Cnh, Chakan', 'Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
+  ['VLPL0767', '2023-09-13', 'Milind Vijay Ingole', 'managercp.pune@vistarlogitek.com', 'A2', 'Chai Point, Pune', 'Project Incharge', 'Wh-Operation', 'Amol Laxman Veer', 1000],
+  ['VLPL0830', '2024-01-08', 'Mahendra Sahebrao Mahajan', 'manager.danfoss@vistarlogitek.com', 'A3', 'Danfoss, Magarpatta', 'Assistant Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
+  ['VLPL0872', '2024-04-19', 'Kishor Yashwant Bhalerao', 'manager.maxion@vistarlogitek.com', 'A2', 'Maxion, Khed', 'Senior Officer', 'Wh-Operation', 'Amol Laxman Veer', 3000],
+  ['VLPL0883', '2024-05-15', 'Dattatray Dadabhau Zanjad', 'dattatray.zanjad@vistarlogitek.com', 'A4', 'Eaton, Ranjangaon', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
+  ['VLPL1170', '2025-04-07', 'Manoj Dattatray Kedari', 'manager.sspune@vistarlogitek.com', 'A2', 'Schwing Stetter, Pune', 'Project Incharge', 'Wh-Operation', 'Amol Laxman Veer', 4000],
+  ['VLPL1223', '2025-06-17', 'Balasaheb Shivaji Chavan', 'balasaheb.chavan@vistarlogitek.com', 'M1', 'Head Office, Pune', 'Regional Manager', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 10000],
+  ['VLPL1285', '2025-09-08', 'Poonam Dnyandev Pawar', 'accounts@vistarlogitek.com', 'A2', 'Head Office, Pune', 'Sr. Accountant', 'Accounts & Finance', 'Sagar Ananda Sasane', 2000],
+  ['VLPL1300', '2025-10-03', 'Ganga Jha', 'jha.gangaa@gmail.com', 'A2', 'Knorr Bremse, Hinjewadi', 'Senior Officer', 'Wh-Operation', 'Prakash Haibatrao Shivale', 2000],
+  ['VLPL1329', '2025-11-01', 'Prakash Haibatrao Shivale', 'prakash.shivale@vistarlogitek.com', 'A4', 'Knorr Bremse, Hinjewadi', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
+  ['VLPL1414', '2026-02-11', 'Parveez', 'manager.cpblr@vistarlogitek.com', 'A3', 'Chai Point, Bangalore', 'Assistant Manager', 'Wh-Operation', 'Sajith Vasu', 2000],
+  ['VLPL1430', '2026-03-05', 'Sunil Subhash Bhutkar', 'sunilbhutkar786@gmail.com', 'A4', 'Schwing Stetter, Turbhe', 'Manager', 'Wh-Operation', 'Amol Laxman Veer', 2000],
+  ['VLPL1432', '2026-03-09', 'Yash Ramesh Thikekar', 'Flutter.developer@vistarlogitek.com', 'A2', 'Head Office, Pune', 'Software Developer', 'IT Department', 'Swati Raghunath Kotkar', 3000],
+  ['VLPL1436', '2026-03-12', 'Dattatraya Somnath Bamankar', 'dattatraya.bamankar@vistarlogitek.com', 'M2', 'Head Office, Pune', 'Sr. General Manager', 'Wh-Operation', 'Prashant Ramchandra Tamhankar', 40000],
+  ['VLPL1443', '2026-03-19', 'Ganesh Dadarao Wani', 'ganesh.wani@vistarlogitek.com', 'A4', 'Maxion, Khed', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
+  ['VLPL1447', '2026-03-23', 'Rahamat Ali', 'manager.kb@vistarlogitek.com', 'A4', 'Knorr Bremse, Hinjewadi', 'Manager', 'Wh-Operation', 'Prakash Haibatrao Shivale', 3000],
+  ['VLPL1463', '2026-04-08', 'Amit Ramchandra Mane', 'amitmane1534@gmail.com', 'A4', 'Knorr Bremse, Hinjewadi', 'Manager', 'Wh-Operation', 'Prakash Haibatrao Shivale', 5000],
+  ['VLPL1473', '2026-04-18', 'Atul Bhimrao Barge', 'atulbarge07@gmail.com', 'A2', 'Maxion, Khed', 'Project Incharge', 'Wh-Operation', 'Amol Laxman Veer', 5000],
+  ['VLPL1474', '2026-04-21', 'Suraj Bharat Tithe', 'rst2118@gmail.com', 'A1', 'Maxion, Khed', 'Administrative Staff', 'Wh-Operation', 'Amol Laxman Veer', 1000],
+  ['VLPL1633', '2026-07-01', 'Kisan Bhagvat Bhosale', 'kisan.bhosale@vistarlogitek.com', 'A4', 'Head Office, Pune', 'Cluster Manager', 'Wh-Operation', 'Amol Laxman Veer', 5000],
+].map(([code, joined, name, email, grade, location, designation, department, manager, incentive]) =>
+  ({ code, joined, name, email, grade, location, designation, department, manager, incentive }));
 
 /// Checksum from the source sheet's total row — a transcription guard.
 const EXPECTED_INCENTIVE_TOTAL = 196500;
@@ -172,6 +173,8 @@ async function main() {
       department: row.department,
       grade: row.grade,
       monthlyIncentiveAmount: row.incentive,
+      // Same shape the app sends (DateTime.toIso8601String on a local date).
+      joinedDate: `${row.joined}T00:00:00.000`,
       ...(loc ? { projectLocationId: loc.id } : {}),
     };
 
@@ -190,10 +193,21 @@ async function main() {
         created.push(`${row.code}  ${row.name}  (role ${payload.role})`);
       } else {
         // Only send what actually differs, and never `role`.
+        //
+        // Two API shapes need care or every row looks changed on every run and
+        // gets re-PATCHed forever: dates come back as full ISO strings (compare
+        // the calendar day), and decimals come back as strings — "8000.00" is
+        // not the string "8000" but is the same number.
         const changes = {};
         for (const [k, v] of Object.entries(fields)) {
-          const before = k === 'projectLocationId' ? existing.projectLocationId : existing[k];
-          if (String(before ?? '') !== String(v ?? '')) changes[k] = v;
+          const before = existing[k];
+          const same =
+            k === 'joinedDate'
+              ? String(before ?? '').slice(0, 10) === String(v).slice(0, 10)
+              : k === 'monthlyIncentiveAmount'
+                ? Number(before) === Number(v)
+                : String(before ?? '') === String(v ?? '');
+          if (!same) changes[k] = v;
         }
         if (Object.keys(changes).length === 0) {
           unchanged.push(`${row.code}  ${row.name}`);
