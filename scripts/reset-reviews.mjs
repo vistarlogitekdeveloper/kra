@@ -31,6 +31,10 @@ import { writeFileSync } from 'node:fs';
 const BASE = process.env.KRA_BASE ?? 'https://vistar-crm.onrender.com/api/v1/kra';
 const EMAIL = process.env.KRA_EMAIL;
 const PASSWORD = process.env.KRA_PASSWORD;
+/// Alternative to email+password: a bearer token copied from the browser
+/// (devtools → Network → any request → Authorization header). Short-lived, so
+/// it's the safer way to authorise a one-off read-only verification.
+const TOKEN = process.env.KRA_TOKEN;
 const APPLY = process.argv.includes('--apply');
 const CONFIRMED = process.argv.includes('--confirm=DELETE-ALL-REVIEWS');
 
@@ -71,8 +75,11 @@ function monthsBetween(from, to) {
 }
 
 async function main() {
-  if (!EMAIL || !PASSWORD) {
-    console.error('Set KRA_EMAIL and KRA_PASSWORD (an HR-admin account).');
+  if (!TOKEN && (!EMAIL || !PASSWORD)) {
+    console.error(
+      'Set KRA_EMAIL and KRA_PASSWORD (an HR-admin account), or KRA_TOKEN\n' +
+        'with a bearer copied from the browser for a read-only check.',
+    );
     process.exit(1);
   }
   if (APPLY && !CONFIRMED) {
@@ -83,16 +90,20 @@ async function main() {
     process.exit(1);
   }
 
-  token = (await api('POST', '/auth/login')).accessToken ?? null;
-  if (!token) {
-    // login needs a body; do it explicitly rather than through the GET helper
+  if (TOKEN) {
+    // Verification only needs a read; a short-lived bearer copied from the
+    // browser's devtools avoids handing over a password at all.
+    token = TOKEN;
+  } else {
     const res = await fetch(`${BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
     });
-    const json = await res.json();
-    if (!json?.data?.accessToken) throw new Error(`Login failed: ${JSON.stringify(json.error ?? json)}`);
+    const json = await res.json().catch(() => ({}));
+    if (!json?.data?.accessToken) {
+      throw new Error(`Login failed: ${JSON.stringify(json.error ?? json)}`);
+    }
     token = json.data.accessToken;
   }
 
