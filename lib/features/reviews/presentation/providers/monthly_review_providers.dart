@@ -387,6 +387,23 @@ List<ReviewPeriod> quarterMonthsFor(ReviewPeriod p) {
   ];
 }
 
+/// Drops every cached review surface.
+///
+/// The review lists call [Ref.keepAlive], so they survive navigation and are
+/// only refetched on pull-to-refresh. That is right for scrolling, but it means
+/// a change made to data the reviews READ BUT DO NOT OWN — HR editing someone's
+/// monthly incentive, say — keeps rendering the old figure for the rest of the
+/// session. Call this after any such change.
+///
+/// Invalidating a family root clears every instance, so all months and all
+/// employees are dropped, not just the one on screen.
+void invalidateReviewCaches(WidgetRef ref) {
+  ref.invalidate(monthlyReviewListProvider);
+  ref.invalidate(defaultReviewPeriodProvider);
+  ref.invalidate(quarterlyReviewDashboardProvider);
+  ref.invalidate(quarterlySheetProvider);
+}
+
 /// One employee's three monthly reviews for the quarter that contains
 /// `anchor`. Any month with no review yet comes back null. Powers the
 /// quarterly KRA sheet.

@@ -10,6 +10,7 @@ import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../auth/data/models/user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../../auth/presentation/widgets/branded_primary_button.dart';
 import '../../../auth/presentation/widgets/branded_text_field.dart';
 import '../../data/models/employee.dart';
@@ -373,6 +374,10 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
         final updated = await repo.update(widget.employeeId!, changes);
         ref.read(employeeListProvider.notifier).replaceUpdated(updated);
         ref.invalidate(employeeDetailProvider(updated.id));
+        // Incentive, grade, manager and location all surface on the review
+        // screens, whose lists are kept alive — drop them so an edit here isn't
+        // invisible there for the rest of the session.
+        invalidateReviewCaches(ref);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStrings.employeeFormSaved)),

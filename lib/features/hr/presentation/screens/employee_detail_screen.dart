@@ -11,6 +11,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../data/models/employee.dart';
+import '../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../data/models/kra_assignment.dart';
 import '../providers/employee_providers.dart';
 import '../providers/kra_assignment_providers.dart';
@@ -735,6 +736,10 @@ class _AssignIncentiveSheetState extends ConsumerState<_AssignIncentiveSheet> {
       );
       ref.read(employeeListProvider.notifier).replaceUpdated(updated);
       ref.invalidate(employeeDetailProvider(updated.id));
+      // The review surfaces show this amount but don't own it, and their lists
+      // are kept alive — without this they'd render the previous figure for the
+      // rest of the session.
+      invalidateReviewCaches(ref);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
