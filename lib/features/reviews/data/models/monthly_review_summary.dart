@@ -197,6 +197,27 @@ class MonthlyReviewSummary {
   /// The incentive has been settled.
   bool get payoutPaid => payoutStatus == PayoutStatus.paid;
 
+  /// True when this review carries a score ANYWHERE — the only honest evidence
+  /// that somebody actually rated it.
+  ///
+  /// Note what is NOT evidence: [payoutPaid]. A payout flag is bookkeeping, not
+  /// a rating, and treating it as proof of work is what let a review with an
+  /// entirely empty sheet render as "Completed · Paid · 0%".
+  ///
+  /// A genuine zero is distinguishable from never-rated: an employee who scored
+  /// 0 has `selfScorePct == 0`, which is non-null, so this still reports true
+  /// for them.
+  bool get hasAnyScore =>
+      finalScorePct > 0 || selfScorePct != null || managementReviewPct != null;
+
+  /// The payout flag CORROBORATED by an actual score.
+  ///
+  /// What a "Paid" badge should be driven by: claiming an incentive was settled
+  /// for a review nobody ever rated is worse than showing nothing, because it
+  /// reads as money already out of the door. [payoutPaid] itself is left alone —
+  /// the incentive maths and the quarterly report depend on the raw flag.
+  bool get payoutSettled => payoutPaid && hasAnyScore;
+
   /// The furthest rating stage the summary's SCORES prove was reached, or null
   /// when nothing beyond Self-Rating has a score yet. Read off the score fields
   /// the list endpoint carries, so it survives a stage cursor that in-place
@@ -209,7 +230,11 @@ class MonthlyReviewSummary {
   /// this can read one notch ahead for a still-in-progress Review; that only
   /// ever applies when the cursor is frozen, and never regresses a live cursor.)
   ReviewStage? get _scoredStage {
-    if (payoutPaid) return ReviewStage.completed;
+    // A settled payout implies the pipeline ran to the end — but only when a
+    // score corroborates it. Reading `payoutPaid` alone contradicted this
+    // getter's own contract ("what the SCORES prove"), so a stale payout flag on
+    // an unrated review promoted it all the way to Completed.
+    if (payoutPaid && hasAnyScore) return ReviewStage.completed;
     if (managementReviewPct != null) return ReviewStage.managementReview;
     if (selfScorePct != null) return ReviewStage.selfRating;
     return null;
@@ -234,7 +259,9 @@ class MonthlyReviewSummary {
   /// scores prove the shown stage was reached; otherwise the cursor's own status
   /// (nothing scored yet → still in progress / pending).
   StageStatus get displayStatus {
-    if (currentStage.isTerminal || payoutPaid) return StageStatus.submitted;
+    if (currentStage.isTerminal || (payoutPaid && hasAnyScore)) {
+      return StageStatus.submitted;
+    }
     if (currentStage != ReviewStage.selfRating) return currentStageStatus;
     return _scoredStage == null ? currentStageStatus : StageStatus.submitted;
   }
@@ -246,12 +273,15 @@ class MonthlyReviewSummary {
   /// This is what tells "this month hasn't started" apart from "this month is
   /// at Self-Rating with the self-rating already in" — a distinction the stage
   /// chip alone can't express, since both read "Self-Rating".
+  /// Reads the cursor and the scores DIRECTLY rather than going through
+  /// [displayStatus]: that getter reports "submitted" for a paid review, and
+  /// since a payout flag is not a rating, routing through it made an unrated
+  /// review look like real activity — circular, and wrong in exactly the case
+  /// this is meant to detect.
   bool get hasRatingActivity =>
-      finalScorePct > 0 ||
-      selfScorePct != null ||
-      managementReviewPct != null ||
-      displayStage != ReviewStage.selfRating ||
-      displayStatus == StageStatus.submitted;
+      hasAnyScore ||
+      currentStage != ReviewStage.selfRating ||
+      currentStageStatus == StageStatus.submitted;
 
   /// True when a month's [summaries] are worth LANDING on: somebody has rated
   /// something, or a row still awaits this caller's own action.

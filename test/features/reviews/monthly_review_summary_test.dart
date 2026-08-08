@@ -206,6 +206,61 @@ void main() {
   // row reads "Self-Rating / 0%" and the whole quarter looks like it never
   // started (which is exactly how a manager misread a real review as untouched
   // while HR's quarter-aggregated dashboard showed it mid-pipeline).
+  // A stale payout flag on a review nobody ever rated used to render as
+  // "Completed · Paid · 0%" on the team list, while the KRA sheet behind it was
+  // completely empty — it read as an incentive already paid out for work that
+  // was never assessed. Payout is bookkeeping, not evidence of a rating.
+  group('MonthlyReviewSummary — a payout flag is not proof of a rating', () {
+    test('paid with NO scores anywhere does not read as Completed or settled',
+        () {
+      final s = summary(
+        stage: ReviewStage.selfRating,
+        status: StageStatus.inProgress,
+        payoutStatus: PayoutStatus.paid,
+      );
+      expect(s.hasAnyScore, isFalse);
+      expect(s.displayStage, ReviewStage.selfRating);
+      expect(s.displayStatus, StageStatus.inProgress);
+      expect(s.payoutSettled, isFalse, reason: 'no Paid badge without a score');
+      // The raw flag is untouched — the incentive report still sees it.
+      expect(s.payoutPaid, isTrue);
+    });
+
+    test('paid with NO scores is not counted as rating activity', () {
+      final s = summary(
+        stage: ReviewStage.selfRating,
+        payoutStatus: PayoutStatus.paid,
+      );
+      expect(s.hasRatingActivity, isFalse,
+          reason: 'routing through displayStatus made this circular');
+    });
+
+    test('paid WITH a score still reads as Completed and settled', () {
+      final s = summary(
+        stage: ReviewStage.selfRating,
+        payoutStatus: PayoutStatus.paid,
+        selfScorePct: 80,
+        finalScorePct: 76,
+      );
+      expect(s.displayStage, ReviewStage.completed);
+      expect(s.displayStatus, StageStatus.submitted);
+      expect(s.payoutSettled, isTrue);
+    });
+
+    test('a genuine ZERO score is not mistaken for never-rated — the employee '
+        'self-rated 0, which is a real assessment', () {
+      final s = summary(
+        stage: ReviewStage.selfRating,
+        payoutStatus: PayoutStatus.paid,
+        selfScorePct: 0,
+        finalScorePct: 0,
+      );
+      expect(s.hasAnyScore, isTrue);
+      expect(s.payoutSettled, isTrue);
+      expect(s.displayStage, ReviewStage.completed);
+    });
+  });
+
   group('MonthlyReviewSummary.hasRatingActivity — has this month started?', () {
     test('a freshly generated month with nothing rated has no activity', () {
       expect(summary(stage: ReviewStage.selfRating).hasRatingActivity, isFalse);

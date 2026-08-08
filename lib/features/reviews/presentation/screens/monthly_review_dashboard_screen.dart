@@ -509,7 +509,9 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                 ],
               ),
               _PayoutControl(
-                paid: summary.payoutPaid,
+                // Corroborated by a score — a "Paid" badge on a review nobody
+                // ever rated reads as money already gone.
+                paid: summary.payoutSettled,
                 canMarkPaid: role != null && summary.canMarkPaidBy(role!),
                 busy: _payingOut,
                 onMarkPaid: _markPaid,
