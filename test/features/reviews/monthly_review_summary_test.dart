@@ -191,10 +191,18 @@ void main() {
     });
 
     test('a completed / paid review shows Completed (submitted)', () {
+      // Carries scores, as a genuinely completed review must: reaching payout
+      // requires the management sign-off, which leaves a score behind. The
+      // score-less variant of this fixture was not a state the pipeline can
+      // produce, and asserting on it is what let "Completed · Paid · 0%" over
+      // an empty sheet look correct — see the payout-flag group below.
       final s = summary(
         stage: ReviewStage.completed,
         status: StageStatus.submitted,
         payoutStatus: PayoutStatus.paid,
+        selfScorePct: 82,
+        managementReviewPct: 85,
+        finalScorePct: 85,
       );
       expect(s.displayStage, ReviewStage.completed);
       expect(s.displayStatus, StageStatus.submitted);
@@ -233,6 +241,42 @@ void main() {
       );
       expect(s.hasRatingActivity, isFalse,
           reason: 'routing through displayStatus made this circular');
+    });
+
+    test('a stale COMPLETED cursor with no scores is refused, not echoed', () {
+      // The row's status columns outlived its score rows. Echoing the cursor
+      // put "Completed" in green over a sheet with nothing in a single cell.
+      final s = summary(
+        stage: ReviewStage.completed,
+        status: StageStatus.submitted,
+        payoutStatus: PayoutStatus.paid,
+      );
+      expect(s.displayStage, ReviewStage.selfRating);
+      expect(s.displayStatus, StageStatus.inProgress);
+      expect(s.payoutSettled, isFalse);
+    });
+
+    test('a mid-pipeline cursor with no scores IS still trusted — awaiting the '
+        'manager is a legitimate state', () {
+      final s = summary(
+        stage: ReviewStage.reportingManagerRating,
+        status: StageStatus.inProgress,
+      );
+      expect(s.displayStage, ReviewStage.reportingManagerRating);
+    });
+
+    test('a genuinely completed review with scores is unaffected', () {
+      final s = summary(
+        stage: ReviewStage.completed,
+        status: StageStatus.submitted,
+        payoutStatus: PayoutStatus.paid,
+        selfScorePct: 88,
+        managementReviewPct: 91,
+        finalScorePct: 91,
+      );
+      expect(s.displayStage, ReviewStage.completed);
+      expect(s.displayStatus, StageStatus.submitted);
+      expect(s.payoutSettled, isTrue);
     });
 
     test('paid WITH a score still reads as Completed and settled', () {
