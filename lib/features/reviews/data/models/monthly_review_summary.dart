@@ -247,6 +247,13 @@ class MonthlyReviewSummary {
   /// mirrors the quarterly KRA sheet, which derives the same stage from the full
   /// review's scores.
   ReviewStage get displayStage {
+    // A TERMINAL cursor with nothing scored behind it cannot be a real state:
+    // reaching payout requires a management sign-off, and that leaves a score.
+    // It means the row's status columns outlived its score rows, and echoing it
+    // verbatim is the visible lie — "Completed · 0%" over an empty sheet. Only
+    // the completion claim is refused; a mid-pipeline cursor is still trusted,
+    // since "advanced to the manager's stage, not yet rated" is legitimate.
+    if (currentStage.isTerminal && !hasAnyScore) return ReviewStage.selfRating;
     if (currentStage != ReviewStage.selfRating) return currentStage;
     final scored = _scoredStage;
     if (scored == null) return currentStage;
@@ -259,6 +266,12 @@ class MonthlyReviewSummary {
   /// scores prove the shown stage was reached; otherwise the cursor's own status
   /// (nothing scored yet → still in progress / pending).
   StageStatus get displayStatus {
+    // Same guard as [displayStage]: a review with nothing scored has submitted
+    // nothing, whatever the stored status column claims. Without this the pill
+    // still renders green ("submitted") behind a stale terminal cursor.
+    if ((currentStage.isTerminal || payoutPaid) && !hasAnyScore) {
+      return StageStatus.inProgress;
+    }
     if (currentStage.isTerminal || (payoutPaid && hasAnyScore)) {
       return StageStatus.submitted;
     }

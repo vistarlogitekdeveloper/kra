@@ -353,7 +353,12 @@ final myMonthlyReviewProvider = FutureProvider.autoDispose
   for (final s in list) {
     if (s.employeeId == scope.userId) return s;
   }
-  return list.isEmpty ? null : list.first;
+  // No row belongs to this user → they have no review this month. Returning
+  // `list.first` here (as this used to) hands the caller SOMEBODY ELSE'S
+  // review: for a manager or HR the list is their reports or the whole org, so
+  // the home card would show a colleague's stage, score and incentive as the
+  // signed-in user's own.
+  return null;
 });
 
 /// Full review for the detail / stage screen.
