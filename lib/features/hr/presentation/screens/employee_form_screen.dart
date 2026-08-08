@@ -145,6 +145,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     'Senior Officer-Hr',
     'Software Developer',
     'Sr. Accountant',
+    'Administrative Staff',
   ];
 
   /// Maps a designation to the functional role that drives access + reviews:
