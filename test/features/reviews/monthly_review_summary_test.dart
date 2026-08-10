@@ -256,11 +256,33 @@ void main() {
       expect(s.payoutSettled, isFalse);
     });
 
-    test('a mid-pipeline cursor with no scores IS still trusted — awaiting the '
-        'manager is a legitimate state', () {
+    test('a MID-PIPELINE cursor with no scores is refused too — this is how the '
+        'quarter dashboard read "Management Review · 0%" while the monthly list '
+        'correctly read Self-Rating', () {
+      // The pipeline only advances off the back of a score: save-scores moves the
+      // cursor to REPORTING_MANAGER_RATING *because* self scores landed, and the
+      // server only surfaces MANAGEMENT_REVIEW once every KRA has been scored by
+      // its assigned reviewer. So either cursor with zero scores means the header
+      // outlived its score rows.
+      for (final stage in [
+        ReviewStage.reportingManagerRating,
+        ReviewStage.accountHrRating,
+        ReviewStage.financeRating,
+        ReviewStage.managementReview,
+      ]) {
+        final s = summary(stage: stage, status: StageStatus.submitted);
+        expect(s.displayStage, ReviewStage.selfRating,
+            reason: '$stage with no score must not claim progress');
+        expect(s.displayStatus, StageStatus.inProgress, reason: '$stage');
+      }
+    });
+
+    test('a mid-pipeline cursor WITH a score is trusted — awaiting the manager '
+        'after a self-rating is the normal state', () {
       final s = summary(
         stage: ReviewStage.reportingManagerRating,
         status: StageStatus.inProgress,
+        selfScorePct: 74,
       );
       expect(s.displayStage, ReviewStage.reportingManagerRating);
     });
