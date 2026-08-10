@@ -139,12 +139,33 @@ class MonthlyReview {
 
   StageRecord? recordFor(ReviewStage stage) => stageRecords[stage];
 
+  /// The record of a stage being sent BACK, if that is what last happened to it.
+  ///
+  /// Carries who returned it, when, and — in [StageRecord.comment] — why, which
+  /// is what the person it landed back on needs to read.
+  StageRecord? returnedRecordFor(ReviewStage stage) {
+    final r = stageRecords[stage];
+    return (r != null && r.returned) ? r : null;
+  }
+
+  /// True when [stage] was sent back for rework and is waiting to be redone.
+  ///
+  /// Only meaningful while the pipeline is actually sitting on the stage the work
+  /// was returned TO — once it moves on again, the record is history.
+  bool get selfRatingReturned =>
+      currentStage == ReviewStage.selfRating &&
+      returnedRecordFor(ReviewStage.reportingManagerRating) != null;
+
   /// Derived coarse status of [stage] on this review.
   StageStatus statusOf(ReviewStage stage) {
     if (stage.isTerminal) {
       return isComplete ? StageStatus.submitted : StageStatus.pending;
     }
-    if (stageRecords.containsKey(stage)) return StageStatus.submitted;
+    // A RETURNED record is not a completion: that submission pushed the review
+    // backwards. Counting it as submitted would show the manager's stage as done
+    // immediately after they sent the work back.
+    final record = stageRecords[stage];
+    if (record != null && !record.returned) return StageStatus.submitted;
     if (stage == currentStage) return StageStatus.inProgress;
     return StageStatus.pending;
   }

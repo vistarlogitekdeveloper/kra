@@ -36,6 +36,90 @@ void main() {
     );
   }
 
+  // Sending work back writes a stage record just like a submission does, so the
+  // record's presence alone can no longer mean "this stage is done" — otherwise
+  // the manager's stage reads as submitted the instant they hand the work back.
+  group('MonthlyReview — a returned stage is not a completed one', () {
+    StageRecord record({bool returned = false, String? comment}) => StageRecord(
+          actorId: 'mgr1',
+          actorName: 'Amol Laxman Veer',
+          submittedAt: DateTime.utc(2026, 8, 10),
+          comment: comment,
+          returned: returned,
+        );
+
+    test('a RETURNED record does not mark its stage submitted', () {
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        records: {ReviewStage.reportingManagerRating: record(returned: true)},
+      );
+      expect(r.statusOf(ReviewStage.reportingManagerRating),
+          isNot(StageStatus.submitted));
+    });
+
+    test('a normal record still marks its stage submitted', () {
+      final r = reviewAt(
+        ReviewStage.accountHrRating,
+        records: {ReviewStage.reportingManagerRating: record()},
+      );
+      expect(r.statusOf(ReviewStage.reportingManagerRating),
+          StageStatus.submitted);
+    });
+
+    test('selfRatingReturned exposes the manager return, with the reason', () {
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        records: {
+          ReviewStage.reportingManagerRating:
+              record(returned: true, comment: 'Every KRA is at 100%.'),
+        },
+      );
+      expect(r.selfRatingReturned, isTrue);
+      final rec = r.returnedRecordFor(ReviewStage.reportingManagerRating);
+      expect(rec?.comment, 'Every KRA is at 100%.');
+      expect(rec?.actorName, 'Amol Laxman Veer');
+    });
+
+    test('not flagged once the pipeline has moved on again — the return is then '
+        'history, not a pending action', () {
+      final r = reviewAt(
+        ReviewStage.reportingManagerRating,
+        records: {ReviewStage.reportingManagerRating: record(returned: true)},
+      );
+      expect(r.selfRatingReturned, isFalse);
+    });
+
+    test('a forward submission is never reported as a return', () {
+      final r = reviewAt(
+        ReviewStage.selfRating,
+        records: {ReviewStage.reportingManagerRating: record()},
+      );
+      expect(r.selfRatingReturned, isFalse);
+      expect(r.returnedRecordFor(ReviewStage.reportingManagerRating), isNull);
+    });
+
+    test('StageRecord.returned round-trips and defaults false when absent', () {
+      expect(
+        StageRecord.fromJson({
+          'actorId': 'mgr1',
+          'actorName': 'A',
+          'submittedAt': '2026-08-10T00:00:00.000Z',
+          'returned': true,
+        }).returned,
+        isTrue,
+      );
+      // Older payloads omit it entirely.
+      expect(
+        StageRecord.fromJson({
+          'actorId': 'mgr1',
+          'actorName': 'A',
+          'submittedAt': '2026-08-10T00:00:00.000Z',
+        }).returned,
+        isFalse,
+      );
+    });
+  });
+
   group('MonthlyReview.statusOf', () {
     test('a submitted stage (record present) reads as submitted', () {
       final r = reviewAt(

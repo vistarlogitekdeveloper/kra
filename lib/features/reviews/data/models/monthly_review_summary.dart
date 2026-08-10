@@ -45,6 +45,10 @@ class MonthlyReviewSummary {
   /// employee has no location mapped.
   final String? projectLocation;
 
+  /// True when some stage of this review was sent BACK for rework. Lets a list
+  /// badge it without fetching each review's stage records.
+  final bool reworkRequested;
+
   /// The self-rating weighted % for this month (0–100), or null when the
   /// employee hasn't self-rated. Feeds the performance-incentive report.
   final double? selfScorePct;
@@ -71,6 +75,7 @@ class MonthlyReviewSummary {
     this.incentiveEligibleAmount,
     this.payoutStatus = PayoutStatus.pending,
     this.projectLocation,
+    this.reworkRequested = false,
     this.selfScorePct,
     this.managementReviewPct,
   });
@@ -107,6 +112,7 @@ class MonthlyReviewSummary {
         payoutStatus:
             PayoutStatus.fromApi(JsonParse.parseString(json['payoutStatus'])),
         projectLocation: JsonParse.parseString(json['projectLocation']),
+        reworkRequested: JsonParse.parseBool(json['reworkRequested']) ?? false,
         selfScorePct: JsonParse.parseDouble(json['selfScorePct']),
         managementReviewPct: JsonParse.parseDouble(json['managementReviewPct']),
       );
@@ -132,6 +138,7 @@ class MonthlyReviewSummary {
         finalScorePct: r.finalScorePct,
         incentiveEligibleAmount: r.eligibleAmount,
         payoutStatus: r.payoutStatus,
+        reworkRequested: r.stageRecords.values.any((rec) => rec.returned),
         selfScorePct: r.weightedScorePct(ReviewStage.selfRating),
         managementReviewPct:
             r.weightedScorePct(ReviewStage.managementReview) > 0
