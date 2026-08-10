@@ -172,15 +172,22 @@ class MonthlyReviewSummary {
   /// [employeeId] / [managerId], never to a role — so only the org-level tail
   /// consults the set.
   bool needsActionByAny(Set<UserRole> roles, {String? userId}) {
-    if (currentStage.isTerminal) return false;
+    // Resolve against [displayStage], NOT the raw cursor. They diverge exactly
+    // when the stored stage outran its scores, and keying the badge off the
+    // cursor then contradicts the chip on the same row: a header stuck at
+    // MANAGEMENT_REVIEW with nothing scored told every HR admin "needs your
+    // action" while the chip beside it read Self-Rating. Whoever the row is
+    // shown as belonging to is who it should ask.
+    final stage = displayStage;
+    if (stage.isTerminal) return false;
     if (currentStageStatus == StageStatus.submitted) return false;
-    if (currentStage == ReviewStage.selfRating) {
+    if (stage == ReviewStage.selfRating) {
       return userId != null && userId == employeeId;
     }
-    if (currentStage == ReviewStage.reportingManagerRating) {
+    if (stage == ReviewStage.reportingManagerRating) {
       return userId != null && managerId != null && userId == managerId;
     }
-    return currentStage.isActionableByAny(roles);
+    return stage.isActionableByAny(roles);
   }
 
   /// The FIXED incentive for the whole quarter — the monthly eligible ceiling

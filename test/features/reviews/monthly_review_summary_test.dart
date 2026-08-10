@@ -44,25 +44,38 @@ void main() {
   // every employee has a reporting manager (managers and HR admins included),
   // so the badge follows employeeId / managerId, not the caller's role.
   group('MonthlyReviewSummary.needsActionBy — relationship stages', () {
+    // These fixtures carry a self score because the badge resolves against
+    // displayStage: a cursor sitting at the manager's stage is only credible once
+    // the self-rating that advanced it exists. Without one the review is treated
+    // as never started and belongs to the employee — covered separately below.
     test('reporting-manager rating badges for the reporting manager, '
         'whatever their own role', () {
-      final s =
-          summary(stage: ReviewStage.reportingManagerRating, managerId: 'mgr1');
+      final s = summary(
+        stage: ReviewStage.reportingManagerRating,
+        managerId: 'mgr1',
+        selfScorePct: 70,
+      );
       expect(s.needsActionBy(UserRole.manager, userId: 'mgr1'), isTrue);
       // An HR_ADMIN who IS the reporting manager — previously role-blocked.
       expect(s.needsActionBy(UserRole.hrAdmin, userId: 'mgr1'), isTrue);
     });
 
     test('reporting-manager rating does not badge for anyone else', () {
-      final s =
-          summary(stage: ReviewStage.reportingManagerRating, managerId: 'mgr1');
+      final s = summary(
+        stage: ReviewStage.reportingManagerRating,
+        managerId: 'mgr1',
+        selfScorePct: 70,
+      );
       expect(s.needsActionBy(UserRole.manager, userId: 'other-mgr'), isFalse);
       expect(s.needsActionBy(UserRole.employee, userId: 'emp1'), isFalse);
       expect(s.needsActionBy(UserRole.finance, userId: 'fin1'), isFalse);
     });
 
     test('reporting-manager rating fails closed with no manager mapped', () {
-      final s = summary(stage: ReviewStage.reportingManagerRating);
+      final s = summary(
+        stage: ReviewStage.reportingManagerRating,
+        selfScorePct: 70,
+      );
       expect(s.needsActionBy(UserRole.manager, userId: 'mgr1'), isFalse);
     });
 
@@ -277,6 +290,35 @@ void main() {
       }
     });
 
+    test('the needs-action badge follows the SHOWN stage, not the stale cursor',
+        () {
+      // A header stuck at MANAGEMENT_REVIEW with nothing scored used to badge
+      // every HR admin with "needs your action", while the chip on the same row
+      // read Self-Rating — the badge and the chip disagreeing about one review.
+      final s = summary(
+        stage: ReviewStage.managementReview,
+        employeeId: 'emp1',
+        managerId: 'mgr1',
+      );
+      expect(s.displayStage, ReviewStage.selfRating);
+      expect(s.needsActionBy(UserRole.hrAdmin, userId: 'hr1'), isFalse);
+      expect(s.needsActionBy(UserRole.admin, userId: 'boss1'), isFalse);
+      expect(s.needsActionBy(UserRole.management, userId: 'boss1'), isFalse);
+      // It belongs to the employee, which is what the chip now says.
+      expect(s.needsActionBy(UserRole.employee, userId: 'emp1'), isTrue);
+    });
+
+    test('a REAL management review still badges the management tier', () {
+      final s = summary(
+        stage: ReviewStage.managementReview,
+        selfScorePct: 80,
+        managementReviewPct: 84,
+        finalScorePct: 84,
+      );
+      expect(s.displayStage, ReviewStage.managementReview);
+      expect(s.needsActionBy(UserRole.management, userId: 'boss1'), isTrue);
+    });
+
     test('a mid-pipeline cursor WITH a score is trusted — awaiting the manager '
         'after a self-rating is the normal state', () {
       final s = summary(
@@ -428,7 +470,15 @@ void main() {
       };
       for (final entry in table.entries) {
         // managerId set + a userId that is NOT it: org stages must ignore both.
-        final s = summary(stage: entry.key, managerId: 'mgr1');
+        // Scores present so the cursor is credible — the badge resolves against
+        // displayStage, and an org stage with nothing scored is treated as never
+        // started (see the payout-flag group).
+        final s = summary(
+          stage: entry.key,
+          managerId: 'mgr1',
+          selfScorePct: 70,
+          managementReviewPct: 75,
+        );
         for (final role in UserRole.values) {
           final shouldBadge = entry.value.contains(role);
           expect(
