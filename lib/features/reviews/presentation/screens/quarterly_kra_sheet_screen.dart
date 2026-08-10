@@ -226,8 +226,30 @@ class _QuarterlyKraSheetScreenState
     required String kraName,
     required String monthLabel,
   }) async {
+    // The reporting manager moderates a self-assessment; they never inflate it.
+    // So their score for a KRA is capped at the employee's own score for that
+    // same KRA and month. Enforced here (the ceiling passed into the sheet) and
+    // again on commit inside the sheet.
+    double? capPct;
+    String? capNote;
+    if (stage == ReviewStage.reportingManagerRating) {
+      final selfValue = _currentScore(review, rowId, ReviewStage.selfRating)?.value;
+      if (selfValue == null) {
+        // Nothing to moderate yet. Rating first would let the manager set the
+        // ceiling for the employee's own rating, which inverts the order.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(AppStrings.sheetCapNoSelfRating)),
+          );
+        }
+        return;
+      }
+      capPct = (selfValue / maxScore * 100).clamp(0, 100).toDouble();
+      capNote = '${AppStrings.sheetCapPrefix} ${capPct.round()}%';
+    }
+
     // Accessible rating entry: a slider + one-tap presets in a bottom sheet.
-    // Tapping a preset saves immediately (no separate "edit then save" step).
+    // Nothing is written until Save is tapped — presets only set the value.
     final result = await showModalBottomSheet<double>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -240,6 +262,8 @@ class _QuarterlyKraSheetScreenState
         monthLabel: monthLabel,
         stageLabel: stage.label,
         currentPct: currentPct,
+        maxPct: capPct,
+        capNote: capNote,
       ),
     );
     if (result == null || result < 0) return;
@@ -2271,11 +2295,22 @@ class _RatingSheet extends StatefulWidget {
   final String monthLabel;
   final String stageLabel;
   final double? currentPct;
+
+  /// Hard ceiling for this rating, or null for the full 0–100 range.
+  ///
+  /// Used by the reporting-manager column, which may not exceed the employee's
+  /// own score for the same KRA: a manager moderates a self-assessment downward,
+  /// never inflates it. Enforced on the slider, the presets AND the commit, so
+  /// there is no route past it.
+  final double? maxPct;
+  final String? capNote;
   const _RatingSheet({
     required this.kraName,
     required this.monthLabel,
     required this.stageLabel,
     required this.currentPct,
+    this.maxPct,
+    this.capNote,
   });
 
   @override
@@ -2285,14 +2320,17 @@ class _RatingSheet extends StatefulWidget {
 class _RatingSheetState extends State<_RatingSheet> {
   late double _val;
 
+  /// The ceiling, normalised into range. Never null so callers can clamp freely.
+  double get _ceiling => (widget.maxPct ?? 100).clamp(0, 100).toDouble();
+
   @override
   void initState() {
     super.initState();
-    _val = (widget.currentPct ?? 0).clamp(0, 100).toDouble();
+    _val = (widget.currentPct ?? 0).clamp(0, _ceiling).toDouble();
   }
 
   void _commit(double v) =>
-      Navigator.of(context).pop(v.clamp(0, 100).toDouble());
+      Navigator.of(context).pop(v.clamp(0, _ceiling).toDouble());
 
   @override
   Widget build(BuildContext context) {
@@ -2361,9 +2399,33 @@ class _RatingSheetState extends State<_RatingSheet> {
                 max: 100,
                 divisions: 100,
                 label: '${_val.round()}%',
-                onChanged: (v) => setState(() => _val = v),
+                // Clamped rather than capping the slider's own `max`, so the
+                // track still shows the full 0-100 scale and the ceiling reads as
+                // a limit rather than a rescaled axis. Also avoids a degenerate
+                // min == max slider when the ceiling is 0.
+                onChanged: (v) =>
+                    setState(() => _val = v.clamp(0, _ceiling).toDouble()),
               ),
             ),
+            if (widget.capNote != null) ...[
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.lock_outline_rounded,
+                      size: 13, color: AppColors.accentOrange),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      widget.capNote!,
+                      style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accentOrange),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 4),
             Text('Quick set',
                 style: TextStyle(
@@ -2377,25 +2439,19 @@ class _RatingSheetState extends State<_RatingSheet> {
               runSpacing: 8,
               children: [
                 for (final p in presets)
-                  InkWell(
-                    onTap: () => _commit(p.toDouble()),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryPurple.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: AppColors.primaryPurple
-                                .withValues(alpha: 0.30)),
-                      ),
-                      child: Text('$p%',
-                          style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primaryPurpleLight)),
-                    ),
+                  // Presets SET the value; they no longer save on tap. Every
+                  // rating — self, the stage-2 reviewers and management — now
+                  // commits through the explicit Save button below, so a stray
+                  // tap can't write a score.
+                  //
+                  // A preset above the ceiling is shown disabled rather than
+                  // hidden, so the manager can see the limit instead of
+                  // wondering where the option went.
+                  _PresetChip(
+                    percent: p,
+                    selected: _val.round() == p,
+                    enabled: p <= _ceiling,
+                    onTap: () => setState(() => _val = p.toDouble()),
                   ),
               ],
             ),
@@ -2429,6 +2485,53 @@ class _RatingSheetState extends State<_RatingSheet> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One "quick set" chip in the rating sheet. Sets the pending value — it does
+/// not save; that is the Save button's job. Disabled when the percentage is
+/// above the rating's ceiling (see [_RatingSheet.maxPct]).
+class _PresetChip extends StatelessWidget {
+  final int percent;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _PresetChip({
+    required this.percent,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final base = enabled ? AppColors.primaryPurple : AppColors.textMuted;
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: base.withValues(alpha: selected ? 0.28 : 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: base.withValues(alpha: selected ? 0.85 : 0.30),
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Text(
+          '$percent%',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: enabled
+                ? AppColors.primaryPurpleLight
+                : AppColors.textMuted,
+            decoration: enabled ? null : TextDecoration.lineThrough,
+          ),
         ),
       ),
     );
