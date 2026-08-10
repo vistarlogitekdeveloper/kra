@@ -26,6 +26,27 @@ class AppStrings {
   static const String quarterlyPayoutTitle = 'Quarter payout';
   static const String quarterlyPayoutAmount = 'Payout this quarter';
 
+  // Reporting-manager rating ceiling. A manager moderates a self-assessment
+  // downward; they cannot rate above what the employee claimed for that KRA.
+  static const String sheetCapPrefix = "Capped at the employee's self-rating:";
+  static const String sheetCapNoSelfRating =
+      'The employee has not self-rated this KRA yet — their rating sets the '
+      'ceiling for yours.';
+
+  // Returning a self-rating for rework.
+  static const String sheetReworkAction = 'Send back for rework';
+  static const String sheetReworkTitle = 'Send self-rating back for rework?';
+  static const String sheetReworkMessage =
+      'The employee will be asked to revise their self-rating for this month. '
+      'Their existing scores stay visible until they change them.';
+  static const String sheetReworkConfirm = 'Send back';
+  static const String sheetReworkReasonLabel = 'What needs revisiting?';
+  static const String sheetReworkReasonHint =
+      'Explain the anomaly so the employee knows what to correct';
+  static const String sheetReworkReasonRequired =
+      'Please say what needs revisiting.';
+  static const String sheetReworkDone = 'Sent back for rework.';
+
   // Per-rating reason + proof captured in the sheet's rating dialog (applies
   // to both the Self and the Reporting-Manager rating of each KRA).
   static const String ratingAchievementLabel = 'Achievement %';

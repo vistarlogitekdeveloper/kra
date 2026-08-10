@@ -45,6 +45,10 @@ class MonthlyReviewSummary {
   /// employee has no location mapped.
   final String? projectLocation;
 
+  /// True when some stage of this review was sent BACK for rework. Lets a list
+  /// badge it without fetching each review's stage records.
+  final bool reworkRequested;
+
   /// The self-rating weighted % for this month (0–100), or null when the
   /// employee hasn't self-rated. Feeds the performance-incentive report.
   final double? selfScorePct;
@@ -71,6 +75,7 @@ class MonthlyReviewSummary {
     this.incentiveEligibleAmount,
     this.payoutStatus = PayoutStatus.pending,
     this.projectLocation,
+    this.reworkRequested = false,
     this.selfScorePct,
     this.managementReviewPct,
   });
@@ -107,6 +112,7 @@ class MonthlyReviewSummary {
         payoutStatus:
             PayoutStatus.fromApi(JsonParse.parseString(json['payoutStatus'])),
         projectLocation: JsonParse.parseString(json['projectLocation']),
+        reworkRequested: JsonParse.parseBool(json['reworkRequested']) ?? false,
         selfScorePct: JsonParse.parseDouble(json['selfScorePct']),
         managementReviewPct: JsonParse.parseDouble(json['managementReviewPct']),
       );
@@ -132,6 +138,7 @@ class MonthlyReviewSummary {
         finalScorePct: r.finalScorePct,
         incentiveEligibleAmount: r.eligibleAmount,
         payoutStatus: r.payoutStatus,
+        reworkRequested: r.stageRecords.values.any((rec) => rec.returned),
         selfScorePct: r.weightedScorePct(ReviewStage.selfRating),
         managementReviewPct:
             r.weightedScorePct(ReviewStage.managementReview) > 0
@@ -172,15 +179,22 @@ class MonthlyReviewSummary {
   /// [employeeId] / [managerId], never to a role — so only the org-level tail
   /// consults the set.
   bool needsActionByAny(Set<UserRole> roles, {String? userId}) {
-    if (currentStage.isTerminal) return false;
+    // Resolve against [displayStage], NOT the raw cursor. They diverge exactly
+    // when the stored stage outran its scores, and keying the badge off the
+    // cursor then contradicts the chip on the same row: a header stuck at
+    // MANAGEMENT_REVIEW with nothing scored told every HR admin "needs your
+    // action" while the chip beside it read Self-Rating. Whoever the row is
+    // shown as belonging to is who it should ask.
+    final stage = displayStage;
+    if (stage.isTerminal) return false;
     if (currentStageStatus == StageStatus.submitted) return false;
-    if (currentStage == ReviewStage.selfRating) {
+    if (stage == ReviewStage.selfRating) {
       return userId != null && userId == employeeId;
     }
-    if (currentStage == ReviewStage.reportingManagerRating) {
+    if (stage == ReviewStage.reportingManagerRating) {
       return userId != null && managerId != null && userId == managerId;
     }
-    return currentStage.isActionableByAny(roles);
+    return stage.isActionableByAny(roles);
   }
 
   /// The FIXED incentive for the whole quarter — the monthly eligible ceiling
@@ -247,13 +261,20 @@ class MonthlyReviewSummary {
   /// mirrors the quarterly KRA sheet, which derives the same stage from the full
   /// review's scores.
   ReviewStage get displayStage {
-    // A TERMINAL cursor with nothing scored behind it cannot be a real state:
-    // reaching payout requires a management sign-off, and that leaves a score.
-    // It means the row's status columns outlived its score rows, and echoing it
-    // verbatim is the visible lie — "Completed · 0%" over an empty sheet. Only
-    // the completion claim is refused; a mid-pipeline cursor is still trusted,
-    // since "advanced to the manager's stage, not yet rated" is legitimate.
-    if (currentStage.isTerminal && !hasAnyScore) return ReviewStage.selfRating;
+    // A cursor PAST Self-Rating with nothing scored behind it cannot be a real
+    // state, so it is refused rather than echoed. The pipeline only advances off
+    // the back of a score: `save-scores` moves the cursor to
+    // REPORTING_MANAGER_RATING *because* self scores landed, and MANAGEMENT_REVIEW
+    // is only surfaced once every KRA has been scored by its assigned reviewer
+    // (the server's own `reviewDone`, which requires rows). So a stage claim with
+    // zero scores means the header outlived its score rows.
+    //
+    // This covers COMPLETED ("Completed · 0%" over an empty sheet) and equally
+    // MANAGEMENT_REVIEW, which is how the same corruption showed up on the
+    // quarter dashboard while the monthly list correctly read Self-Rating.
+    if (currentStage != ReviewStage.selfRating && !hasAnyScore) {
+      return ReviewStage.selfRating;
+    }
     if (currentStage != ReviewStage.selfRating) return currentStage;
     final scored = _scoredStage;
     if (scored == null) return currentStage;
@@ -268,10 +289,8 @@ class MonthlyReviewSummary {
   StageStatus get displayStatus {
     // Same guard as [displayStage]: a review with nothing scored has submitted
     // nothing, whatever the stored status column claims. Without this the pill
-    // still renders green ("submitted") behind a stale terminal cursor.
-    if ((currentStage.isTerminal || payoutPaid) && !hasAnyScore) {
-      return StageStatus.inProgress;
-    }
+    // still renders green ("submitted") behind a stale cursor.
+    if (!hasAnyScore) return StageStatus.inProgress;
     if (currentStage.isTerminal || (payoutPaid && hasAnyScore)) {
       return StageStatus.submitted;
     }
