@@ -301,24 +301,38 @@ class _QuarterlyKraSheetScreenState
 
   /// Months in this quarter whose self-rating this viewer may SUBMIT.
   ///
-  /// Three conditions, all necessary:
+  /// Conditions:
   ///   * it is their own sheet ([_canEditSelf]);
-  ///   * the pipeline is still on Self-Rating — the backend rejects a submit for
-  ///     any stage that isn't the review's current one, so an already-submitted
-  ///     month must not offer the button again;
-  ///   * something has actually been rated. Submitting an untouched month would
-  ///     hand the manager an empty sheet and email them about it.
+  ///   * at least one KRA carries a self score. Submitting an untouched month
+  ///     would hand the manager an empty sheet and email them about it;
+  ///   * it has not already been submitted — a stage record for Self-Rating is
+  ///     what proves that, so the button disappears once used.
+  ///
+  /// Note what is NOT required: the cursor still being on `SELF_RATING`. Gating
+  /// on that made the button impossible to reach against a backend that still
+  /// auto-advances the cursor when a score is saved — before rating there is
+  /// nothing to submit, and after rating the cursor had already moved, so the
+  /// window never opened. A stale server is now handled where it belongs, on the
+  /// response (see [_submitSelfRating]), rather than by hiding the action.
   List<MonthlyReview> _submittableReviews(
     List<MonthlyReview?> reviews,
     ReviewScope? scope,
   ) =>
       [
         for (final r in reviews.whereType<MonthlyReview>())
-          if (r.currentStage == ReviewStage.selfRating &&
-              _canEditSelf(r, scope) &&
-              r.weightedScorePct(ReviewStage.selfRating) > 0)
+          if (_canEditSelf(r, scope) &&
+              _hasSelfScore(r) &&
+              r.recordFor(ReviewStage.selfRating) == null)
             r,
       ];
+
+  /// True when any KRA has a self score.
+  ///
+  /// Tests for PRESENCE, not a positive total: an employee who honestly rates
+  /// everything 0 has still rated, and a weighted-total test would have silently
+  /// refused to let them submit.
+  bool _hasSelfScore(MonthlyReview r) =>
+      r.rows.any((row) => row.scoreFor(ReviewStage.selfRating)?.value != null);
 
   /// The submit action, or null when there is nothing to submit — which keeps the
   /// bar off other people's sheets, off months already submitted, and off months
@@ -373,8 +387,18 @@ class _QuarterlyKraSheetScreenState
       if (mounted) await _showSubmittedDialog();
     } catch (e) {
       if (mounted) {
+        // A 409 here means the server has moved this review past Self-Rating —
+        // either someone else advanced it, or the deployment still auto-advances
+        // the cursor when a score is saved. Say that, rather than showing a raw
+        // "Review is at REPORTING_MANAGER_RATING, not SELF_RATING".
+        final conflict = e is ApiError && e.statusCode == 409;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.selfSubmitFailed} $e')),
+          SnackBar(
+            content: Text(conflict
+                ? AppStrings.selfSubmitAlreadyMoved
+                : '${AppStrings.selfSubmitFailed} '
+                    '${e is ApiError ? e.message : e}'),
+          ),
         );
       }
     } finally {
