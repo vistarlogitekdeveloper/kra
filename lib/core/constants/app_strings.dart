@@ -49,6 +49,9 @@ class AppStrings {
       'notified.';
   static const String selfSubmitFailed = 'Could not submit:';
   static const String selfSubmitAlreadyDone = 'Self-rating submitted';
+  static const String selfSubmitAlreadyMoved =
+      'This month has already moved on to your reporting manager, so it can no '
+      'longer be submitted.';
 
   // Returning a self-rating for rework.
   static const String sheetReworkAction = 'Send back for rework';
