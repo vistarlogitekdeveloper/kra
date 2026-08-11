@@ -68,9 +68,13 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
+  # Web uses the MARK, not the full wordmark: a favicon renders at 16-32px,
+  # where "ViStar" is an unreadable smudge but the swoosh still reads.
   web:
     generate: true
-    image_path: "assets/icons/app_icon.png"
+    image_path: "assets/icons/app_icon_mark.png"
+    background_color: "#FFFFFF"
+    theme_color: "#6B1F7C"
   # Adaptive icon: Android crops a circle/squircle out of the foreground, so the
   # padded canvas is what keeps the wordmark from being clipped at the edges.
   adaptive_icon_background: "#FFFFFF"
