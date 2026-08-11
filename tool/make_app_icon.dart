@@ -74,6 +74,69 @@ void main() {
     background: ColorRgba8(0, 0, 0, 0),
     path: '$_outDir/app_icon_foreground.png',
   );
+
+  // The MARK on its own, for anywhere the icon renders small — a browser
+  // favicon is 16-32px, where the full wordmark is an illegible smudge.
+  final mark = _cropMark(logo);
+  _write(
+    logo: mark,
+    // Nearly fills the canvas: at favicon size every pixel of margin costs
+    // legibility, and there is no launcher mask to worry about here.
+    fit: 0.96,
+    background: ColorRgba8(255, 255, 255, 255),
+    path: '$_outDir/app_icon_mark.png',
+  );
+}
+
+/// Crops the logo down to its swoosh, discarding the wordmark.
+///
+/// Found by colour rather than by hardcoded pixel coordinates, so it survives
+/// the logo being re-exported at a different size: the lettering is purple only,
+/// while the swoosh is the sole part of the mark carrying warm hues (red →
+/// orange → yellow). So the bounding box of "warm" pixels IS the swoosh.
+Image _cropMark(Image logo) {
+  var minX = logo.width, minY = logo.height, maxX = -1, maxY = -1;
+  for (var y = 0; y < logo.height; y++) {
+    for (var x = 0; x < logo.width; x++) {
+      final p = logo.getPixel(x, y);
+      final r = p.r.toDouble(), g = p.g.toDouble(), b = p.b.toDouble();
+      // Warm = red/orange/yellow: red leads, blue is clearly suppressed. Excludes
+      // both the purple lettering (blue high) and the white ground (all high).
+      final warm = r > 140 && r > b + 60 && g > b + 20;
+      if (!warm) continue;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) {
+    stdout.writeln('! No warm pixels found — falling back to the full logo.');
+    return logo;
+  }
+
+  // Vertically: grow OUTWARD, to take in the swoosh's purple outline and its
+  // tips, which the warm test deliberately excluded.
+  //
+  // Horizontally: pull INWARD. The swoosh sweeps between "Vi" and "tar" and its
+  // tails reach past both, so any axis-aligned box holding the whole swoosh also
+  // catches slivers of the "i" and the "t" — which read as specks of noise once
+  // scaled down. Trimming the outermost few percent of the tails is the cheaper
+  // trade than keeping stray letter fragments in the icon.
+  //
+  // No squaring here: [_write] already fits any aspect ratio onto the square
+  // canvas, and forcing a square would re-expand horizontally into the very
+  // letters this inset removes.
+  final warmW = maxX - minX, warmH = maxY - minY;
+  final inset = (warmW * 0.08).round();
+  final grow = (warmH * 0.06).round();
+  final x0 = (minX + inset).clamp(0, logo.width - 1);
+  final y0 = (minY - grow).clamp(0, logo.height - 1);
+  final w = (maxX - inset - x0).clamp(1, logo.width - x0);
+  final h = (maxY + grow - y0).clamp(1, logo.height - y0);
+
+  stdout.writeln('Mark: warm box ($minX,$minY)-($maxX,$maxY) → crop ${w}x$h');
+  return copyCrop(logo, x: x0, y: y0, width: w, height: h);
 }
 
 /// Fits [logo] onto a square canvas, centred, preserving aspect ratio.
