@@ -20,6 +20,7 @@ import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/review_stage.dart';
 import '../../data/models/row_score.dart';
+import '../../../hr/presentation/widgets/confirm_action_dialog.dart';
 import '../../data/models/stage_record.dart';
 import '../../data/repositories/monthly_review_repository.dart';
 import '../providers/kra_reviewer_map_provider.dart';
@@ -297,6 +298,121 @@ class _QuarterlyKraSheetScreenState
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  /// Months in this quarter whose self-rating this viewer may SUBMIT.
+  ///
+  /// Three conditions, all necessary:
+  ///   * it is their own sheet ([_canEditSelf]);
+  ///   * the pipeline is still on Self-Rating — the backend rejects a submit for
+  ///     any stage that isn't the review's current one, so an already-submitted
+  ///     month must not offer the button again;
+  ///   * something has actually been rated. Submitting an untouched month would
+  ///     hand the manager an empty sheet and email them about it.
+  List<MonthlyReview> _submittableReviews(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) =>
+      [
+        for (final r in reviews.whereType<MonthlyReview>())
+          if (r.currentStage == ReviewStage.selfRating &&
+              _canEditSelf(r, scope) &&
+              r.weightedScorePct(ReviewStage.selfRating) > 0)
+            r,
+      ];
+
+  /// The submit action, or null when there is nothing to submit — which keeps the
+  /// bar off other people's sheets, off months already submitted, and off months
+  /// with nothing rated yet.
+  Future<void> Function()? _submitAction(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) {
+    if (scope == null) return null;
+    final targets = _submittableReviews(reviews, scope);
+    if (targets.isEmpty) return null;
+    return () => _submitSelfRating(targets, scope);
+  }
+
+  /// Submits the self-rating for [targets] and confirms it.
+  ///
+  /// The backend advances each review to the reporting manager and emails them
+  /// (CC HR) once the transaction commits — so this is the point of no return for
+  /// the employee, hence the confirmation before and the explicit
+  /// acknowledgement after.
+  Future<void> _submitSelfRating(
+    List<MonthlyReview> targets,
+    ReviewScope scope,
+  ) async {
+    final months = targets.map((r) => r.period.label).join(', ');
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.selfSubmitConfirmTitle,
+      message: '${AppStrings.selfSubmitConfirmMessage}\n\n$months',
+      confirmLabel: AppStrings.selfSubmitConfirmAction,
+      cancelLabel: AppStrings.commonCancel,
+      icon: Icons.task_alt_rounded,
+      accentColor: AppColors.primaryPurple,
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(monthlyReviewRepositoryProvider);
+      for (final review in targets) {
+        await repo.submitStage(
+          review.id,
+          ReviewStage.selfRating,
+          actorId: scope.userId,
+          actorName: scope.userName,
+        );
+      }
+      ref.invalidate(quarterlySheetProvider);
+      // The home card and the manager's list both read the summary, so drop the
+      // cached lists as well or the submitted state won't show there.
+      ref.invalidate(monthlyReviewListProvider);
+      if (mounted) await _showSubmittedDialog();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.selfSubmitFailed} $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// The "submitted successfully" acknowledgement. A dialog rather than a
+  /// snackbar: this is the end of the employee's task and it tells them the
+  /// manager has been notified, which is worth an explicit dismissal.
+  Future<void> _showSubmittedDialog() => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surfaceElevated,
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.success, size: 44),
+          title: const Text(
+            AppStrings.selfSubmitDoneTitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            AppStrings.selfSubmitDoneMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          actions: [
+            Center(
+              child: FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple),
+                child: const Text(AppStrings.commonClose),
+              ),
+            ),
+          ],
+        ),
+      );
 
   /// Months in this quarter whose self-rating this viewer may hand back: the
   /// pipeline is sitting on the manager's rating (so `submit-stage` will accept
@@ -738,6 +854,8 @@ class _QuarterlyKraSheetScreenState
             // The reporting manager can hand a self-rating back when it looks
             // wrong. Null unless they actually have a month to return.
             onSendBackForRework: _reworkAction(mappedReviews, scope),
+            // The employee finalises their own rating; null for everyone else.
+            onSubmitSelfRating: _submitAction(mappedReviews, scope),
           );
         },
       ),
@@ -778,6 +896,7 @@ Widget quarterlyKraSheetBodyForTest({
   Future<void> Function()? onLockManagement,
   Future<void> Function()? onReopenManagement,
   Future<void> Function()? onSendBackForRework,
+  Future<void> Function()? onSubmitSelfRating,
 }) {
   double? pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
@@ -825,6 +944,7 @@ Widget quarterlyKraSheetBodyForTest({
     onLockManagement: onLockManagement,
     onReopenManagement: onReopenManagement,
     onSendBackForRework: onSendBackForRework,
+    onSubmitSelfRating: onSubmitSelfRating,
   );
 }
 
@@ -877,6 +997,10 @@ class _Sheet extends StatelessWidget {
   /// this quarter whose self-rating they may send back for revision.
   final Future<void> Function()? onSendBackForRework;
 
+  /// Non-null when the viewer owns at least one month in this quarter that is
+  /// still at Self-Rating and has something rated to submit.
+  final Future<void> Function()? onSubmitSelfRating;
+
   const _Sheet({
     required this.months,
     required this.reviews,
@@ -895,6 +1019,7 @@ class _Sheet extends StatelessWidget {
     this.onLockManagement,
     this.onReopenManagement,
     this.onSendBackForRework,
+    this.onSubmitSelfRating,
   });
 
   MonthlyReview? get _any =>
@@ -1072,6 +1197,12 @@ class _Sheet extends StatelessWidget {
                 ),
               ),
             ),
+            // Sits directly under the table, at the END of the ratings — the
+            // employee scrolls through every KRA and then submits.
+            if (onSubmitSelfRating != null) ...[
+              const SizedBox(height: 14),
+              _SubmitSelfRatingBar(onSubmit: onSubmitSelfRating!),
+            ],
             if (onSendBackForRework != null) ...[
               const SizedBox(height: 14),
               _ReworkBar(onSendBack: onSendBackForRework!),
@@ -2585,6 +2716,84 @@ class _RatingSheetState extends State<_RatingSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The employee's "I'm done" action, at the end of the ratings.
+///
+/// Deliberately a prominent filled button rather than one more tap-target in the
+/// grid: it is the only irreversible thing the employee does on this screen —
+/// it moves the review to their manager and emails them.
+class _SubmitSelfRatingBar extends StatefulWidget {
+  final Future<void> Function() onSubmit;
+  const _SubmitSelfRatingBar({required this.onSubmit});
+
+  @override
+  State<_SubmitSelfRatingBar> createState() => _SubmitSelfRatingBarState();
+}
+
+class _SubmitSelfRatingBarState extends State<_SubmitSelfRatingBar> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onSubmit();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border:
+            Border.all(color: AppColors.primaryPurple.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.task_alt_rounded,
+                  size: 18, color: AppColors.primaryPurple),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  AppStrings.selfSubmitHint,
+                  style: TextStyle(
+                      fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _busy ? null : _run,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: _busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send_rounded, size: 18),
+            label: const Text(
+              AppStrings.selfSubmitAction,
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
       ),
     );
   }
