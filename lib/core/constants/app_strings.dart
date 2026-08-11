@@ -33,6 +33,23 @@ class AppStrings {
       'The employee has not self-rated this KRA yet — their rating sets the '
       'ceiling for yours.';
 
+  // Submitting the self-rating. Final for the employee: it advances the review
+  // to their reporting manager and emails them (CC HR).
+  static const String selfSubmitAction = 'Submit self-rating';
+  static const String selfSubmitHint =
+      'Rated everything? Submit to send it to your reporting manager.';
+  static const String selfSubmitConfirmTitle = 'Submit your self-rating?';
+  static const String selfSubmitConfirmMessage =
+      'Your reporting manager will be notified and will review these ratings. '
+      'You can still be asked to revise them if something needs a change.';
+  static const String selfSubmitConfirmAction = 'Submit';
+  static const String selfSubmitDoneTitle = 'KRA submitted successfully';
+  static const String selfSubmitDoneMessage =
+      'Your self-rating has been submitted and your reporting manager has been '
+      'notified.';
+  static const String selfSubmitFailed = 'Could not submit:';
+  static const String selfSubmitAlreadyDone = 'Self-rating submitted';
+
   // Returning a self-rating for rework.
   static const String sheetReworkAction = 'Send back for rework';
   static const String sheetReworkTitle = 'Send self-rating back for rework?';
