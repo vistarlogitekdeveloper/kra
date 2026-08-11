@@ -70,7 +70,7 @@ class AppStrings {
   static const String ratingManager = 'Manager';
 
   // ───── App ─────
-  static const String appName = 'Vistar';
+  static const String appName = 'Vistar KRA';
   static const String appTagline = 'KRA Review & Incentive Management';
   static const String companyName = 'Vistar Logitek Pvt. Ltd.';
 
