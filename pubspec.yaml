@@ -51,6 +51,31 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.0
 
+  # Launcher-icon generation (build-time only, never shipped). Regenerate with:
+  #   dart run tool/make_app_icon.dart && dart run flutter_launcher_icons
+  flutter_launcher_icons: ^0.13.1
+
+  # Used only by tool/make_app_icon.dart to letterbox the logo onto a square
+  # canvas. Declared directly rather than leaned on transitively.
+  image: ^4.1.7
+
+# Launcher icons are generated from a SQUARE source, produced by
+# tool/make_app_icon.dart. The brand logo is a wide 3:2 wordmark, so it is
+# letterboxed onto a square white canvas rather than resized — resizing a 3:2
+# image into a square stretches the wordmark.
+flutter_launcher_icons:
+  image_path: "assets/icons/app_icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+  # Adaptive icon: Android crops a circle/squircle out of the foreground, so the
+  # padded canvas is what keeps the wordmark from being clipped at the edges.
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
+
 flutter:
   uses-material-design: true
 

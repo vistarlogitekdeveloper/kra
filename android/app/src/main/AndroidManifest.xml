@@ -8,7 +8,7 @@
          contributes it through manifest merging. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="krafrontend"
+        android:label="Vistar KRA"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
