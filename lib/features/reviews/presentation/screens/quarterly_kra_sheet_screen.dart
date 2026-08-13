@@ -201,8 +201,16 @@ class _QuarterlyKraSheetScreenState
 
   // Self rating: editable ONLY by the employee themselves (their own sheet).
   // Admins, HR and managers can view it but not change someone's self score.
+  //
+  // Every gate below ALSO requires the month's review to still be open. That
+  // check is not cosmetic: the backend rejects a save against a finished
+  // review with 409 RES_002 ("Review is completed; scores are locked."). A
+  // gate that only asks "who are you?" renders an edit affordance on a locked
+  // month, opens the rating sheet, and fails only *after* the user has picked
+  // a value. Each month in the quarter locks independently, so the check is
+  // per-review — never per-sheet.
   bool _canEditSelf(MonthlyReview r, ReviewScope? scope) {
-    if (scope == null) return false;
+    if (scope == null || r.isComplete) return false;
     return scope.userId == r.employeeId;
   }
 
@@ -215,7 +223,7 @@ class _QuarterlyKraSheetScreenState
   // lock out a perfectly valid reporting manager who happened to be HR/admin.
   // Still excludes the employee themselves and anyone else's manager.
   bool _canEditManager(MonthlyReview r, ReviewScope? scope) {
-    if (scope == null) return false;
+    if (scope == null || r.isComplete) return false;
     return r.managerId != null && r.managerId == scope.userId;
   }
 
@@ -223,16 +231,18 @@ class _QuarterlyKraSheetScreenState
   // ROLE (HR, Finance); the reporting-manager one stays a RELATIONSHIP (above).
   //   * HR rating       → HR / HR_ADMIN
   //   * Finance rating  → FINANCE
-  bool _canEditHr(ReviewScope? scope) =>
+  bool _canEditHr(MonthlyReview r, ReviewScope? scope) =>
       scope != null &&
+      !r.isComplete &&
       (scope.role == UserRole.hr || scope.role == UserRole.hrAdmin);
-  bool _canEditFinance(ReviewScope? scope) =>
-      scope != null && scope.role == UserRole.finance;
+  bool _canEditFinance(MonthlyReview r, ReviewScope? scope) =>
+      scope != null && !r.isComplete && scope.role == UserRole.finance;
 
   // Management review (cycle 3) — HR either approves the Review average or, on
   // rework, overrides it per KRA. Done by HR_ADMIN / ADMIN.
-  bool _canEditManagement(ReviewScope? scope) =>
+  bool _canEditManagement(MonthlyReview r, ReviewScope? scope) =>
       scope != null &&
+      !r.isComplete &&
       (scope.role == UserRole.hrAdmin || scope.role == UserRole.admin);
 
   Future<void> _editCell({
@@ -282,14 +292,32 @@ class _QuarterlyKraSheetScreenState
       // Refresh every quarterly-sheet query for this employee.
       ref.invalidate(quarterlySheetProvider);
     } catch (e) {
+      // A 409 means our copy of the review is stale — the month locked while
+      // this sheet was open. Re-read it so the edit affordances disappear
+      // instead of inviting the same doomed save again.
+      if (e is ApiError && e.statusCode == 409) {
+        ref.invalidate(quarterlySheetProvider);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not save: $e')));
+            .showSnackBar(SnackBar(content: Text(_saveErrorText(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  /// User-facing text for a failed save.
+  ///
+  /// `'$e'` on an [ApiError] renders its `toString()` — the debug form
+  /// (`ApiError(ApiErrorType.validation, code=RES_002, status=409, msg="…")`),
+  /// which is what used to reach the SnackBar. [ApiError.combinedMessage] is
+  /// the sanitised text the backend actually wrote for the user, so a lock
+  /// reads as "Review is completed; scores are locked." RES_002 is a generic
+  /// conflict code (it also covers "Template already exists"), so it is
+  /// deliberately not mapped to a fixed string here.
+  String _saveErrorText(Object e) =>
+      e is ApiError ? e.combinedMessage : 'Could not save. Please try again.';
 
   /// Fetches a row's stored proof attachment and shows it.
   ///
@@ -499,9 +527,9 @@ class _QuarterlyKraSheetScreenState
           pct: _pct,
           canEditSelf: (r) => _canEditSelf(r, scope),
           canEditManager: (r) => _canEditManager(r, scope),
-          canEditHr: _canEditHr(scope),
-          canEditFinance: _canEditFinance(scope),
-          canEditManagement: _canEditManagement(scope),
+          canEditHr: (r) => _canEditHr(r, scope),
+          canEditFinance: (r) => _canEditFinance(r, scope),
+          canEditManagement: (r) => _canEditManagement(r, scope),
           onEdit: _editCell,
           onJustify: _openJustification,
           // Server value first: a viewer never picked the file, so only the
@@ -567,11 +595,13 @@ Widget quarterlyKraSheetBodyForTest({
     onPrevQuarter: () {},
     onNextQuarter: () {},
     pct: pct,
-    canEditSelf: (_) => editableSelf,
-    canEditManager: (_) => editableManager,
-    canEditHr: editableHr,
-    canEditFinance: editableFinance,
-    canEditManagement: false,
+    // The bool flags say what ROLE the harness is signed in as; a completed
+    // month still refuses the edit, exactly as the real gates do.
+    canEditSelf: (r) => editableSelf && !r.isComplete,
+    canEditManager: (r) => editableManager && !r.isComplete,
+    canEditHr: (r) => editableHr && !r.isComplete,
+    canEditFinance: (r) => editableFinance && !r.isComplete,
+    canEditManagement: (_) => false,
     onEdit: ({
       required review,
       required rowId,
@@ -606,9 +636,13 @@ class _Sheet extends StatelessWidget {
   // Management override. A KRA's Review cell is editable only by its assigned
   // reviewer — RM via [canEditManager] (relationship), HR via [canEditHr],
   // Accounts via [canEditFinance].
-  final bool canEditHr;
-  final bool canEditFinance;
-  final bool canEditManagement;
+  //
+  // These take the month's review rather than a bare bool so they can refuse a
+  // completed month. A role alone can't answer "is this editable?" — the
+  // quarter's three months lock independently.
+  final bool Function(MonthlyReview) canEditHr;
+  final bool Function(MonthlyReview) canEditFinance;
+  final bool Function(MonthlyReview) canEditManagement;
   final Future<void> Function({
     required MonthlyReview review,
     required String rowId,
@@ -701,23 +735,39 @@ class _Sheet extends StatelessWidget {
         (monthTotal(0, stage) + monthTotal(1, stage) + monthTotal(2, stage)) /
         3;
 
-    final canSelf = canEditSelf(any);
-    final canMgr = canEditManager(any);
-    final canEditAny =
-        canSelf || canMgr || canEditHr || canEditFinance || canEditManagement;
+    // Editability is per MONTH, not per sheet: the quarter's three reviews
+    // advance and lock independently, so a banner derived from one of them
+    // ([any]) would promise edit rights the other two months refuse. Ask every
+    // month present and claim only what at least one of them allows.
+    final present = reviews.whereType<MonthlyReview>().toList();
+    bool inAnyMonth(bool Function(MonthlyReview) can) => present.any(can);
+
+    final canSelf = inAnyMonth(canEditSelf);
+    final canMgr = inAnyMonth(canEditManager);
+    final canHr = inAnyMonth(canEditHr);
+    final canFin = inAnyMonth(canEditFinance);
+    final canMgmt = inAnyMonth(canEditManagement);
+    final canEditAny = canSelf || canMgr || canHr || canFin || canMgmt;
+
+    // "Locked" and "not yours to edit" are different answers and deserve
+    // different words — a finished quarter is nobody's to edit.
+    final allComplete =
+        present.isNotEmpty && present.every((r) => r.isComplete);
     final scopeLabel = canSelf
         ? 'You can edit the Self ratings on this sheet.'
         : canMgr
             ? 'You can rate the KRAs assigned to you as Reporting Manager — '
                 'tap a Review cell.'
-            : canEditHr
+            : canHr
                 ? 'You can rate the KRAs assigned to HR — tap a Review cell.'
-                : canEditFinance
+                : canFin
                     ? 'You can rate the KRAs assigned to Accounts — '
                         'tap a Review cell.'
-                    : canEditManagement
+                    : canMgmt
                         ? 'You can enter the Management rating for each KRA.'
-                        : 'View only — you cannot edit this sheet.';
+                        : allComplete
+                            ? 'This quarter is completed — scores are locked.'
+                            : 'View only — you cannot edit this sheet.';
 
     // Payout follows the FINAL score (management override → Review average →
     // self), quarter-averaged across the three months.
@@ -1017,9 +1067,9 @@ class _Grid extends StatefulWidget {
   final double? Function(MonthlyReview?, String, ReviewStage) pct;
   final bool Function(MonthlyReview) canEditSelf;
   final bool Function(MonthlyReview) canEditManager;
-  final bool canEditHr;
-  final bool canEditFinance;
-  final bool canEditManagement;
+  final bool Function(MonthlyReview) canEditHr;
+  final bool Function(MonthlyReview) canEditFinance;
+  final bool Function(MonthlyReview) canEditManagement;
   final Future<void> Function({
     required MonthlyReview review,
     required String rowId,
@@ -1259,7 +1309,7 @@ class _GridState extends State<_Grid> {
         _cell(
             _wMon,
             _scoreCell(i, rowId, maxScore, name, ReviewStage.managementReview,
-                canEdit: (_) => widget.canEditManagement)),
+                canEdit: widget.canEditManagement)),
       ],
       _cell(
           _wQtr,
@@ -1465,9 +1515,9 @@ class _GridState extends State<_Grid> {
       case ReviewStage.reportingManagerRating:
         return widget.canEditManager(review);
       case ReviewStage.accountHrRating:
-        return widget.canEditHr;
+        return widget.canEditHr(review);
       case ReviewStage.financeRating:
-        return widget.canEditFinance;
+        return widget.canEditFinance(review);
       default:
         return false;
     }
