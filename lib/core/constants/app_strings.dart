@@ -137,6 +137,20 @@ class AppStrings {
   static const String setPasswordLabel = 'New password';
   static const String setPasswordForceReset = 'Require change on next sign-in';
   static const String setPasswordSubmit = 'Set password';
+  // Employee-initiated password change (authenticated; proves intent with the
+  // current password, unlike the emailed-token reset flow).
+  static const String changePasswordTitle = 'Change password';
+  static const String changePasswordSubtitle =
+      'Enter your current password, then choose a new one of at least 8 '
+      'characters.';
+  static const String changePasswordCurrentLabel = 'Current password';
+  static const String changePasswordNewLabel = 'New password';
+  static const String changePasswordConfirmLabel = 'Confirm new password';
+  static const String changePasswordSubmit = 'Update password';
+  static const String changePasswordSuccess = 'Password updated.';
+  static const String changePasswordSameAsOld =
+      'Please choose a password different from your current one.';
+  static const String profileChangePassword = 'Change password';
   static const String setPasswordSuccess = 'Password updated';
 
   // ───── Dashboard ─────

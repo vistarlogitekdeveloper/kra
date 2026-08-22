@@ -6,6 +6,7 @@ import '../../features/auth/data/models/user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/change_password_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/reviews/presentation/screens/admin_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
@@ -56,6 +57,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
+  static const String changePassword = '/change-password';
   static const String employeeDashboard = '/employee';
   static const String managerDashboard = '/manager';
   static const String hrDashboard = '/hr';
@@ -346,6 +348,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => ResetPasswordScreen(
           token: state.uri.queryParameters['token'],
         ),
+      ),
+
+      // Authenticated password change, reached from Profile. Top-level rather
+      // than inside a role shell so every role gets it from one route — a
+      // manager and an HR admin change their password the same way an employee
+      // does. Pushed, so the app bar's back button returns to Profile.
+      GoRoute(
+        path: AppRoutes.changePassword,
+        builder: (_, __) => const ChangePasswordScreen(),
       ),
 
       // ───── Monthly reviews (new pipeline) ─────

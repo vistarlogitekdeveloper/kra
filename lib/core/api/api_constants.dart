@@ -33,6 +33,9 @@ class ApiConstants {
   static const String authMe = '/auth/me';
   static const String authForgotPassword = '/auth/forgot-password';
   static const String authResetPassword = '/auth/reset-password';
+  // Authenticated password change: verifies the CURRENT password server-side,
+  // unlike the reset flow which trusts an emailed token.
+  static const String authChangePassword = '/auth/change-password';
   // Admin set-password is constructed: '$employees/$id/set-password'
 
   // HR module endpoints
