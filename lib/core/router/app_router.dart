@@ -34,6 +34,7 @@ import '../../features/hr/presentation/screens/kra_assign_screen.dart';
 import '../../features/hr/presentation/screens/kra_template_form_screen.dart';
 import '../../features/hr/presentation/screens/kra_templates_screen.dart';
 import '../../features/hr/presentation/screens/locations_screen.dart';
+import '../../features/hr/presentation/screens/review_compliance_screen.dart';
 import '../../features/manager/presentation/screens/manager_shell_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_confirm_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_result_screen.dart';
@@ -111,6 +112,7 @@ class AppRoutes {
   static const String hrReports = '/hr/reports';
   static const String hrLocations = '/hr/locations';
   static const String hrAuditLog = '/hr/reports/audit-log';
+  static const String hrReviewCompliance = '/hr/reports/review-compliance';
 
   // Helpers for parameterised routes — keep the slash arithmetic in one
   // place so the wiring on either side stays in sync.
@@ -675,6 +677,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.hrAuditLog,
         builder: (_, __) => const AuditLogScreen(),
+      ),
+      // Sits under /hr/reports/* alongside the audit log, so the HR-area guard
+      // already covers it — no separate role check needed.
+      GoRoute(
+        path: AppRoutes.hrReviewCompliance,
+        builder: (_, __) => const ReviewComplianceScreen(),
       ),
     ],
   );
