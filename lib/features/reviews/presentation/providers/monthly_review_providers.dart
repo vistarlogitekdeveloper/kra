@@ -11,6 +11,7 @@ import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
 import '../../data/models/quarterly_review_summary.dart';
+import '../../data/models/review_compliance_row.dart';
 import '../../data/repositories/api_monthly_review_repository.dart';
 import '../../data/repositories/live_monthly_review_repository.dart';
 import '../../data/repositories/monthly_review_repository.dart';
@@ -386,6 +387,47 @@ List<ReviewPeriod> quarterMonthsFor(ReviewPeriod p) {
     ReviewPeriod(p.year, start + 2),
   ];
 }
+
+/// HR's review-compliance report for [period]: one row per employee showing who
+/// has reviewed and who has not.
+///
+/// Built from FULL reviews, not summaries, because the list endpoint carries
+/// only aggregate percentages — it cannot say whether HR specifically has
+/// scored its own KRAs. So this fans out one detail fetch per employee.
+///
+/// Fetched in bounded batches rather than one big `Future.wait`: an org-wide
+/// month is ~40 reviews, and firing them all at once buries a cold-started
+/// Render instance and risks the client's own connection limits. Batching keeps
+/// it parallel enough to be quick while staying polite.
+///
+/// A review that fails to load is skipped rather than failing the whole report —
+/// one bad row should not blank the page for everyone else.
+final reviewComplianceProvider = FutureProvider.autoDispose
+    .family<List<ReviewComplianceRow>, ReviewPeriod>((ref, period) async {
+  ref.keepAlive();
+  final scope = ref.watch(currentReviewScopeProvider);
+  if (scope == null) return const [];
+
+  final summaries = await ref.watch(monthlyReviewListProvider(period).future);
+  final repo = ref.read(monthlyReviewRepositoryProvider);
+
+  const batchSize = 6;
+  final rows = <ReviewComplianceRow>[];
+  for (var i = 0; i < summaries.length; i += batchSize) {
+    final batch = summaries.skip(i).take(batchSize);
+    final loaded = await Future.wait([
+      for (final s in batch)
+        repo.getReview(s.id).then<MonthlyReview?>((r) => r).catchError((_) => null),
+    ]);
+    for (final review in loaded) {
+      if (review != null) rows.add(ReviewComplianceRow.from(review));
+    }
+  }
+
+  rows.sort((a, b) =>
+      a.employeeName.toLowerCase().compareTo(b.employeeName.toLowerCase()));
+  return rows;
+});
 
 /// Drops every cached review surface.
 ///

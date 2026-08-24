@@ -145,6 +145,34 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  @override
+  Future<String> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConstants.authChangePassword,
+        data: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+        // NOT skipAuth: the endpoint is authenticated, and identifying the user
+        // from the token is what stops one person changing another's password.
+      );
+      final data = unwrapObject(response);
+      return JsonParse.parseString(data['message']) ??
+          'Password updated.';
+    } on DioException catch (e) {
+      throw _toAuthException(ApiError.fromDioException(e));
+    } on ApiError catch (e) {
+      throw _toAuthException(e);
+    } catch (e) {
+      throw const AuthException('Something went wrong. Please try again.');
+    }
+  }
+
+  @override
   Future<String> resetPassword({
     required String token,
     required String password,

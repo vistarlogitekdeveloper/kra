@@ -187,7 +187,29 @@ class _ProfileBody extends StatelessWidget {
           ],
         ),
 
+        // Account actions. Every role reaches Profile, so this is the one place
+        // a password change needs to live to cover employees, managers and HR.
         const SizedBox(height: 18),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: OutlinedButton.icon(
+            // Pushed, not go(): Profile stays beneath so the screen's back
+            // button returns here instead of resetting the tab.
+            onPressed: () => context.push(AppRoutes.changePassword),
+            icon: const Icon(Icons.password_rounded),
+            label: const Text(
+              AppStrings.profileChangePassword,
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primaryPurple,
+              side: const BorderSide(color: AppColors.primaryPurple),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: OutlinedButton.icon(

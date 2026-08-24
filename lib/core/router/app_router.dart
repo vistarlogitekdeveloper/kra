@@ -6,6 +6,7 @@ import '../../features/auth/data/models/user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/change_password_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/reviews/presentation/screens/admin_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
@@ -33,6 +34,7 @@ import '../../features/hr/presentation/screens/kra_assign_screen.dart';
 import '../../features/hr/presentation/screens/kra_template_form_screen.dart';
 import '../../features/hr/presentation/screens/kra_templates_screen.dart';
 import '../../features/hr/presentation/screens/locations_screen.dart';
+import '../../features/hr/presentation/screens/review_compliance_screen.dart';
 import '../../features/manager/presentation/screens/manager_shell_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_confirm_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_result_screen.dart';
@@ -56,6 +58,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
+  static const String changePassword = '/change-password';
   static const String employeeDashboard = '/employee';
   static const String managerDashboard = '/manager';
   static const String hrDashboard = '/hr';
@@ -109,6 +112,7 @@ class AppRoutes {
   static const String hrReports = '/hr/reports';
   static const String hrLocations = '/hr/locations';
   static const String hrAuditLog = '/hr/reports/audit-log';
+  static const String hrReviewCompliance = '/hr/reports/review-compliance';
 
   // Helpers for parameterised routes — keep the slash arithmetic in one
   // place so the wiring on either side stays in sync.
@@ -346,6 +350,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => ResetPasswordScreen(
           token: state.uri.queryParameters['token'],
         ),
+      ),
+
+      // Authenticated password change, reached from Profile. Top-level rather
+      // than inside a role shell so every role gets it from one route — a
+      // manager and an HR admin change their password the same way an employee
+      // does. Pushed, so the app bar's back button returns to Profile.
+      GoRoute(
+        path: AppRoutes.changePassword,
+        builder: (_, __) => const ChangePasswordScreen(),
       ),
 
       // ───── Monthly reviews (new pipeline) ─────
@@ -664,6 +677,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.hrAuditLog,
         builder: (_, __) => const AuditLogScreen(),
+      ),
+      // Sits under /hr/reports/* alongside the audit log, so the HR-area guard
+      // already covers it — no separate role check needed.
+      GoRoute(
+        path: AppRoutes.hrReviewCompliance,
+        builder: (_, __) => const ReviewComplianceScreen(),
       ),
     ],
   );

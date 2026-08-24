@@ -32,6 +32,14 @@ class HrReportsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _ReportTile(
+            icon: Icons.fact_check_rounded,
+            iconColor: AppColors.primaryPurple,
+            title: AppStrings.complianceTitle,
+            subtitle: AppStrings.complianceSubtitle,
+            onTap: () => context.push(AppRoutes.hrReviewCompliance),
+          ),
+          const SizedBox(height: 12),
+          _ReportTile(
             icon: Icons.receipt_long_rounded,
             iconColor: AppColors.primaryPurple,
             title: AppStrings.auditLogTitle,
