@@ -21,6 +21,39 @@ class AppStrings {
   static const String adminDashNeedsReview = 'Awaiting your review';
   static const String adminDashSearchHint = 'Search employees…';
 
+  // ───── HR review-compliance report ─────
+  // Who has reviewed and who has not, per employee, for one month. Complements
+  // the Review Dashboard: that shows how far a review has got, this shows which
+  // reviewer is holding it up.
+  static const String complianceTitle = 'Review compliance';
+  static const String complianceSubtitle =
+      'Who has reviewed and who has not, employee by employee, for a month.';
+  static const String complianceColSl = 'SL';
+  static const String complianceColName = 'Employee';
+  static const String complianceColSelf = 'Self rating';
+  static const String complianceColFinance = 'Finance';
+  static const String complianceColHr = 'HR';
+  static const String complianceColManager = 'Reporting mgr';
+  static const String complianceColOps = 'Ops Exc.';
+  static const String complianceColFinal = 'Final approval';
+  static const String complianceSubmitted = 'Submitted';
+  static const String complianceNotSubmitted = 'Not submitted';
+  static const String complianceStatEmployees = 'Employees';
+  static const String complianceStatSubmitted = 'Self-rated';
+  static const String complianceStatApproved = 'Approved';
+  static const String complianceLegendYes = 'Reviewed';
+  static const String complianceLegendNo = 'Pending';
+  static const String complianceLegendNa = 'No KRA for that reviewer';
+  static const String complianceLoading =
+      'Building the report — this reads each employee\'s full sheet, so it '
+      'takes a few seconds.';
+  static const String complianceEmpty = 'No reviews for this month.';
+  // Stated on the report itself rather than left as a mystery blank column.
+  static const String complianceOpsNote =
+      'Ops Excellence is not a reviewer the app assigns KRAs to — each KRA is '
+      'owned by the reporting manager, HR or Accounts — so that column is not '
+      'tracked.';
+
   // ───── Quarterly KRA sheet ─────
   static const String quarterlySheetTitle = 'Quarterly KRA Sheet';
   static const String quarterlyPayoutTitle = 'Quarter payout';
@@ -137,6 +170,20 @@ class AppStrings {
   static const String setPasswordLabel = 'New password';
   static const String setPasswordForceReset = 'Require change on next sign-in';
   static const String setPasswordSubmit = 'Set password';
+  // Employee-initiated password change (authenticated; proves intent with the
+  // current password, unlike the emailed-token reset flow).
+  static const String changePasswordTitle = 'Change password';
+  static const String changePasswordSubtitle =
+      'Enter your current password, then choose a new one of at least 8 '
+      'characters.';
+  static const String changePasswordCurrentLabel = 'Current password';
+  static const String changePasswordNewLabel = 'New password';
+  static const String changePasswordConfirmLabel = 'Confirm new password';
+  static const String changePasswordSubmit = 'Update password';
+  static const String changePasswordSuccess = 'Password updated.';
+  static const String changePasswordSameAsOld =
+      'Please choose a password different from your current one.';
+  static const String profileChangePassword = 'Change password';
   static const String setPasswordSuccess = 'Password updated';
 
   // ───── Dashboard ─────

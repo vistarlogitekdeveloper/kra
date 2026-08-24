@@ -41,6 +41,18 @@ abstract class AuthRepository {
     required String token,
     required String password,
   });
+
+  /// Changes the SIGNED-IN user's password.
+  ///
+  /// Unlike [resetPassword], which trusts an emailed token, this proves intent
+  /// with [currentPassword] — verified server-side — so an unlocked, borrowed
+  /// device can't be used to take an account over. Returns a user-safe success
+  /// message; throws [AuthException] on failure (wrong current password, or a
+  /// new one the server rejects).
+  Future<String> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
 }
 
 /// UI-safe exception type. The repository implementation is responsible
