@@ -332,8 +332,9 @@ class _QuarterlyKraSheetScreenState
   /// reads as "Review is completed; scores are locked." RES_002 is a generic
   /// conflict code (it also covers "Template already exists"), so it is
   /// deliberately not mapped to a fixed string here.
-  String _saveErrorText(Object e) =>
-      e is ApiError ? e.combinedMessage : 'Could not save. Please try again.';
+  String _saveErrorText(Object e,
+          [String fallback = 'Could not save. Please try again.']) =>
+      e is ApiError ? e.combinedMessage : fallback;
 
   /// Months in this quarter whose self-rating this viewer may SUBMIT.
   ///
@@ -647,7 +648,7 @@ class _QuarterlyKraSheetScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not save: $e')));
+            .showSnackBar(SnackBar(content: Text(_saveErrorText(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -672,7 +673,9 @@ class _QuarterlyKraSheetScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not reopen: $e')));
+            .showSnackBar(SnackBar(
+                content: Text(_saveErrorText(
+                    e, 'Could not reopen. Please try again.'))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -811,7 +814,7 @@ class _QuarterlyKraSheetScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not save: $e')));
+            .showSnackBar(SnackBar(content: Text(_saveErrorText(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
