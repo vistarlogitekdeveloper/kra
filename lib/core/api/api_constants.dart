@@ -21,7 +21,7 @@ class ApiConstants {
   // Trailing slash included; Dio joins relative endpoint paths onto it.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE',
-    defaultValue: 'https://vistar-crm.onrender.com/api/v1/kra/',
+    defaultValue: 'https://api.vistarlogitek.com/api/v1/kra/',
   );
   static const String environment =
       String.fromEnvironment('ENV', defaultValue: 'test');
