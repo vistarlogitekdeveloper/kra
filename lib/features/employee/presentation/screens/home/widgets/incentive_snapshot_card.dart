@@ -91,8 +91,7 @@ class IncentiveSnapshotCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      EmployeeFormatters.percent(
-                          incentive.earnedPercentage),
+                      EmployeeFormatters.percent(incentive.earnedPercentage),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

@@ -31,9 +31,8 @@ class KraTemplateFilter {
   KraTemplateFilter copyWith({String? role, Object? isActive = _sentinel}) {
     return KraTemplateFilter(
       role: role ?? this.role,
-      isActive: identical(isActive, _sentinel)
-          ? this.isActive
-          : isActive as bool?,
+      isActive:
+          identical(isActive, _sentinel) ? this.isActive : isActive as bool?,
     );
   }
 

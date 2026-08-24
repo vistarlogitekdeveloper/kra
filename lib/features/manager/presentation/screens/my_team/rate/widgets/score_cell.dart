@@ -162,8 +162,7 @@ class _ScoreCellState extends State<ScoreCell> {
           color: AppColors.textSecondary,
           fontWeight: FontWeight.w700,
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         filled: true,
         fillColor: disabled
             ? AppColors.divider.withValues(alpha: 0.35)
@@ -309,20 +308,17 @@ class _RemarkField extends StatelessWidget {
           fontSize: 11,
           color: AppColors.textMuted,
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         filled: true,
         fillColor: AppColors.background,
         counterText: '',
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide:
-              BorderSide(color: AppColors.divider, width: 1),
+          borderSide: BorderSide(color: AppColors.divider, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide:
-              BorderSide(color: AppColors.divider, width: 1),
+          borderSide: BorderSide(color: AppColors.divider, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

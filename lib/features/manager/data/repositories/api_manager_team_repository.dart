@@ -29,8 +29,7 @@ class ApiManagerTeamRepository implements ManagerTeamRepository {
           'limit': pageSize,
           if (search != null && search.trim().isNotEmpty)
             'search': search.trim(),
-          if (filter.toApiString() != null)
-            'filterState': filter.toApiString(),
+          if (filter.toApiString() != null) 'filterState': filter.toApiString(),
         },
       );
       final items = unwrapList(response)

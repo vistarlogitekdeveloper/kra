@@ -40,8 +40,7 @@ class ManagerStatsGrid extends ConsumerWidget {
         bg: AppColors.accentOrange.withValues(alpha: 0.12),
         fg: AppColors.accentOrange,
         highlight: stats.pendingMyReview > 0,
-        onTap: () =>
-            _goToList(ref, context, ManagerTeamFilter.pendingMyReview),
+        onTap: () => _goToList(ref, context, ManagerTeamFilter.pendingMyReview),
       ),
       _StatCard(
         icon: Icons.check_circle_rounded,

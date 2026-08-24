@@ -38,6 +38,12 @@ class ReviewPeriod {
   String get label => '${(month >= 1 && month <= 12) ? _names[month] : ''} '
       '$year';
 
+  /// Compact "Jul '26" — a 3-letter month + 2-digit year for tight table
+  /// headers and month chips.
+  String get shortLabel =>
+      "${(month >= 1 && month <= 12) ? _names[month].substring(0, 3) : ''} "
+      "'${year.toString().substring(2)}";
+
   /// India's fiscal-year quarter this month falls in:
   ///   Q1 = Apr–Jun, Q2 = Jul–Sep, Q3 = Oct–Dec, Q4 = Jan–Mar.
   int get fiscalQuarter {
@@ -102,6 +108,11 @@ class MonthlyReview {
 
   final IncentiveSnapshot incentive;
 
+  /// When set, management has committed the review: the incentive is locked to
+  /// the management scores and the Management column is read-only until it is
+  /// reopened. Null while the management review is still open.
+  final DateTime? managementLockedAt;
+
   const MonthlyReview({
     required this.id,
     required this.employeeId,
@@ -115,6 +126,7 @@ class MonthlyReview {
     this.stageRecords = const {},
     this.rows = const [],
     this.incentive = const IncentiveSnapshot(),
+    this.managementLockedAt,
   });
 
   // ── Incentive convenience (delegates to [incentive]) ──────────────────
@@ -122,14 +134,38 @@ class MonthlyReview {
   PayoutStatus get payoutStatus => incentive.payoutStatus;
   DateTime? get paidAt => incentive.paidAt;
 
+  /// True once management has locked the review (see [managementLockedAt]).
+  bool get isManagementLocked => managementLockedAt != null;
+
   StageRecord? recordFor(ReviewStage stage) => stageRecords[stage];
+
+  /// The record of a stage being sent BACK, if that is what last happened to it.
+  ///
+  /// Carries who returned it, when, and — in [StageRecord.comment] — why, which
+  /// is what the person it landed back on needs to read.
+  StageRecord? returnedRecordFor(ReviewStage stage) {
+    final r = stageRecords[stage];
+    return (r != null && r.returned) ? r : null;
+  }
+
+  /// True when [stage] was sent back for rework and is waiting to be redone.
+  ///
+  /// Only meaningful while the pipeline is actually sitting on the stage the work
+  /// was returned TO — once it moves on again, the record is history.
+  bool get selfRatingReturned =>
+      currentStage == ReviewStage.selfRating &&
+      returnedRecordFor(ReviewStage.reportingManagerRating) != null;
 
   /// Derived coarse status of [stage] on this review.
   StageStatus statusOf(ReviewStage stage) {
     if (stage.isTerminal) {
       return isComplete ? StageStatus.submitted : StageStatus.pending;
     }
-    if (stageRecords.containsKey(stage)) return StageStatus.submitted;
+    // A RETURNED record is not a completion: that submission pushed the review
+    // backwards. Counting it as submitted would show the manager's stage as done
+    // immediately after they sent the work back.
+    final record = stageRecords[stage];
+    if (record != null && !record.returned) return StageStatus.submitted;
     if (stage == currentStage) return StageStatus.inProgress;
     return StageStatus.pending;
   }
@@ -386,6 +422,7 @@ class MonthlyReview {
           .map(MonthlyKraRow.fromJson)
           .toList(),
       incentive: incentive,
+      managementLockedAt: JsonParse.parseDate(json['managementLockedAt']),
     );
   }
 
@@ -403,6 +440,7 @@ class MonthlyReview {
             stageRecords.map((k, v) => MapEntry(k.toApiString(), v.toJson())),
         'rows': rows.map((r) => r.toJson()).toList(),
         'incentive': incentive.toJson(),
+        'managementLockedAt': managementLockedAt?.toIso8601String(),
       };
 
   MonthlyReview copyWith({
@@ -418,6 +456,8 @@ class MonthlyReview {
     Map<ReviewStage, StageRecord>? stageRecords,
     List<MonthlyKraRow>? rows,
     IncentiveSnapshot? incentive,
+    DateTime? managementLockedAt,
+    bool clearManagementLock = false,
   }) {
     return MonthlyReview(
       id: id ?? this.id,
@@ -432,6 +472,9 @@ class MonthlyReview {
       stageRecords: stageRecords ?? this.stageRecords,
       rows: rows ?? this.rows,
       incentive: incentive ?? this.incentive,
+      managementLockedAt: clearManagementLock
+          ? null
+          : (managementLockedAt ?? this.managementLockedAt),
     );
   }
 }

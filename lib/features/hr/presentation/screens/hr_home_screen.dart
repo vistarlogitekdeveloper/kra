@@ -164,13 +164,7 @@ class _GreetingCard extends StatelessWidget {
   final String name;
   const _GreetingCard({required this.name});
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    if (hour < 21) return 'Good evening';
-    return 'Good night';
-  }
+  String _greeting() => AppStrings.greetingForHour(DateTime.now().hour);
 
   @override
   Widget build(BuildContext context) {

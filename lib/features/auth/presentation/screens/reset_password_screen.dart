@@ -92,9 +92,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             label: AppStrings.resetTokenLabel,
             hint: AppStrings.resetTokenHint,
             prefixIcon: Icons.key_outlined,
-            validator: (v) => (v ?? '').trim().isEmpty
-                ? AppStrings.resetTokenRequired
-                : null,
+            validator: (v) =>
+                (v ?? '').trim().isEmpty ? AppStrings.resetTokenRequired : null,
           ),
           const SizedBox(height: 18),
           BrandedTextField(

@@ -51,8 +51,7 @@ class ModeSegmentedSwitcher extends ConsumerWidget {
                 badge: mode == ManagerMode.myReview && teamBadgeCount > 0
                     ? ModeBadge(count: teamBadgeCount)
                     : null,
-                onTap: () =>
-                    ref.read(managerModeProvider.notifier).toMyTeam(),
+                onTap: () => ref.read(managerModeProvider.notifier).toMyTeam(),
               ),
             ),
             Expanded(
@@ -113,11 +112,8 @@ class _ModePill extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 13.5,
-                  fontWeight:
-                      isActive ? FontWeight.w800 : FontWeight.w600,
-                  color: isActive
-                      ? Colors.white
-                      : AppColors.textSecondary,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  color: isActive ? Colors.white : AppColors.textSecondary,
                   letterSpacing: 0.2,
                 ),
               ),

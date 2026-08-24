@@ -429,9 +429,7 @@ class HrActivityEntry {
     final parts = action.split('.');
     if (parts.length < 2) return action;
     final entity = parts.first.replaceAll('_', ' ');
-    final verb = parts.last
-        .toLowerCase()
-        .replaceAll('_', ' ');
+    final verb = parts.last.toLowerCase().replaceAll('_', ' ');
     return '$entity $verb';
   }
 }

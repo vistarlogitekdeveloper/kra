@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../../core/constants/app_colors.dart';
+import '../../../../../../core/utils/name_format.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
 import '../../../../../../core/widgets/paged_list_view.dart';
@@ -54,8 +55,8 @@ class _TeamMemberProfileScreenState
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(
-        managerTeamMemberProfileProvider(widget.employeeId));
+    final async =
+        ref.watch(managerTeamMemberProfileProvider(widget.employeeId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -97,8 +98,8 @@ class _TeamMemberProfileScreenState
         loading: () => const _ProfileLoading(),
         error: (e, _) => _ProfileError(
           message: e.toString(),
-          onRetry: () => ref.invalidate(
-              managerTeamMemberProfileProvider(widget.employeeId)),
+          onRetry: () => ref
+              .invalidate(managerTeamMemberProfileProvider(widget.employeeId)),
         ),
         data: (profile) => TabBarView(
           controller: _tabs,
@@ -147,8 +148,7 @@ class _ProfileTab extends StatelessWidget {
             _FieldRow(label: 'Grade', value: profile.grade),
             _FieldRow(label: 'Position', value: profile.position),
             _FieldRow(
-                label: 'Project location',
-                value: profile.projectLocation),
+                label: 'Project location', value: profile.projectLocation),
           ],
         ),
         const SizedBox(height: 14),
@@ -179,13 +179,6 @@ class _Header extends StatelessWidget {
   final TeamMemberProfile profile;
   const _Header({required this.profile});
 
-  String _initials() {
-    final parts = profile.fullName.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '·';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -204,14 +197,13 @@ class _Header extends StatelessWidget {
               shape: BoxShape.circle,
               color: AppColors.primaryPurple.withValues(alpha: 0.14),
               border: Border.all(
-                color:
-                    AppColors.primaryPurple.withValues(alpha: 0.40),
+                color: AppColors.primaryPurple.withValues(alpha: 0.40),
                 width: 2,
               ),
             ),
             alignment: Alignment.center,
             child: Text(
-              _initials(),
+              initialsOf(profile.fullName),
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -555,8 +547,8 @@ class _CurrentReviewTab extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryPurple,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 22, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -602,7 +594,9 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
     // build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(teamHistoryFilterProvider.notifier).setEmployee(widget.employeeId);
+      ref
+          .read(teamHistoryFilterProvider.notifier)
+          .setEmployee(widget.employeeId);
     });
   }
 
@@ -610,7 +604,9 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
   void didUpdateWidget(covariant _HistoryTab old) {
     super.didUpdateWidget(old);
     if (old.employeeId != widget.employeeId) {
-      ref.read(teamHistoryFilterProvider.notifier).setEmployee(widget.employeeId);
+      ref
+          .read(teamHistoryFilterProvider.notifier)
+          .setEmployee(widget.employeeId);
     }
   }
 
@@ -623,8 +619,7 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
       isLoadingMore: list.isLoadingMore,
       hasMore: list.hasMore,
       initialError: list.error,
-      onLoadMore: () =>
-          ref.read(teamHistoryListProvider.notifier).loadMore(),
+      onLoadMore: () => ref.read(teamHistoryListProvider.notifier).loadMore(),
       onRefresh: () async =>
           ref.read(teamHistoryListProvider.notifier).refresh(),
       emptyBuilder: (_) => Center(

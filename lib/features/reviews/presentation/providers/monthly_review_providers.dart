@@ -10,6 +10,7 @@ import '../../../manager/presentation/providers/manager_team_providers.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/monthly_review_summary.dart';
+import '../../data/models/quarterly_review_summary.dart';
 import '../../data/repositories/api_monthly_review_repository.dart';
 import '../../data/repositories/live_monthly_review_repository.dart';
 import '../../data/repositories/monthly_review_repository.dart';
@@ -32,12 +33,22 @@ final monthlyBackendEnabledProvider = Provider<bool>(
 class ReviewScope {
   final String userId;
   final String userName;
+
+  /// Primary role — drives roster scoping (which employees this user sees).
   final UserRole role;
+
+  /// Every role held. Review AUTHORITY is checked against this, so someone
+  /// holding both the HR and Accounts seats can act on either.
+  final Set<UserRole> roles;
   const ReviewScope({
     required this.userId,
     required this.userName,
     required this.role,
+    this.roles = const {},
   });
+
+  /// [roles], or `{role}` when only a scalar role is known.
+  Set<UserRole> get effectiveRoles => roles.isEmpty ? {role} : roles;
 }
 
 /// Data layer for monthly reviews.
@@ -101,6 +112,9 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.finance:
     case UserRole.admin:
     case UserRole.hrAdmin:
+    // Management reviews the whole org, so it gets the full roster too — the
+    // Management approval is the last gate before payout on every review.
+    case UserRole.management:
       // Fetch the roster and every assignment concurrently, then join the
       // real KRA rows onto each employee by id. 200 is the backend's max
       // page size (larger → 400); fine for the current headcount.
@@ -177,6 +191,7 @@ final currentReviewScopeProvider = Provider<ReviewScope?>((ref) {
     userId: auth.user.id,
     userName: auth.user.fullName,
     role: auth.user.role,
+    roles: auth.user.effectiveRoles,
   );
 });
 
@@ -220,6 +235,98 @@ final monthlyReviewListProvider = FutureProvider.autoDispose
       );
 });
 
+/// The month the monthly dashboard should LAND on before the user picks one:
+/// the newest period worth showing, or null when none is (caller then falls
+/// back to the newest period).
+///
+/// The monthly list is a single-month snapshot, so early in a month it reads
+/// "Self-Rating / 0%" for everybody and looks as though no review had ever
+/// happened — the same confusion [quarterlyReviewDashboardProvider] aggregates
+/// away for HR. This view is deliberately per-month, so instead of aggregating
+/// it walks the picker's months newest-first and stops at the first one with
+/// real activity (or with work awaiting this caller — see
+/// [MonthlyReviewSummary.anyWorthLanding], which keeps an employee on the month
+/// they still owe a self-rating for).
+///
+/// The walk short-circuits, so the usual cost is one request (current month is
+/// live) or two (current month untouched → previous month). Only the newest
+/// month is `watch`ed — it's the list the screen renders by default; the older
+/// months are `read`, because the landing month only matters on first paint and
+/// shouldn't re-resolve every time some past month's data changes.
+final defaultReviewPeriodProvider =
+    FutureProvider.autoDispose<ReviewPeriod?>((ref) async {
+  ref.keepAlive();
+  final scope = ref.watch(currentReviewScopeProvider);
+  final periods = ref.watch(availablePeriodsProvider);
+  if (scope == null || periods.isEmpty) return null;
+
+  bool worthLanding(List<MonthlyReviewSummary> list) =>
+      MonthlyReviewSummary.anyWorthLanding(list,
+          roles: scope.effectiveRoles, userId: scope.userId);
+
+  final newest =
+      await ref.watch(monthlyReviewListProvider(periods.first).future);
+  if (worthLanding(newest)) return periods.first;
+
+  for (final period in periods.skip(1)) {
+    if (worthLanding(await ref.read(monthlyReviewListProvider(period).future))) {
+      return period;
+    }
+  }
+  return null;
+});
+
+/// One employee's three monthly summaries for the quarter that contains
+/// [anchor] — `[m0, m1, m2]`, null where a month has no review — ordered by
+/// employee name.
+///
+/// Shared by the Performance Incentive Sheet and the quarter-level Review
+/// Dashboard so they aggregate the exact same source (fetch three months in
+/// parallel via the cached list provider, then group by employee). The
+/// `ref.watch`es run before the first await, so Riverpod still tracks the
+/// dependency and rebuilds when any month changes.
+Future<List<({String employeeId, List<MonthlyReviewSummary?> months})>>
+    quarterSummariesByEmployee(Ref ref, ReviewPeriod anchor) async {
+  final months = quarterMonthsFor(anchor);
+  final lists = await Future.wait([
+    for (final m in months) ref.watch(monthlyReviewListProvider(m).future),
+  ]);
+
+  final byEmp = <String, List<MonthlyReviewSummary?>>{};
+  final names = <String, String>{};
+  for (var i = 0; i < lists.length; i++) {
+    for (final s in lists[i]) {
+      byEmp.putIfAbsent(s.employeeId,
+          () => List<MonthlyReviewSummary?>.filled(3, null))[i] = s;
+      names[s.employeeId] = s.employeeName;
+    }
+  }
+
+  final ids = byEmp.keys.toList()
+    ..sort((a, b) => (names[a] ?? '')
+        .toLowerCase()
+        .compareTo((names[b] ?? '').toLowerCase()));
+  return [for (final id in ids) (employeeId: id, months: byEmp[id]!)];
+}
+
+/// The quarter-level Review Dashboard: one [QuarterlyReviewSummary] per
+/// employee, aggregated from the three monthly review lists of the quarter that
+/// contains [anchor]. Role-scoped by the underlying list provider (an employee
+/// sees only their own; a manager their reports; HR / Accounts / Management the
+/// whole org). Built the same way as the Performance Incentive Sheet so the
+/// dashboard's score and incentive figures line up with that report.
+final quarterlyReviewDashboardProvider = FutureProvider.autoDispose
+    .family<List<QuarterlyReviewSummary>, ReviewPeriod>((ref, anchor) async {
+  ref.keepAlive();
+  final scope = ref.watch(currentReviewScopeProvider);
+  if (scope == null) return const [];
+  final groups = await quarterSummariesByEmployee(ref, anchor);
+  return [
+    for (final g in groups)
+      QuarterlyReviewSummary.build(employeeId: g.employeeId, months: g.months),
+  ];
+});
+
 /// The signed-in user's OWN monthly review summary for [period], or null when
 /// none has been generated.
 ///
@@ -236,16 +343,22 @@ final myMonthlyReviewProvider = FutureProvider.autoDispose
     .family<MonthlyReviewSummary?, ReviewPeriod>((ref, period) async {
   final scope = ref.watch(currentReviewScopeProvider);
   if (scope == null) return null;
-  final list = await ref.read(monthlyReviewRepositoryProvider).listMonthlyReviews(
-        year: period.year,
-        month: period.month,
-        mine: true,
-        scopeRole: scope.role,
-      );
+  final list =
+      await ref.read(monthlyReviewRepositoryProvider).listMonthlyReviews(
+            year: period.year,
+            month: period.month,
+            mine: true,
+            scopeRole: scope.role,
+          );
   for (final s in list) {
     if (s.employeeId == scope.userId) return s;
   }
-  return list.isEmpty ? null : list.first;
+  // No row belongs to this user → they have no review this month. Returning
+  // `list.first` here (as this used to) hands the caller SOMEBODY ELSE'S
+  // review: for a manager or HR the list is their reports or the whole org, so
+  // the home card would show a colleague's stage, score and incentive as the
+  // signed-in user's own.
+  return null;
 });
 
 /// Full review for the detail / stage screen.
@@ -274,6 +387,23 @@ List<ReviewPeriod> quarterMonthsFor(ReviewPeriod p) {
   ];
 }
 
+/// Drops every cached review surface.
+///
+/// The review lists call [Ref.keepAlive], so they survive navigation and are
+/// only refetched on pull-to-refresh. That is right for scrolling, but it means
+/// a change made to data the reviews READ BUT DO NOT OWN — HR editing someone's
+/// monthly incentive, say — keeps rendering the old figure for the rest of the
+/// session. Call this after any such change.
+///
+/// Invalidating a family root clears every instance, so all months and all
+/// employees are dropped, not just the one on screen.
+void invalidateReviewCaches(WidgetRef ref) {
+  ref.invalidate(monthlyReviewListProvider);
+  ref.invalidate(defaultReviewPeriodProvider);
+  ref.invalidate(quarterlyReviewDashboardProvider);
+  ref.invalidate(quarterlySheetProvider);
+}
+
 /// One employee's three monthly reviews for the quarter that contains
 /// `anchor`. Any month with no review yet comes back null. Powers the
 /// quarterly KRA sheet.
@@ -297,9 +427,9 @@ final quarterlySheetProvider = FutureProvider.autoDispose.family<
       mine: isOwnSheet,
       scopeRole: scope?.role,
     );
-    final matches =
-        list.where((s) => s.employeeId == args.employeeId).toList();
-    reviews.add(matches.isEmpty ? null : await repo.getReview(matches.first.id));
+    final matches = list.where((s) => s.employeeId == args.employeeId).toList();
+    reviews
+        .add(matches.isEmpty ? null : await repo.getReview(matches.first.id));
   }
   return (months: months, reviews: reviews);
 });

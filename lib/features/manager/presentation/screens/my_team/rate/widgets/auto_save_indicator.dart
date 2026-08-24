@@ -14,8 +14,7 @@ class AutoSaveIndicator extends ConsumerStatefulWidget {
   const AutoSaveIndicator({super.key});
 
   @override
-  ConsumerState<AutoSaveIndicator> createState() =>
-      _AutoSaveIndicatorState();
+  ConsumerState<AutoSaveIndicator> createState() => _AutoSaveIndicatorState();
 }
 
 class _AutoSaveIndicatorState extends ConsumerState<AutoSaveIndicator> {
@@ -26,8 +25,8 @@ class _AutoSaveIndicatorState extends ConsumerState<AutoSaveIndicator> {
   @override
   void initState() {
     super.initState();
-    _ticker = Stream.periodic(
-        const Duration(seconds: 15), (_) => DateTime.now());
+    _ticker =
+        Stream.periodic(const Duration(seconds: 15), (_) => DateTime.now());
   }
 
   @override
@@ -49,8 +48,7 @@ class _AutoSaveIndicatorState extends ConsumerState<AutoSaveIndicator> {
     }
     if (state.autoSaveError != null) {
       return _ErrorPill(
-        onRetry: () =>
-            ref.read(managerRateProvider.notifier).retryAutoSave(),
+        onRetry: () => ref.read(managerRateProvider.notifier).retryAutoSave(),
       );
     }
     final savedAt = state.lastSavedAt;
@@ -82,8 +80,7 @@ class _Pill extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: fg.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(20),
@@ -124,8 +121,7 @@ class _ErrorPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: onRetry,
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [

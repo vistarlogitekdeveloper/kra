@@ -26,6 +26,47 @@ class AppStrings {
   static const String quarterlyPayoutTitle = 'Quarter payout';
   static const String quarterlyPayoutAmount = 'Payout this quarter';
 
+  // Reporting-manager rating ceiling. A manager moderates a self-assessment
+  // downward; they cannot rate above what the employee claimed for that KRA.
+  static const String sheetCapPrefix = "Capped at the employee's self-rating:";
+  static const String sheetCapNoSelfRating =
+      'The employee has not self-rated this KRA yet — their rating sets the '
+      'ceiling for yours.';
+
+  // Submitting the self-rating. Final for the employee: it advances the review
+  // to their reporting manager and emails them (CC HR).
+  static const String selfSubmitAction = 'Submit self-rating';
+  static const String selfSubmitHint =
+      'Rated everything? Submit to send it to your reporting manager.';
+  static const String selfSubmitConfirmTitle = 'Submit your self-rating?';
+  static const String selfSubmitConfirmMessage =
+      'Your reporting manager will be notified and will review these ratings. '
+      'You can still be asked to revise them if something needs a change.';
+  static const String selfSubmitConfirmAction = 'Submit';
+  static const String selfSubmitDoneTitle = 'KRA submitted successfully';
+  static const String selfSubmitDoneMessage =
+      'Your self-rating has been submitted and your reporting manager has been '
+      'notified.';
+  static const String selfSubmitFailed = 'Could not submit:';
+  static const String selfSubmitAlreadyDone = 'Self-rating submitted';
+  static const String selfSubmitAlreadyMoved =
+      'This month has already moved on to your reporting manager, so it can no '
+      'longer be submitted.';
+
+  // Returning a self-rating for rework.
+  static const String sheetReworkAction = 'Send back for rework';
+  static const String sheetReworkTitle = 'Send self-rating back for rework?';
+  static const String sheetReworkMessage =
+      'The employee will be asked to revise their self-rating for this month. '
+      'Their existing scores stay visible until they change them.';
+  static const String sheetReworkConfirm = 'Send back';
+  static const String sheetReworkReasonLabel = 'What needs revisiting?';
+  static const String sheetReworkReasonHint =
+      'Explain the anomaly so the employee knows what to correct';
+  static const String sheetReworkReasonRequired =
+      'Please say what needs revisiting.';
+  static const String sheetReworkDone = 'Sent back for rework.';
+
   // Per-rating reason + proof captured in the sheet's rating dialog (applies
   // to both the Self and the Reporting-Manager rating of each KRA).
   static const String ratingAchievementLabel = 'Achievement %';
@@ -49,7 +90,7 @@ class AppStrings {
   static const String ratingManager = 'Manager';
 
   // ───── App ─────
-  static const String appName = 'Vistar';
+  static const String appName = 'Vistar KRA';
   static const String appTagline = 'KRA Review & Incentive Management';
   static const String companyName = 'Vistar Logitek Pvt. Ltd.';
 
@@ -238,6 +279,14 @@ class AppStrings {
   static const String employeeFormRole = 'Role';
   static const String employeeFormDesignation = 'Designation';
   static const String employeeFormDesignationHint = 'Select designation';
+  static const String employeeFormAccessRole = 'Access role';
+  static const String employeeFormAccessRoleAuto = 'Auto (from designation)';
+  static const String employeeFormAccessRoleMultiPending =
+      'Only the first role will be saved — the API stores one role per person. '
+      'Multiple roles need backend support.';
+  static const String employeeFormAccessRoleHelp =
+      'Controls permissions and which review seat this person holds. Leave on '
+      'Auto unless someone needs access their job title does not imply.';
   static const String employeeFormDepartment = 'Department';
   static const String employeeFormProjectLocation = 'Project location';
   static const String employeeFormManager = 'Reporting manager';
@@ -275,7 +324,8 @@ class AppStrings {
   static const String kraTemplatesDeleteAllCta = 'Delete all';
   static const String kraTemplatesDeleteAllResultTitle = 'Delete all templates';
   static const String kraTemplatesDeleteAllNone = 'No templates to delete.';
-  static const String kraTemplatesArchiveConfirmTitle = 'Archive this template?';
+  static const String kraTemplatesArchiveConfirmTitle =
+      'Archive this template?';
   static const String kraTemplatesArchiveCta = 'Archive instead';
   static const String kraTemplatesArchiveSuccess =
       'Template archived. It\'s hidden from lists and assignment, and its '
@@ -474,6 +524,15 @@ class AppStrings {
   static const String greetingEvening = 'Good evening';
   static const String greetingNight = 'Good night';
 
+  /// The time-of-day greeting for [hour] (0–23) — one source for every
+  /// dashboard's header so the thresholds never drift apart.
+  static String greetingForHour(int hour) {
+    if (hour < 12) return greetingMorning;
+    if (hour < 17) return greetingAfternoon;
+    if (hour < 21) return greetingEvening;
+    return greetingNight;
+  }
+
   // ───── Home — current month card ─────
   static const String homeCurrentMonthTitle = 'Current month';
   static const String homeCurrentMonthSelfPending = 'Self-rating pending';
@@ -491,8 +550,7 @@ class AppStrings {
   // ───── Home — KRAs summary ─────
   static const String homeMyKrasTitle = 'My KRAs';
   static const String homeMyKrasViewAll = 'View all';
-  static const String homeMyKrasEmpty =
-      'No KRAs assigned yet. Contact HR.';
+  static const String homeMyKrasEmpty = 'No KRAs assigned yet. Contact HR.';
   static const String homeMyKrasItemsCountSingular = '1 item';
   // Plural form composed at the call-site: "$count items"
 
@@ -545,7 +603,8 @@ class AppStrings {
   static const String monthlyReviewPaid = 'Incentive marked as paid.';
   static const String monthlyReviewPaidBadge = 'Paid';
   static const String monthlyReviewMarkPaidTooltip = 'Mark incentive paid';
-  static const String monthlyReviewMarkPaidConfirmTitle = 'Mark incentive paid?';
+  static const String monthlyReviewMarkPaidConfirmTitle =
+      'Mark incentive paid?';
   static const String monthlyReviewMarkPaidConfirmMessage =
       'Confirm the incentive payout has been settled. This finalizes the '
       'review and can\'t be undone.';

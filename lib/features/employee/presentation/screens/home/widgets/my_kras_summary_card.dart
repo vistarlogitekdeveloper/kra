@@ -23,8 +23,7 @@ class MyKrasSummaryCard extends ConsumerStatefulWidget {
   const MyKrasSummaryCard({super.key, this.cycleId});
 
   @override
-  ConsumerState<MyKrasSummaryCard> createState() =>
-      _MyKrasSummaryCardState();
+  ConsumerState<MyKrasSummaryCard> createState() => _MyKrasSummaryCardState();
 }
 
 class _MyKrasSummaryCardState extends ConsumerState<MyKrasSummaryCard> {
@@ -118,8 +117,7 @@ class _MyKrasSummaryCardState extends ConsumerState<MyKrasSummaryCard> {
               onPressed: () => setState(() => _expanded = !_expanded),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primaryPurple,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 minimumSize: const Size(0, 32),
               ),
               child: Text(
@@ -211,8 +209,7 @@ class _KraRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: AppColors.primaryPurple.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(6),

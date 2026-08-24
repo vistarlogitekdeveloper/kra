@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_error.dart';
+import '../../../../core/utils/name_format.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../data/models/employee.dart';
+import '../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../data/models/kra_assignment.dart';
 import '../providers/employee_providers.dart';
 import '../providers/kra_assignment_providers.dart';
@@ -460,7 +462,7 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = _initials(employee.fullName);
+    final initials = initialsOf(employee.fullName);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -528,14 +530,6 @@ class _ProfileHeader extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _initials(String full) {
-    final parts = full.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first)
-        .toUpperCase();
   }
 }
 
@@ -742,6 +736,10 @@ class _AssignIncentiveSheetState extends ConsumerState<_AssignIncentiveSheet> {
       );
       ref.read(employeeListProvider.notifier).replaceUpdated(updated);
       ref.invalidate(employeeDetailProvider(updated.id));
+      // The review surfaces show this amount but don't own it, and their lists
+      // are kept alive — without this they'd render the previous figure for the
+      // rest of the session.
+      invalidateReviewCaches(ref);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(

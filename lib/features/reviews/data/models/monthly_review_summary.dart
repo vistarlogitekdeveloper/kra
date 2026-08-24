@@ -45,6 +45,10 @@ class MonthlyReviewSummary {
   /// employee has no location mapped.
   final String? projectLocation;
 
+  /// True when some stage of this review was sent BACK for rework. Lets a list
+  /// badge it without fetching each review's stage records.
+  final bool reworkRequested;
+
   /// The self-rating weighted % for this month (0–100), or null when the
   /// employee hasn't self-rated. Feeds the performance-incentive report.
   final double? selfScorePct;
@@ -71,6 +75,7 @@ class MonthlyReviewSummary {
     this.incentiveEligibleAmount,
     this.payoutStatus = PayoutStatus.pending,
     this.projectLocation,
+    this.reworkRequested = false,
     this.selfScorePct,
     this.managementReviewPct,
   });
@@ -107,9 +112,9 @@ class MonthlyReviewSummary {
         payoutStatus:
             PayoutStatus.fromApi(JsonParse.parseString(json['payoutStatus'])),
         projectLocation: JsonParse.parseString(json['projectLocation']),
+        reworkRequested: JsonParse.parseBool(json['reworkRequested']) ?? false,
         selfScorePct: JsonParse.parseDouble(json['selfScorePct']),
-        managementReviewPct:
-            JsonParse.parseDouble(json['managementReviewPct']),
+        managementReviewPct: JsonParse.parseDouble(json['managementReviewPct']),
       );
 
   /// Projection from a full review — used by the mock and any backend
@@ -133,6 +138,7 @@ class MonthlyReviewSummary {
         finalScorePct: r.finalScorePct,
         incentiveEligibleAmount: r.eligibleAmount,
         payoutStatus: r.payoutStatus,
+        reworkRequested: r.stageRecords.values.any((rec) => rec.returned),
         selfScorePct: r.weightedScorePct(ReviewStage.selfRating),
         managementReviewPct:
             r.weightedScorePct(ReviewStage.managementReview) > 0
@@ -165,16 +171,30 @@ class MonthlyReviewSummary {
   /// [userId] resolves them against this row: self-rating belongs to
   /// [employeeId], reporting-manager rating to [managerId] — whatever either
   /// party's role happens to be. Org-level stages stay role-gated.
-  bool needsActionBy(UserRole role, {String? userId}) {
-    if (currentStage.isTerminal) return false;
+  bool needsActionBy(UserRole role, {String? userId}) =>
+      needsActionByAny({role}, userId: userId);
+
+  /// Multi-role form of [needsActionBy]: true when ANY of [roles] is asked to
+  /// act. The relationship stages are unaffected — they answer to
+  /// [employeeId] / [managerId], never to a role — so only the org-level tail
+  /// consults the set.
+  bool needsActionByAny(Set<UserRole> roles, {String? userId}) {
+    // Resolve against [displayStage], NOT the raw cursor. They diverge exactly
+    // when the stored stage outran its scores, and keying the badge off the
+    // cursor then contradicts the chip on the same row: a header stuck at
+    // MANAGEMENT_REVIEW with nothing scored told every HR admin "needs your
+    // action" while the chip beside it read Self-Rating. Whoever the row is
+    // shown as belonging to is who it should ask.
+    final stage = displayStage;
+    if (stage.isTerminal) return false;
     if (currentStageStatus == StageStatus.submitted) return false;
-    if (currentStage == ReviewStage.selfRating) {
+    if (stage == ReviewStage.selfRating) {
       return userId != null && userId == employeeId;
     }
-    if (currentStage == ReviewStage.reportingManagerRating) {
+    if (stage == ReviewStage.reportingManagerRating) {
       return userId != null && managerId != null && userId == managerId;
     }
-    return currentStage.isActionableBy(role);
+    return stage.isActionableByAny(roles);
   }
 
   /// The FIXED incentive for the whole quarter — the monthly eligible ceiling
@@ -190,6 +210,125 @@ class MonthlyReviewSummary {
 
   /// The incentive has been settled.
   bool get payoutPaid => payoutStatus == PayoutStatus.paid;
+
+  /// True when this review carries a score ANYWHERE — the only honest evidence
+  /// that somebody actually rated it.
+  ///
+  /// Note what is NOT evidence: [payoutPaid]. A payout flag is bookkeeping, not
+  /// a rating, and treating it as proof of work is what let a review with an
+  /// entirely empty sheet render as "Completed · Paid · 0%".
+  ///
+  /// A genuine zero is distinguishable from never-rated: an employee who scored
+  /// 0 has `selfScorePct == 0`, which is non-null, so this still reports true
+  /// for them.
+  bool get hasAnyScore =>
+      finalScorePct > 0 || selfScorePct != null || managementReviewPct != null;
+
+  /// The payout flag CORROBORATED by an actual score.
+  ///
+  /// What a "Paid" badge should be driven by: claiming an incentive was settled
+  /// for a review nobody ever rated is worse than showing nothing, because it
+  /// reads as money already out of the door. [payoutPaid] itself is left alone —
+  /// the incentive maths and the quarterly report depend on the raw flag.
+  bool get payoutSettled => payoutPaid && hasAnyScore;
+
+  /// The furthest rating stage the summary's SCORES prove was reached, or null
+  /// when nothing beyond Self-Rating has a score yet. Read off the score fields
+  /// the list endpoint carries, so it survives a stage cursor that in-place
+  /// score saves left frozen (the backend advances [currentStage] on a formal
+  /// stage submit, not on an edit-in-place `save-scores`).
+  ///
+  /// `managementReviewPct` is non-null once the Review/Management cycle has any
+  /// score, so it maps to Management Review — the phase a completed Review sits
+  /// at. (The summary can't tell a management override from a Review average, so
+  /// this can read one notch ahead for a still-in-progress Review; that only
+  /// ever applies when the cursor is frozen, and never regresses a live cursor.)
+  ReviewStage? get _scoredStage {
+    // A settled payout implies the pipeline ran to the end — but only when a
+    // score corroborates it. Reading `payoutPaid` alone contradicted this
+    // getter's own contract ("what the SCORES prove"), so a stale payout flag on
+    // an unrated review promoted it all the way to Completed.
+    if (payoutPaid && hasAnyScore) return ReviewStage.completed;
+    if (managementReviewPct != null) return ReviewStage.managementReview;
+    if (selfScorePct != null) return ReviewStage.selfRating;
+    return null;
+  }
+
+  /// Stage to SHOW on dashboards. Trusts the backend's stage cursor once it has
+  /// advanced past Self-Rating (it's authoritative then), and only repairs the
+  /// specific frozen-at-Self-Rating case: a review whose scores prove more work
+  /// was done still reads as Self-Rating because the cursor never moved. This
+  /// mirrors the quarterly KRA sheet, which derives the same stage from the full
+  /// review's scores.
+  ReviewStage get displayStage {
+    // A cursor PAST Self-Rating with nothing scored behind it cannot be a real
+    // state, so it is refused rather than echoed. The pipeline only advances off
+    // the back of a score: `save-scores` moves the cursor to
+    // REPORTING_MANAGER_RATING *because* self scores landed, and MANAGEMENT_REVIEW
+    // is only surfaced once every KRA has been scored by its assigned reviewer
+    // (the server's own `reviewDone`, which requires rows). So a stage claim with
+    // zero scores means the header outlived its score rows.
+    //
+    // This covers COMPLETED ("Completed · 0%" over an empty sheet) and equally
+    // MANAGEMENT_REVIEW, which is how the same corruption showed up on the
+    // quarter dashboard while the monthly list correctly read Self-Rating.
+    if (currentStage != ReviewStage.selfRating && !hasAnyScore) {
+      return ReviewStage.selfRating;
+    }
+    if (currentStage != ReviewStage.selfRating) return currentStage;
+    final scored = _scoredStage;
+    if (scored == null) return currentStage;
+    return scored.pipelineIndex >= currentStage.pipelineIndex
+        ? scored
+        : currentStage;
+  }
+
+  /// Status of [displayStage]: submitted once the review is terminal/paid or the
+  /// scores prove the shown stage was reached; otherwise the cursor's own status
+  /// (nothing scored yet → still in progress / pending).
+  StageStatus get displayStatus {
+    // Same guard as [displayStage]: a review with nothing scored has submitted
+    // nothing, whatever the stored status column claims. Without this the pill
+    // still renders green ("submitted") behind a stale cursor.
+    if (!hasAnyScore) return StageStatus.inProgress;
+    if (currentStage.isTerminal || (payoutPaid && hasAnyScore)) {
+      return StageStatus.submitted;
+    }
+    if (currentStage != ReviewStage.selfRating) return currentStageStatus;
+    return _scoredStage == null ? currentStageStatus : StageStatus.submitted;
+  }
+
+  /// True when this month's review carries real rating ACTIVITY — a score
+  /// exists somewhere, or the pipeline has moved past Self-Rating. A freshly
+  /// generated month (the row exists, nobody has rated yet) is false.
+  ///
+  /// This is what tells "this month hasn't started" apart from "this month is
+  /// at Self-Rating with the self-rating already in" — a distinction the stage
+  /// chip alone can't express, since both read "Self-Rating".
+  /// Reads the cursor and the scores DIRECTLY rather than going through
+  /// [displayStatus]: that getter reports "submitted" for a paid review, and
+  /// since a payout flag is not a rating, routing through it made an unrated
+  /// review look like real activity — circular, and wrong in exactly the case
+  /// this is meant to detect.
+  bool get hasRatingActivity =>
+      hasAnyScore ||
+      currentStage != ReviewStage.selfRating ||
+      currentStageStatus == StageStatus.submitted;
+
+  /// True when a month's [summaries] are worth LANDING on: somebody has rated
+  /// something, or a row still awaits this caller's own action.
+  ///
+  /// The "needs my action" half matters as much as the activity half. An
+  /// employee whose current month is untouched still owes a self-rating there,
+  /// so the dashboard must never skip past it to an older, busier month and
+  /// hide the one thing they have to do.
+  static bool anyWorthLanding(
+    Iterable<MonthlyReviewSummary> summaries, {
+    Set<UserRole> roles = const {},
+    String? userId,
+  }) =>
+      summaries.any((s) =>
+          s.hasRatingActivity || s.needsActionByAny(roles, userId: userId));
 
   /// The management review has been done (management scored, or the review has
   /// already moved on to payout / completed) — so the incentive can be settled.

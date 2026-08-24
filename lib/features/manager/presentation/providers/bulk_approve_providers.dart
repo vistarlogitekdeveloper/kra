@@ -10,8 +10,7 @@ import '../../data/repositories/bulk_approve_repository.dart';
 import 'manager_dashboard_providers.dart';
 import 'manager_team_providers.dart';
 
-final bulkApproveRepositoryProvider =
-    Provider<BulkApproveRepository>((ref) {
+final bulkApproveRepositoryProvider = Provider<BulkApproveRepository>((ref) {
   return ApiBulkApproveRepository(dio: ref.read(dioProvider));
 });
 

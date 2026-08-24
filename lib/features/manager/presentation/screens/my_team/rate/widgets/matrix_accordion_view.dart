@@ -16,10 +16,8 @@ import 'score_cell.dart';
 /// user can keep multiple rows open at once if they want to compare.
 class MatrixAccordionView extends StatelessWidget {
   final ManagerReviewDetail review;
-  final void Function(String monthlyScoreId, double? rating)
-      onScoreChanged;
-  final void Function(String monthlyScoreId, String? remark)
-      onRemarkChanged;
+  final void Function(String monthlyScoreId, double? rating) onScoreChanged;
+  final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
   const MatrixAccordionView({
     super.key,
@@ -53,10 +51,8 @@ class MatrixAccordionView extends StatelessWidget {
 class _RowCard extends StatelessWidget {
   final ReviewRow row;
   final List<ManagerReviewMonth> months;
-  final void Function(String monthlyScoreId, double? rating)
-      onScoreChanged;
-  final void Function(String monthlyScoreId, String? remark)
-      onRemarkChanged;
+  final void Function(String monthlyScoreId, double? rating) onScoreChanged;
+  final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
   const _RowCard({
     required this.row,
@@ -118,10 +114,8 @@ class _RowCard extends StatelessWidget {
           dividerColor: Colors.transparent,
         ),
         child: ExpansionTile(
-          tilePadding:
-              const EdgeInsets.fromLTRB(16, 4, 12, 4),
-          childrenPadding:
-              const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          tilePadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           iconColor: AppColors.primaryPurple,
           collapsedIconColor: AppColors.textSecondary,
           title: Row(
@@ -153,15 +147,14 @@ class _RowCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.primaryPurpleSurface,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    EmployeeFormatters.weightagePercent(
-                        row.weightagePercent),
+                    EmployeeFormatters.weightagePercent(row.weightagePercent),
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -202,8 +195,7 @@ class _RowCard extends StatelessWidget {
             ),
           ),
           children: [
-            if (row.description != null &&
-                row.description!.isNotEmpty) ...[
+            if (row.description != null && row.description!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
@@ -237,10 +229,8 @@ class _RowCard extends StatelessWidget {
 class _MonthBlock extends StatelessWidget {
   final ReviewRow row;
   final ManagerReviewMonth month;
-  final void Function(String monthlyScoreId, double? rating)
-      onScoreChanged;
-  final void Function(String monthlyScoreId, String? remark)
-      onRemarkChanged;
+  final void Function(String monthlyScoreId, double? rating) onScoreChanged;
+  final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
   const _MonthBlock({
     required this.row,
@@ -263,23 +253,20 @@ class _MonthBlock extends StatelessWidget {
     if (cell.monthlyScoreId.isEmpty) return const SizedBox.shrink();
     final isFeed = row.scoreSource == ScoreSource.feed;
     final monthClosed = month.status != ReviewMonthStatus.open;
-    final cellWidget =
-        (isFeed || monthClosed || cell.isNotApplicable)
-            ? ReadonlyScoreCell(
-                key: ValueKey('ro_${cell.monthlyScoreId}'),
-                cell: cell,
-                maxScore: row.maxScore,
-                isFeedRow: isFeed,
-              )
-            : ScoreCell(
-                key: ValueKey(cell.monthlyScoreId),
-                cell: cell,
-                maxScore: row.maxScore,
-                onScoreChanged: (v) =>
-                    onScoreChanged(cell.monthlyScoreId, v),
-                onRemarkChanged: (v) =>
-                    onRemarkChanged(cell.monthlyScoreId, v),
-              );
+    final cellWidget = (isFeed || monthClosed || cell.isNotApplicable)
+        ? ReadonlyScoreCell(
+            key: ValueKey('ro_${cell.monthlyScoreId}'),
+            cell: cell,
+            maxScore: row.maxScore,
+            isFeedRow: isFeed,
+          )
+        : ScoreCell(
+            key: ValueKey(cell.monthlyScoreId),
+            cell: cell,
+            maxScore: row.maxScore,
+            onScoreChanged: (v) => onScoreChanged(cell.monthlyScoreId, v),
+            onRemarkChanged: (v) => onRemarkChanged(cell.monthlyScoreId, v),
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

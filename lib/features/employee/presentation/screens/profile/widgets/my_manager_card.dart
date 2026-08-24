@@ -20,8 +20,7 @@ class MyManagerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final swatch =
-        ProfileHeader.colourFor(manager.employeeCode ?? manager.id);
+    final swatch = ProfileHeader.colourFor(manager.employeeCode ?? manager.id);
     final initials = ProfileHeader.initialsOf(manager.name);
     final role = manager.role?.replaceAll('_', ' ');
 

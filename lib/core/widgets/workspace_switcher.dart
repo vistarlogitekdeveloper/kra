@@ -28,9 +28,9 @@ class WorkspaceSwitcher {
   /// KRA and gets no menu; a manager also has My Team, a reviewer (HR /
   /// Accounts / admin) also has Reviews, and an admin also has HR Admin.
   static bool hasExtras(User user) =>
-      AppRoutes.canAccessManager(user.role, hasReports: user.hasReports) ||
-      AppRoutes.canReview(user.role) ||
-      AppRoutes.canAccessHr(user.role);
+      AppRoutes.canAccessManagerAny(user.effectiveRoles, hasReports: user.hasReports) ||
+      AppRoutes.canReviewAny(user.effectiveRoles) ||
+      AppRoutes.canAccessHrAny(user.effectiveRoles);
 
   /// The ordered workspaces available to [user]. My KRA is always first.
   static List<Workspace> workspacesFor(User user) {
@@ -42,7 +42,7 @@ class WorkspaceSwitcher {
         route: AppRoutes.employeeHome,
         areaPrefix: AppRoutes.employeeDashboard, // '/employee'
       ),
-      if (AppRoutes.canAccessManager(user.role, hasReports: user.hasReports))
+      if (AppRoutes.canAccessManagerAny(user.effectiveRoles, hasReports: user.hasReports))
         const Workspace(
           label: AppStrings.workspaceMyTeam,
           subtitle: AppStrings.workspaceMyTeamSubtitle,
@@ -50,7 +50,7 @@ class WorkspaceSwitcher {
           route: AppRoutes.managerTeamDashboard,
           areaPrefix: AppRoutes.managerDashboard, // '/manager'
         ),
-      if (AppRoutes.canReview(user.role))
+      if (AppRoutes.canReviewAny(user.effectiveRoles))
         const Workspace(
           label: AppStrings.workspaceReviews,
           subtitle: AppStrings.workspaceReviewsSubtitle,
@@ -58,7 +58,7 @@ class WorkspaceSwitcher {
           route: AppRoutes.monthlyReviews,
           areaPrefix: AppRoutes.reviewsDashboard, // '/reviews'
         ),
-      if (AppRoutes.canAccessHr(user.role))
+      if (AppRoutes.canAccessHrAny(user.effectiveRoles))
         const Workspace(
           label: AppStrings.workspaceHrAdmin,
           subtitle: AppStrings.workspaceHrAdminSubtitle,

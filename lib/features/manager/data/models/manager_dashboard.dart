@@ -36,16 +36,14 @@ class ManagerDashboard {
             .toList(),
         lastCycleTrend: JsonParse.parseMap(json['lastCycleTrend']) == null
             ? null
-            : TeamTrend.fromJson(
-                JsonParse.parseMap(json['lastCycleTrend'])!),
+            : TeamTrend.fromJson(JsonParse.parseMap(json['lastCycleTrend'])!),
       );
 
   Map<String, dynamic> toJson() => {
         'manager': manager.toJson(),
         'activeCycle': activeCycle?.toJson(),
         'stats': stats.toJson(),
-        'pendingActions':
-            pendingActions.map((p) => p.toJson()).toList(),
+        'pendingActions': pendingActions.map((p) => p.toJson()).toList(),
         'lastCycleTrend': lastCycleTrend?.toJson(),
       };
 }
@@ -124,8 +122,7 @@ class ManagerActiveCycle {
         endDate: JsonParse.parseDate(json['endDate']),
         managerReviewDeadline:
             JsonParse.parseDate(json['managerReviewDeadline']),
-        deadlineRemaining:
-            JsonParse.parseInt(json['deadlineRemaining']),
+        deadlineRemaining: JsonParse.parseInt(json['deadlineRemaining']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -135,8 +132,7 @@ class ManagerActiveCycle {
         'fyLabel': fyLabel,
         'quarterNum': quarterNum,
         'endDate': endDate?.toIso8601String(),
-        'managerReviewDeadline':
-            managerReviewDeadline?.toIso8601String(),
+        'managerReviewDeadline': managerReviewDeadline?.toIso8601String(),
         'deadlineRemaining': deadlineRemaining,
       };
 }
@@ -169,8 +165,7 @@ class TeamTrend {
         lowest: JsonParse.parseMap(json['lowest']) == null
             ? null
             : TopPerformer.fromJson(JsonParse.parseMap(json['lowest'])!),
-        completionRate:
-            JsonParse.parseDouble(json['completionRate']) ?? 0,
+        completionRate: JsonParse.parseDouble(json['completionRate']) ?? 0,
       );
 
   Map<String, dynamic> toJson() => {
@@ -194,8 +189,7 @@ class TopPerformer {
     required this.score,
   });
 
-  factory TopPerformer.fromJson(Map<String, dynamic> json) =>
-      TopPerformer(
+  factory TopPerformer.fromJson(Map<String, dynamic> json) => TopPerformer(
         employeeId: JsonParse.parseString(json['employeeId']) ?? '',
         name: JsonParse.parseString(json['name']) ?? '',
         score: JsonParse.parseDouble(json['score']) ?? 0,

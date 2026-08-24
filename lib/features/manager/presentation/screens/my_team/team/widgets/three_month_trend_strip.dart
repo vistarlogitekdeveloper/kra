@@ -13,9 +13,8 @@ class ThreeMonthTrendStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = scores.length > 3
-        ? scores.sublist(scores.length - 3)
-        : scores;
+    final visible =
+        scores.length > 3 ? scores.sublist(scores.length - 3) : scores;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

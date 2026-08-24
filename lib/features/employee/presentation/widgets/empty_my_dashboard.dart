@@ -71,11 +71,10 @@ class EmptyMyDashboard extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primaryPurple,
                     side: BorderSide(
-                      color:
-                          AppColors.primaryPurple.withValues(alpha: 0.40),
+                      color: AppColors.primaryPurple.withValues(alpha: 0.40),
                     ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 22, vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

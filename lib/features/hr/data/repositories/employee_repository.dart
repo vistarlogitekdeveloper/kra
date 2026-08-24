@@ -20,6 +20,10 @@ abstract class EmployeeRepository {
     required String fullName,
     required String email,
     required String role,
+
+    /// Full grant set when the server supports multi-role; omit otherwise.
+    /// See `FeatureFlags.multiRole`.
+    List<String>? roles,
     String? position,
     String? department,
     String? projectLocationId,

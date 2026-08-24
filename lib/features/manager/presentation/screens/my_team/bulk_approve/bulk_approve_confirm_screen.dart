@@ -49,9 +49,7 @@ class _BulkApproveConfirmScreenState
     );
     if (ok != true) return;
     final comment = _commentController.text.trim();
-    final response = await ref
-        .read(bulkApproveProvider.notifier)
-        .submit(
+    final response = await ref.read(bulkApproveProvider.notifier).submit(
           reviewIds: widget.reviewIds,
           comment: comment.isEmpty ? null : comment,
         );
@@ -178,13 +176,11 @@ class _CommentField extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: AppColors.divider, width: 1),
+                borderSide: BorderSide(color: AppColors.divider, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: AppColors.divider, width: 1),
+                borderSide: BorderSide(color: AppColors.divider, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -273,8 +269,7 @@ class _ApproveBar extends StatelessWidget {
             width: double.infinity,
             child: isOffline
                 ? Tooltip(
-                    message:
-                        AppStrings.managerRateOfflineTooltip,
+                    message: AppStrings.managerRateOfflineTooltip,
                     child: btn,
                   )
                 : btn,

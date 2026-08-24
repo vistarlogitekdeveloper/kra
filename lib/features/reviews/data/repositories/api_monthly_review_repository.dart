@@ -78,8 +78,7 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
         data: {
           'stage': stage.toApiString(),
           if (rowScores != null)
-            'rowScores':
-                rowScores.map((k, v) => MapEntry(k, v.toJson())),
+            'rowScores': rowScores.map((k, v) => MapEntry(k, v.toJson())),
           if (approved != null) 'approved': approved,
           if (comment != null) 'comment': comment,
         },
@@ -121,6 +120,30 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
           'stage': stage.toApiString(),
           'rowScores': rowScores.map((k, v) => MapEntry(k, v.toJson())),
         },
+      );
+      return MonthlyReview.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
+  Future<MonthlyReview> lockManagement(String reviewId) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.monthlyReviews}/$reviewId/lock-management',
+      );
+      return MonthlyReview.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
+  Future<MonthlyReview> unlockManagement(String reviewId) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.monthlyReviews}/$reviewId/unlock-management',
       );
       return MonthlyReview.fromJson(unwrapObject(response));
     } catch (e, st) {

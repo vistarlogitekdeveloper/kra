@@ -43,13 +43,10 @@ class ManagerTotalFooter extends ConsumerWidget {
           data: (v) => v,
           orElse: () => true,
         );
-    final canTap =
-        isPrimaryEnabled && !isSubmitting && isOnline;
+    final canTap = isPrimaryEnabled && !isSubmitting && isOnline;
     final disabledReason = !isOnline
         ? AppStrings.selfRateOfflineTooltip
-        : (!isPrimaryEnabled
-            ? AppStrings.managerRateIncompleteScores
-            : null);
+        : (!isPrimaryEnabled ? AppStrings.managerRateIncompleteScores : null);
 
     final button = ElevatedButton(
       onPressed: canTap ? onPrimary : null,
@@ -59,8 +56,7 @@ class ManagerTotalFooter extends ConsumerWidget {
         disabledBackgroundColor:
             AppColors.primaryPurple.withValues(alpha: 0.25),
         disabledForegroundColor: Colors.white,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),

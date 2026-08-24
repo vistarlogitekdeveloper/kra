@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
+import '../../../../../core/utils/name_format.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../../core/widgets/theme_toggle_button.dart';
 import '../../../../../core/widgets/workspace_drawer.dart';
@@ -92,10 +93,9 @@ class EmployeeHomeScreen extends ConsumerWidget {
     // My Team / HR Admin). A reporting manager who lands on My KRA needs a
     // clear, discoverable way over to My Team; a lone back arrow that silently
     // jumped there read as a browser-back, which is what looked broken.
-    final hasWorkspaceMenu =
-        user != null && WorkspaceSwitcher.hasExtras(user);
+    final hasWorkspaceMenu = user != null && WorkspaceSwitcher.hasExtras(user);
     final header = GreetingHeader(
-      name: _firstName(fullName),
+      name: firstNameOf(fullName),
       employeeCode: employeeCode,
       roleLabel: roleLabel,
       leading: Row(
@@ -141,11 +141,6 @@ class EmployeeHomeScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _firstName(String fullName) {
-    if (fullName.trim().isEmpty) return 'there';
-    return fullName.trim().split(' ').first;
   }
 }
 
@@ -285,7 +280,8 @@ class _DeadlineBannerSection extends ConsumerWidget {
         final selfDone = ref
                 .watch(myMonthlyReviewProvider(
                     _CurrentMonthSection._periodFor(dashboard)))
-                .maybeWhen(data: (r) => r?.selfRatingSubmitted, orElse: () => null) ??
+                .maybeWhen(
+                    data: (r) => r?.selfRatingSubmitted, orElse: () => null) ??
             false;
         final submittedAll =
             selfDone || (dashboard.scorecard?.state.hasSubmittedAll ?? false);
@@ -331,9 +327,8 @@ class _CurrentMonthSection extends ConsumerWidget {
         // Cross-check against the monthly review the KRA sheet actually writes
         // to, and promote the state when the self-rating really is in.
         final period = _periodFor(dashboard);
-        final selfDone = ref
-                .watch(myMonthlyReviewProvider(period))
-                .maybeWhen(data: (r) => r?.selfRatingSubmitted, orElse: () => null) ??
+        final selfDone = ref.watch(myMonthlyReviewProvider(period)).maybeWhen(
+                data: (r) => r?.selfRatingSubmitted, orElse: () => null) ??
             false;
         final legacyState = dashboard.scorecard?.state ?? ReviewState.draft;
         final promote = selfDone && !legacyState.hasSubmittedAll;

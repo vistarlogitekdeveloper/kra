@@ -95,8 +95,7 @@ class _Tile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ExpansionTile(
       tilePadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
-      childrenPadding:
-          const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       iconColor: AppColors.accentOrange,
       collapsedIconColor: AppColors.textSecondary,
       title: Row(
@@ -151,8 +150,7 @@ class _Tile extends StatelessWidget {
       children: [
         if (item.detail != null && item.detail!.isNotEmpty) ...[
           Container(
-            padding:
-                const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.circular(8),
@@ -177,8 +175,7 @@ class _Tile extends StatelessWidget {
             ),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primaryPurple,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             ),
             icon: const Icon(Icons.rate_review_rounded, size: 16),
             label: const Text(

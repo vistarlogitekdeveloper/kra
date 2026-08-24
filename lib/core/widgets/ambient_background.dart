@@ -112,8 +112,7 @@ class AmbientBackground extends StatelessWidget {
                         child: Image.asset(
                           AppAssets.sMark,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) =>
-                              const SizedBox.shrink(),
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                         ),
                       ),
                     ),

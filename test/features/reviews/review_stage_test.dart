@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/constants/feature_flags.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 
@@ -73,9 +74,10 @@ void main() {
           containsAll([UserRole.hr, UserRole.hrAdmin]));
       expect(ReviewStage.accountHrRating.actorRoles,
           isNot(contains(UserRole.finance)));
-      // Finance is the third Review rater.
-      expect(
-          ReviewStage.financeRating.actorRoles, contains(UserRole.finance));
+      // Finance is the third Review rater — and HR_ADMIN holds that Accounts
+      // seat too, since one UserRole can't say "HR Admin AND Accounts".
+      expect(ReviewStage.financeRating.actorRoles,
+          containsAll([UserRole.finance, UserRole.hrAdmin]));
       expect(ReviewStage.incentivePayout.actorRoles,
           containsAll([UserRole.finance, UserRole.hr, UserRole.hrAdmin]));
       // Any manager-tier role gets a team roster, so all of them can rate.
@@ -86,8 +88,17 @@ void main() {
             UserRole.bdManager,
             UserRole.warehouseMgr,
           ]));
+      // Management sign-off belongs to the management tier. HR_ADMIN shares it
+      // ONLY while the backend cannot store MANAGEMENT — gating on a role
+      // nobody can hold would leave the stage with no actor at all.
       expect(ReviewStage.managementReview.actorRoles,
-          containsAll([UserRole.admin, UserRole.hrAdmin]));
+          contains(UserRole.management));
+      expect(
+        ReviewStage.managementReview.actorRoles.contains(UserRole.hrAdmin),
+        !FeatureFlags.roleTiers,
+        reason: 'HR must lose the sign-off seat once MANAGEMENT is assignable',
+      );
+      // A reporting manager never gets management review, whatever happens.
       expect(ReviewStage.managementReview.actorRoles,
           isNot(contains(UserRole.manager)));
       // Self-rating is owner-scoped; ops holds its own review too.

@@ -46,9 +46,8 @@ class SelfRatingChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w800,
-              color: hasRating
-                  ? AppColors.accentOrange
-                  : AppColors.textSecondary,
+              color:
+                  hasRating ? AppColors.accentOrange : AppColors.textSecondary,
               letterSpacing: 0.3,
             ),
           ),

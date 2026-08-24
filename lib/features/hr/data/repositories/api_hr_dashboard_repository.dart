@@ -107,8 +107,7 @@ class ApiHrDashboardRepository implements HrDashboardRepository {
 
   // ── 7. GET /hr/dashboard/recent-activity?limit= ──────────────────
   @override
-  Future<List<HrActivityEntry>> fetchRecentActivity(
-      {int limit = 15}) async {
+  Future<List<HrActivityEntry>> fetchRecentActivity({int limit = 15}) async {
     try {
       final res = await _dio.get(
         '${ApiConstants.hrDashboard}/recent-activity',

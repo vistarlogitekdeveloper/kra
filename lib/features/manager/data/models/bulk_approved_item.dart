@@ -17,10 +17,8 @@ class BulkApprovedItem {
   factory BulkApprovedItem.fromJson(Map<String, dynamic> json) =>
       BulkApprovedItem(
         reviewId: JsonParse.parseString(json['reviewId']) ?? '',
-        employeeName:
-            JsonParse.parseString(json['employeeName']) ?? '',
-        employeeCode:
-            JsonParse.parseString(json['employeeCode']),
+        employeeName: JsonParse.parseString(json['employeeName']) ?? '',
+        employeeCode: JsonParse.parseString(json['employeeCode']),
         managerTotal: JsonParse.parseDouble(json['managerTotal']),
       );
 

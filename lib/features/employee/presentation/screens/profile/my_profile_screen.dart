@@ -139,12 +139,11 @@ class _ProfileBody extends StatelessWidget {
           children: [
             if (profile.manager != null)
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: MyManagerCard(
                   manager: profile.manager!,
-                  onTap: () =>
-                      context.go(AppRoutes.employeeReportingTree),
+                  onTap: () => context.go(AppRoutes.employeeReportingTree),
                 ),
               )
             else

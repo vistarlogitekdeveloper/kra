@@ -129,9 +129,8 @@ class TeamMember {
       fullName: fullName ?? this.fullName,
       role: role ?? this.role,
       projectLocation: projectLocation ?? this.projectLocation,
-      reviewId: identical(reviewId, _sentinel)
-          ? this.reviewId
-          : reviewId as String?,
+      reviewId:
+          identical(reviewId, _sentinel) ? this.reviewId : reviewId as String?,
       reviewState: reviewState ?? this.reviewState,
       selfTotal: identical(selfTotal, _sentinel)
           ? this.selfTotal

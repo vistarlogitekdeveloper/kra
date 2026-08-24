@@ -25,9 +25,7 @@ class MonthColumnHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: isLocked
-                  ? AppColors.textMuted
-                  : AppColors.textSecondary,
+              color: isLocked ? AppColors.textMuted : AppColors.textSecondary,
               letterSpacing: 0.5,
             ),
           ),

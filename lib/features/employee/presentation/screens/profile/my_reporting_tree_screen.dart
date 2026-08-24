@@ -176,8 +176,7 @@ class _PersonNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final swatch =
-        ProfileHeader.colourFor(code.isNotEmpty ? code : name);
+    final swatch = ProfileHeader.colourFor(code.isNotEmpty ? code : name);
     final initials = ProfileHeader.initialsOf(name);
     final roleLabel = role?.replaceAll('_', ' ');
 
@@ -187,16 +186,13 @@ class _PersonNode extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isCurrentUser
-              ? AppColors.primaryPurple
-              : AppColors.divider,
+          color: isCurrentUser ? AppColors.primaryPurple : AppColors.divider,
           width: isCurrentUser ? 1.4 : 1,
         ),
         boxShadow: isCurrentUser
             ? [
                 BoxShadow(
-                  color:
-                      AppColors.primaryPurple.withValues(alpha: 0.12),
+                  color: AppColors.primaryPurple.withValues(alpha: 0.12),
                   blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
@@ -252,8 +248,8 @@ class _PersonNode extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryPurple
-                              .withValues(alpha: 0.10),
+                          color:
+                              AppColors.primaryPurple.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(

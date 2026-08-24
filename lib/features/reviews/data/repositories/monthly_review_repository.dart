@@ -72,6 +72,14 @@ abstract class MonthlyReviewRepository {
     required Map<String, RowScore> rowScores,
   });
 
+  /// Commits (locks) the management review on [reviewId]: the incentive is
+  /// fixed to the current management scores and the Management column becomes
+  /// read-only until [unlockManagement] reopens it. Management-tier only.
+  Future<MonthlyReview> lockManagement(String reviewId);
+
+  /// Reopens a locked management review so its scores can be revised + re-locked.
+  Future<MonthlyReview> unlockManagement(String reviewId);
+
   /// Fetches one row's stored proof attachment on demand.
   ///
   /// The bytes are deliberately NOT carried on the review payload (a sheet

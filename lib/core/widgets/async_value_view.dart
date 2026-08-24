@@ -51,8 +51,7 @@ class AsyncValueView<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return value.when(
-      loading: () =>
-          loadingBuilder?.call(context) ?? const _DefaultLoading(),
+      loading: () => loadingBuilder?.call(context) ?? const _DefaultLoading(),
       error: (e, st) =>
           errorBuilder?.call(e, st) ??
           _DefaultError(error: e, onRetry: onRetry),

@@ -18,8 +18,7 @@ class DeadlineWarningCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final overdue = permissions.isOverdue;
-    final accent =
-        overdue ? AppColors.accentRed : AppColors.accentOrange;
+    final accent = overdue ? AppColors.accentRed : AppColors.accentOrange;
     final daysRemaining = permissions.deadlineRemaining ?? 0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -34,9 +33,7 @@ class DeadlineWarningCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              overdue
-                  ? Icons.warning_amber_rounded
-                  : Icons.schedule_rounded,
+              overdue ? Icons.warning_amber_rounded : Icons.schedule_rounded,
               color: accent,
               size: 20,
             ),

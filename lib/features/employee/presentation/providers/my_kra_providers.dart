@@ -24,8 +24,7 @@ final myKraAssignmentsProvider = FutureProvider.autoDispose
 /// assignment per cycle (the one matching their role's template).
 final myActiveAssignmentProvider = FutureProvider.autoDispose
     .family<MyKraAssignment?, String?>((ref, cycleId) async {
-  final list =
-      await ref.watch(myKraAssignmentsProvider(cycleId).future);
+  final list = await ref.watch(myKraAssignmentsProvider(cycleId).future);
   if (list.isEmpty) return null;
   // Most realistic case is one assignment per (employee, cycle); if
   // the backend ever returns multiple, the first one (sorted by the

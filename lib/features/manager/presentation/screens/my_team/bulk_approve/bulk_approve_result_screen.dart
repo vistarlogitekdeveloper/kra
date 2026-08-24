@@ -105,12 +105,10 @@ class _Body extends StatelessWidget {
       children: [
         _CountsCard(result: result),
         const SizedBox(height: 18),
-        if (result.approved.isNotEmpty)
-          ApprovedList(items: result.approved),
+        if (result.approved.isNotEmpty) ApprovedList(items: result.approved),
         if (result.approved.isNotEmpty && result.skipped.isNotEmpty)
           const SizedBox(height: 18),
-        if (result.skipped.isNotEmpty)
-          SkippedList(items: result.skipped),
+        if (result.skipped.isNotEmpty) SkippedList(items: result.skipped),
       ],
     );
   }
@@ -231,8 +229,7 @@ class _ResultBar extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryPurple,
                     foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

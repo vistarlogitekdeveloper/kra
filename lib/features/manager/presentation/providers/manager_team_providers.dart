@@ -12,8 +12,7 @@ import '../../data/models/team_member_profile.dart';
 import '../../data/repositories/api_manager_team_repository.dart';
 import '../../data/repositories/manager_team_repository.dart';
 
-final managerTeamRepositoryProvider =
-    Provider<ManagerTeamRepository>((ref) {
+final managerTeamRepositoryProvider = Provider<ManagerTeamRepository>((ref) {
   return ApiManagerTeamRepository(dio: ref.read(dioProvider));
 });
 
@@ -40,9 +39,8 @@ class ManagerTeamFilterState {
     ManagerTeamFilter? filter,
   }) {
     return ManagerTeamFilterState(
-      cycleId: identical(cycleId, _sentinel)
-          ? this.cycleId
-          : cycleId as String?,
+      cycleId:
+          identical(cycleId, _sentinel) ? this.cycleId : cycleId as String?,
       search: search ?? this.search,
       filter: filter ?? this.filter,
     );
@@ -96,8 +94,8 @@ class ManagerTeamFilterNotifier extends StateNotifier<ManagerTeamFilterState> {
   }
 }
 
-final managerTeamFilterProvider = StateNotifierProvider<
-    ManagerTeamFilterNotifier, ManagerTeamFilterState>(
+final managerTeamFilterProvider =
+    StateNotifierProvider<ManagerTeamFilterNotifier, ManagerTeamFilterState>(
   (ref) => ManagerTeamFilterNotifier(),
 );
 

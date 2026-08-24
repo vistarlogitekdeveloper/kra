@@ -65,24 +65,20 @@ class ScoreSlider extends StatelessWidget {
                 letterSpacing: -0.5,
                 color: disabled
                     ? AppColors.textMuted
-                    : (value == null
-                        ? AppColors.textSecondary
-                        : accent),
+                    : (value == null ? AppColors.textSecondary : accent),
               ),
             ),
             const Spacer(),
             FilterChip(
               label: const Text(
                 'N/A',
-                style:
-                    TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
               ),
               selected: isNotApplicable,
               showCheckmark: false,
               onSelected: onToggleNotApplicable,
               backgroundColor: AppColors.divider.withValues(alpha: 0.5),
-              selectedColor:
-                  AppColors.primaryPurple.withValues(alpha: 0.16),
+              selectedColor: AppColors.primaryPurple.withValues(alpha: 0.16),
               labelStyle: TextStyle(
                 color: isNotApplicable
                     ? AppColors.primaryPurple
@@ -111,8 +107,7 @@ class ScoreSlider extends StatelessWidget {
             ),
             trackHeight: 4,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 11),
-            overlayShape:
-                const RoundSliderOverlayShape(overlayRadius: 22),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 22),
           ),
           child: Slider(
             value: effective.toDouble().clamp(0.0, safeMax),
@@ -135,11 +130,11 @@ class ScoreSlider extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('0',
-                  style: TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary)),
+                  style:
+                      TextStyle(fontSize: 11, color: AppColors.textSecondary)),
               Text('Max',
-                  style: TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary)),
+                  style:
+                      TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
         ),

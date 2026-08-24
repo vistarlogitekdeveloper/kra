@@ -73,8 +73,7 @@ class ScoreComparisonTable extends StatelessWidget {
                         row: row,
                         monthId: m.id,
                       ),
-                      onLongPress: () =>
-                          _showCommentSheet(context, row, m.id),
+                      onLongPress: () => _showCommentSheet(context, row, m.id),
                     ),
                 ],
               ),

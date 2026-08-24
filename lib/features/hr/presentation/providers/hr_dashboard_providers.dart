@@ -61,14 +61,14 @@ final hrActiveEmployeeCountProvider = FutureProvider.autoDispose<int>((ref) {
 //    the id it exposes.
 // ─────────────────────────────────────────────────────────────────────
 
-final hrActiveCycleProvider =
-    FutureProvider.autoDispose<HrActiveCycle?>((ref) {
+final hrActiveCycleProvider = FutureProvider.autoDispose<HrActiveCycle?>((ref) {
   ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchActiveCycle();
 });
 
 // Derived: just the ID — used by the family providers below.
-final hrActiveCycleIdProvider = Provider.autoDispose<AsyncValue<String?>>((ref) {
+final hrActiveCycleIdProvider =
+    Provider.autoDispose<AsyncValue<String?>>((ref) {
   return ref.watch(hrActiveCycleProvider).whenData((c) => c?.id);
 });
 
@@ -85,29 +85,24 @@ final hrKpisProvider =
 });
 
 /// 4. Review pipeline funnel
-final hrPipelineProvider =
-    FutureProvider.autoDispose.family<List<HrPipelineItem>, String>(
-        (ref, cycleId) {
+final hrPipelineProvider = FutureProvider.autoDispose
+    .family<List<HrPipelineItem>, String>((ref, cycleId) {
   ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchPipeline(cycleId);
 });
 
 /// 5. Action items that need HR attention
-final hrActionItemsProvider =
-    FutureProvider.autoDispose.family<List<HrActionItem>, String>(
-        (ref, cycleId) {
+final hrActionItemsProvider = FutureProvider.autoDispose
+    .family<List<HrActionItem>, String>((ref, cycleId) {
   ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchActionItems(cycleId);
 });
 
 /// 6. Location heatmap (lazy — below the fold)
-final hrLocationHeatmapProvider =
-    FutureProvider.autoDispose.family<HrLocationHeatmap, String>(
-        (ref, cycleId) {
+final hrLocationHeatmapProvider = FutureProvider.autoDispose
+    .family<HrLocationHeatmap, String>((ref, cycleId) {
   ref.keepAlive();
-  return ref
-      .watch(hrDashboardRepositoryProvider)
-      .fetchLocationHeatmap(cycleId);
+  return ref.watch(hrDashboardRepositoryProvider).fetchLocationHeatmap(cycleId);
 });
 
 /// 7. Recent activity — not cycle-scoped
@@ -121,8 +116,7 @@ final hrRecentActivityProvider =
 
 /// 8. Deadline countdown strip
 final hrDeadlinesProvider =
-    FutureProvider.autoDispose.family<List<HrDeadline>, String>(
-        (ref, cycleId) {
+    FutureProvider.autoDispose.family<List<HrDeadline>, String>((ref, cycleId) {
   ref.keepAlive();
   return ref.watch(hrDashboardRepositoryProvider).fetchDeadlines(cycleId);
 });

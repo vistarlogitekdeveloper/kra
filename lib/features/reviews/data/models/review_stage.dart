@@ -1,3 +1,4 @@
+import '../../../../core/constants/feature_flags.dart';
 import '../../../auth/data/models/user.dart';
 
 /// Stages of a single monthly review.
@@ -7,7 +8,8 @@ import '../../../auth/data/models/user.dart';
 ///   2. **Review** — three INDEPENDENT ratings entered in parallel by the
 ///      reporting manager, HR and Finance. Their per-KRA average is the
 ///      Review score (see [MonthlyReview.reviewAvgPct]).
-///   3. **Management** — HR either approves (the Review average stands) or, on
+///   3. **Management** — management (the founder/CEO tier, held as
+///      [UserRole.admin]) either approves (the Review average stands) or, on
 ///      rework, enters a rating that OVERRIDES it and becomes final.
 ///   4. **Payout** — Finance/HR mark the incentive paid.
 ///
@@ -204,11 +206,22 @@ enum ReviewStage {
         // The HR rater in the Review cycle.
         return const {UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.financeRating:
-        // The Finance / Accounts rater in the Review cycle.
-        return const {UserRole.finance};
+        // The Finance / Accounts rater in the Review cycle. HR_ADMIN holds this
+        // seat too: the commercial/HR-admin post covers Accounts rating as well,
+        // and a single [UserRole] can't express "HR Admin AND Accounts".
+        return const {UserRole.finance, UserRole.hrAdmin};
       case ReviewStage.managementReview:
-        // Management review is done by HR (approve, or override on rework).
-        return const {UserRole.hrAdmin, UserRole.admin};
+        // The management tier signs off (approve, or override per KRA on
+        // rework) — the last gate before the incentive is paid, so it is
+        // deliberately NOT the same seat as the HR rater: HR would otherwise
+        // approve its own input.
+        //
+        // Until the backend's employees enum accepts `MANAGEMENT`, nobody can
+        // be assigned it and gating on it alone would leave this stage with no
+        // eligible actor, so HR_ADMIN shares it. See [FeatureFlags.roleTiers].
+        return FeatureFlags.roleTiers
+            ? const {UserRole.management}
+            : const {UserRole.management, UserRole.hrAdmin};
       case ReviewStage.incentivePayout:
         return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
       case ReviewStage.completed:
@@ -278,6 +291,11 @@ enum ReviewStage {
   /// Authority for the ORG-LEVEL stages only. For the relationship stages
   /// ([isRelationshipStage]) see [MonthlyReview.isActionableBy].
   bool isActionableBy(UserRole role) => actorRoles.contains(role);
+
+  /// True when ANY of [roles] may act on this stage — the multi-role form.
+  /// Someone holding both the HR and Accounts seats can act on either.
+  bool isActionableByAny(Set<UserRole> roles) =>
+      roles.any(actorRoles.contains);
 
   /// Stages decided by WHO the caller is to a review rather than by role:
   ///   * [selfRating] — the review's owner, whatever their role.

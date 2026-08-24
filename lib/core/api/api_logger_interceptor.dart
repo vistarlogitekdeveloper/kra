@@ -53,7 +53,8 @@ class ApiLoggerInterceptor extends Interceptor {
       handler.next(response);
       return;
     }
-    final ms = _watches.remove(response.requestOptions.hashCode)?.elapsedMilliseconds;
+    final ms =
+        _watches.remove(response.requestOptions.hashCode)?.elapsedMilliseconds;
     debugPrint(
       '← ${response.requestOptions.method} ${response.requestOptions.path} '
       '(${response.statusCode}) ${ms ?? '?'}ms',
@@ -70,7 +71,8 @@ class ApiLoggerInterceptor extends Interceptor {
       handler.next(err);
       return;
     }
-    final ms = _watches.remove(err.requestOptions.hashCode)?.elapsedMilliseconds;
+    final ms =
+        _watches.remove(err.requestOptions.hashCode)?.elapsedMilliseconds;
     final status = err.response?.statusCode;
     debugPrint(
       '✕ ${err.requestOptions.method} ${err.requestOptions.path} '

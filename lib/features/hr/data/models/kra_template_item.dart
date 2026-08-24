@@ -1,3 +1,4 @@
+import '../../../../core/api/json_parse.dart';
 import '../../../../core/enums/kra_reviewer.dart';
 
 /// A single KRA item inside a [KraTemplate]. Weightages must sum to 100
@@ -52,13 +53,13 @@ class KraTemplateItem {
   factory KraTemplateItem.fromJson(Map<String, dynamic> json) {
     // Backend stores weightage as Prisma Decimal, which serialises to a
     // JSON string ("0.05") — not a number. Tolerate both shapes.
-    final raw = _parseDouble(json['weightage']) ?? 0;
+    final raw = JsonParse.parseDouble(json['weightage']) ?? 0;
     // Normalise to percentage (0–100).
     final pct = raw <= 1.0 ? raw * 100 : raw;
     // Wire format uses 1-based sortOrder; we keep 0-based internally so it
     // lines up with `_items[i]` in the form. Clamp at 0 so a malformed
     // payload can't produce a negative index.
-    final wireSortOrder = _parseInt(json['sortOrder']) ?? 1;
+    final wireSortOrder = JsonParse.parseInt(json['sortOrder']) ?? 1;
     final internalSortOrder = wireSortOrder > 0 ? wireSortOrder - 1 : 0;
     return KraTemplateItem(
       id: json['id'] as String?,
@@ -76,21 +77,6 @@ class KraTemplateItem {
       weightage: pct,
       sortOrder: internalSortOrder,
     );
-  }
-
-  static double? _parseDouble(dynamic value) {
-    if (value == null) return null;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
-  }
-
-  static int? _parseInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value);
-    return null;
   }
 
   /// Wire format:
@@ -113,8 +99,10 @@ class KraTemplateItem {
         // enum is fixed, so it MUST be sent in that vocabulary. `reviewerGroup`
         // is sent alongside for any backend that reads a dedicated column; the
         // template API simply ignores unknown keys.
-        if (reviewerGroup != null) 'scoreSource': reviewerGroup!.toScoreSource(),
-        if (reviewerGroup != null) 'reviewerGroup': reviewerGroup!.toApiString(),
+        if (reviewerGroup != null)
+          'scoreSource': reviewerGroup!.toScoreSource(),
+        if (reviewerGroup != null)
+          'reviewerGroup': reviewerGroup!.toApiString(),
         'weightage': weightagePercent / 100,
         'sortOrder': sortOrder + 1,
       };

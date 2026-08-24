@@ -252,8 +252,7 @@ class _TimelineStrip extends StatelessWidget {
                         : AppColors.divider),
               ),
             ),
-            if (i == _steps.length - 1)
-              const SizedBox.shrink(),
+            if (i == _steps.length - 1) const SizedBox.shrink(),
           ],
         ],
       ),

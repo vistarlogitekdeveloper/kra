@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Every screen in this app talks to the KRA API, so the whole thing is
+         dead without this. Flutter only declares INTERNET in the debug and
+         profile manifests (for hot reload), which is why `flutter run` works
+         while a RELEASE APK installs fine and then fails every request.
+
+         ACCESS_NETWORK_STATE is not declared here on purpose: connectivity_plus
+         contributes it through manifest merging. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="krafrontend"
+        android:label="Vistar KRA"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

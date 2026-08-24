@@ -23,10 +23,8 @@ class ManagerRatePartialSuccessScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(managerRateProvider);
-    final transitionError =
-        state.lastSubmitResponse?.transitionError;
-    final managerTotal =
-        state.lastSubmitResponse?.totals.managerTotal;
+    final transitionError = state.lastSubmitResponse?.transitionError;
+    final managerTotal = state.lastSubmitResponse?.totals.managerTotal;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -40,8 +38,7 @@ class ManagerRatePartialSuccessScreen extends ConsumerWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () =>
-              context.go(AppRoutes.managerReviewDetail(reviewId)),
+          onPressed: () => context.go(AppRoutes.managerReviewDetail(reviewId)),
         ),
       ),
       body: ListView(
@@ -60,8 +57,7 @@ class ManagerRatePartialSuccessScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 14),
-          if (transitionError != null)
-            _ReasonCard(error: transitionError),
+          if (transitionError != null) _ReasonCard(error: transitionError),
           if (managerTotal != null) ...[
             const SizedBox(height: 14),
             _TotalSaved(value: managerTotal),
@@ -71,13 +67,11 @@ class ManagerRatePartialSuccessScreen extends ConsumerWidget {
             onPressed: state.isSubmitting
                 ? null
                 : () async {
-                    final response = await ref
-                        .read(managerRateProvider.notifier)
-                        .submit();
+                    final response =
+                        await ref.read(managerRateProvider.notifier).submit();
                     if (!context.mounted) return;
                     if (response != null && response.transitioned) {
-                      context.go(
-                          AppRoutes.managerRateSuccess(reviewId));
+                      context.go(AppRoutes.managerRateSuccess(reviewId));
                     }
                   },
             icon: state.isSubmitting
@@ -193,8 +187,8 @@ class _ReasonCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accentOrange.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: AppColors.accentOrange.withValues(alpha: 0.30)),
+        border:
+            Border.all(color: AppColors.accentOrange.withValues(alpha: 0.30)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

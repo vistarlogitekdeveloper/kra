@@ -321,9 +321,8 @@ class _KraAssignScreenState extends ConsumerState<KraAssignScreen> {
           : 'Replaced the KRA for $updated employees.');
     }
     if (skipped > 0) {
-      parts.add(skipped == 1
-          ? '1 skipped (locked).'
-          : '$skipped skipped (locked).');
+      parts.add(
+          skipped == 1 ? '1 skipped (locked).' : '$skipped skipped (locked).');
     }
     return parts.join(' ');
   }

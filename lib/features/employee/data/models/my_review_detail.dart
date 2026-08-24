@@ -77,8 +77,8 @@ class MyReview {
       managerId: JsonParse.parseString(json['managerId']),
       templateId: JsonParse.parseString(json['templateId']),
       projectLocationId: JsonParse.parseString(json['projectLocationId']),
-      state: ReviewState.fromApi(
-          JsonParse.parseString(json['state']) ?? 'DRAFT'),
+      state:
+          ReviewState.fromApi(JsonParse.parseString(json['state']) ?? 'DRAFT'),
       monthlyIncentiveAmount:
           JsonParse.parseDouble(json['monthlyIncentiveAmount']),
       quarterlyFixedIncentive:
@@ -100,12 +100,10 @@ class MyReview {
               JsonParse.parseMap(json['projectLocation'])!),
       reviewCycle: JsonParse.parseMap(json['reviewCycle']) == null
           ? null
-          : ReviewCycleRef.fromJson(
-              JsonParse.parseMap(json['reviewCycle'])!),
-      rows: JsonParse.parseMapList(json['rows'])
-          .map(ReviewRow.fromJson)
-          .toList()
-        ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder)),
+          : ReviewCycleRef.fromJson(JsonParse.parseMap(json['reviewCycle'])!),
+      rows:
+          JsonParse.parseMapList(json['rows']).map(ReviewRow.fromJson).toList()
+            ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder)),
       remark: JsonParse.parseMap(json['remark']),
     );
   }
@@ -436,8 +434,7 @@ class ReviewMonthRef {
     required this.status,
   });
 
-  factory ReviewMonthRef.fromJson(Map<String, dynamic> json) =>
-      ReviewMonthRef(
+  factory ReviewMonthRef.fromJson(Map<String, dynamic> json) => ReviewMonthRef(
         id: JsonParse.parseString(json['id']) ?? '',
         monthLabel: JsonParse.parseString(json['monthLabel']) ?? '',
         monthDate: JsonParse.parseDate(json['monthDate']),
@@ -563,14 +560,12 @@ class ReviewCycleRef {
     this.months = const [],
   });
 
-  factory ReviewCycleRef.fromJson(Map<String, dynamic> json) =>
-      ReviewCycleRef(
+  factory ReviewCycleRef.fromJson(Map<String, dynamic> json) => ReviewCycleRef(
         id: JsonParse.parseString(json['id']) ?? '',
         name: JsonParse.parseString(json['name']) ?? '',
         fyLabel: JsonParse.parseString(json['fyLabel']),
         status: JsonParse.parseString(json['status']) ?? '',
-        selfRatingDeadline:
-            JsonParse.parseDate(json['selfRatingDeadline']),
+        selfRatingDeadline: JsonParse.parseDate(json['selfRatingDeadline']),
         managerReviewDeadline:
             JsonParse.parseDate(json['managerReviewDeadline']),
         months: JsonParse.parseMapList(json['months'])
@@ -584,8 +579,7 @@ class ReviewCycleRef {
         'fyLabel': fyLabel,
         'status': status,
         'selfRatingDeadline': selfRatingDeadline?.toIso8601String(),
-        'managerReviewDeadline':
-            managerReviewDeadline?.toIso8601String(),
+        'managerReviewDeadline': managerReviewDeadline?.toIso8601String(),
         'months': months.map((e) => e.toJson()).toList(),
       };
 

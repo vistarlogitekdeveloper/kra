@@ -20,25 +20,11 @@ import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/review_stage.dart';
 import '../../data/models/row_score.dart';
+import '../../../hr/presentation/widgets/confirm_action_dialog.dart';
+import '../../data/models/stage_record.dart';
 import '../../data/repositories/monthly_review_repository.dart';
 import '../providers/kra_reviewer_map_provider.dart';
 import '../providers/monthly_review_providers.dart';
-
-const _monthAbbr = [
-  '',
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 
 /// Content type for a proof attachment, from its extension.
 ///
@@ -85,9 +71,6 @@ String _mimeFor(String fileName) {
       return 'application/octet-stream';
   }
 }
-
-String _shortMonth(ReviewPeriod p) =>
-    "${_monthAbbr[p.month]} '${p.year.toString().substring(2)}";
 
 /// Brand colour that identifies a KRA's single Review-cycle reviewer, so the
 /// name badge and the month cell read as the same owner at a glance.
@@ -165,7 +148,8 @@ class _QuarterlyKraSheetScreenState
   ///   3. the template's assignment by POSITION (the Nth KRA);
   ///   4. default to the Reporting Manager — the relationship every employee
   ///      has — so a KRA is never left unassigned.
-  MonthlyReview? _applyReviewerMap(MonthlyReview? r, KraReviewerAssignment map) {
+  MonthlyReview? _applyReviewerMap(
+      MonthlyReview? r, KraReviewerAssignment map) {
     if (r == null) return r;
     // Match the template's ordering so position-based fallback lines up.
     final ordered = [...r.rows]
@@ -240,10 +224,18 @@ class _QuarterlyKraSheetScreenState
 
   // Management review (cycle 3) — HR either approves the Review average or, on
   // rework, overrides it per KRA. Done by HR_ADMIN / ADMIN.
-  bool _canEditManagement(MonthlyReview r, ReviewScope? scope) =>
+  //
+  // Split in two on purpose. [_hasManagementRole] is the ROLE alone, with no
+  // lock check: it gates the sheet-level lock / reopen actions, and *reopening*
+  // is precisely the action you need on a finished quarter — folding
+  // `!isComplete` into it would remove the only way back out of a locked
+  // review. [_canEditManagement] adds the lock and gates per-KRA score entry.
+  bool _hasManagementRole(ReviewScope? scope) =>
       scope != null &&
-      !r.isComplete &&
       (scope.role == UserRole.hrAdmin || scope.role == UserRole.admin);
+
+  bool _canEditManagement(MonthlyReview r, ReviewScope? scope) =>
+      _hasManagementRole(scope) && !r.isComplete;
 
   Future<void> _editCell({
     required MonthlyReview review,
@@ -254,8 +246,30 @@ class _QuarterlyKraSheetScreenState
     required String kraName,
     required String monthLabel,
   }) async {
+    // The reporting manager moderates a self-assessment; they never inflate it.
+    // So their score for a KRA is capped at the employee's own score for that
+    // same KRA and month. Enforced here (the ceiling passed into the sheet) and
+    // again on commit inside the sheet.
+    double? capPct;
+    String? capNote;
+    if (stage == ReviewStage.reportingManagerRating) {
+      final selfValue = _currentScore(review, rowId, ReviewStage.selfRating)?.value;
+      if (selfValue == null) {
+        // Nothing to moderate yet. Rating first would let the manager set the
+        // ceiling for the employee's own rating, which inverts the order.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(AppStrings.sheetCapNoSelfRating)),
+          );
+        }
+        return;
+      }
+      capPct = (selfValue / maxScore * 100).clamp(0, 100).toDouble();
+      capNote = '${AppStrings.sheetCapPrefix} ${capPct.round()}%';
+    }
+
     // Accessible rating entry: a slider + one-tap presets in a bottom sheet.
-    // Tapping a preset saves immediately (no separate "edit then save" step).
+    // Nothing is written until Save is tapped — presets only set the value.
     final result = await showModalBottomSheet<double>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -268,6 +282,8 @@ class _QuarterlyKraSheetScreenState
         monthLabel: monthLabel,
         stageLabel: stage.label,
         currentPct: currentPct,
+        maxPct: capPct,
+        capNote: capNote,
       ),
     );
     if (result == null || result < 0) return;
@@ -318,6 +334,350 @@ class _QuarterlyKraSheetScreenState
   /// deliberately not mapped to a fixed string here.
   String _saveErrorText(Object e) =>
       e is ApiError ? e.combinedMessage : 'Could not save. Please try again.';
+
+  /// Months in this quarter whose self-rating this viewer may SUBMIT.
+  ///
+  /// Conditions:
+  ///   * it is their own sheet ([_canEditSelf]);
+  ///   * at least one KRA carries a self score. Submitting an untouched month
+  ///     would hand the manager an empty sheet and email them about it;
+  ///   * it has not already been submitted — a stage record for Self-Rating is
+  ///     what proves that, so the button disappears once used.
+  ///
+  /// Note what is NOT required: the cursor still being on `SELF_RATING`. Gating
+  /// on that made the button impossible to reach against a backend that still
+  /// auto-advances the cursor when a score is saved — before rating there is
+  /// nothing to submit, and after rating the cursor had already moved, so the
+  /// window never opened. A stale server is now handled where it belongs, on the
+  /// response (see [_submitSelfRating]), rather than by hiding the action.
+  List<MonthlyReview> _submittableReviews(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) =>
+      [
+        for (final r in reviews.whereType<MonthlyReview>())
+          if (_canEditSelf(r, scope) &&
+              _hasSelfScore(r) &&
+              r.recordFor(ReviewStage.selfRating) == null)
+            r,
+      ];
+
+  /// True when any KRA has a self score.
+  ///
+  /// Tests for PRESENCE, not a positive total: an employee who honestly rates
+  /// everything 0 has still rated, and a weighted-total test would have silently
+  /// refused to let them submit.
+  bool _hasSelfScore(MonthlyReview r) =>
+      r.rows.any((row) => row.scoreFor(ReviewStage.selfRating)?.value != null);
+
+  /// The submit action, or null when there is nothing to submit — which keeps the
+  /// bar off other people's sheets, off months already submitted, and off months
+  /// with nothing rated yet.
+  Future<void> Function()? _submitAction(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) {
+    if (scope == null) return null;
+    final targets = _submittableReviews(reviews, scope);
+    if (targets.isEmpty) return null;
+    return () => _submitSelfRating(targets, scope);
+  }
+
+  /// Submits the self-rating for [targets] and confirms it.
+  ///
+  /// The backend advances each review to the reporting manager and emails them
+  /// (CC HR) once the transaction commits — so this is the point of no return for
+  /// the employee, hence the confirmation before and the explicit
+  /// acknowledgement after.
+  Future<void> _submitSelfRating(
+    List<MonthlyReview> targets,
+    ReviewScope scope,
+  ) async {
+    final months = targets.map((r) => r.period.label).join(', ');
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.selfSubmitConfirmTitle,
+      message: '${AppStrings.selfSubmitConfirmMessage}\n\n$months',
+      confirmLabel: AppStrings.selfSubmitConfirmAction,
+      cancelLabel: AppStrings.commonCancel,
+      icon: Icons.task_alt_rounded,
+      accentColor: AppColors.primaryPurple,
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(monthlyReviewRepositoryProvider);
+      for (final review in targets) {
+        await repo.submitStage(
+          review.id,
+          ReviewStage.selfRating,
+          actorId: scope.userId,
+          actorName: scope.userName,
+        );
+      }
+      ref.invalidate(quarterlySheetProvider);
+      // The home card and the manager's list both read the summary, so drop the
+      // cached lists as well or the submitted state won't show there.
+      ref.invalidate(monthlyReviewListProvider);
+      if (mounted) await _showSubmittedDialog();
+    } catch (e) {
+      if (mounted) {
+        // A 409 here means the server has moved this review past Self-Rating —
+        // either someone else advanced it, or the deployment still auto-advances
+        // the cursor when a score is saved. Say that, rather than showing a raw
+        // "Review is at REPORTING_MANAGER_RATING, not SELF_RATING".
+        final conflict = e is ApiError && e.statusCode == 409;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(conflict
+                ? AppStrings.selfSubmitAlreadyMoved
+                : '${AppStrings.selfSubmitFailed} '
+                    '${e is ApiError ? e.message : e}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// The "submitted successfully" acknowledgement. A dialog rather than a
+  /// snackbar: this is the end of the employee's task and it tells them the
+  /// manager has been notified, which is worth an explicit dismissal.
+  Future<void> _showSubmittedDialog() => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surfaceElevated,
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.success, size: 44),
+          title: const Text(
+            AppStrings.selfSubmitDoneTitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            AppStrings.selfSubmitDoneMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          actions: [
+            Center(
+              child: FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple),
+                child: const Text(AppStrings.commonClose),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  /// Months in this quarter whose self-rating this viewer may hand back: the
+  /// pipeline is sitting on the manager's rating (so `submit-stage` will accept
+  /// it — the backend rejects a stage that isn't the current one) and the viewer
+  /// is that review's reporting manager.
+  List<MonthlyReview> _returnableReviews(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) =>
+      [
+        for (final r in reviews.whereType<MonthlyReview>())
+          if (r.currentStage == ReviewStage.reportingManagerRating &&
+              _canEditManager(r, scope))
+            r,
+      ];
+
+  /// The rework action, or null when this viewer has nothing to hand back —
+  /// which is what keeps the bar off the sheet for employees, other people's
+  /// managers, and months not sitting at the manager's stage.
+  Future<void> Function()? _reworkAction(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) {
+    if (scope == null) return null;
+    final targets = _returnableReviews(reviews, scope);
+    if (targets.isEmpty) return null;
+    return () => _sendBackForRework(targets, scope);
+  }
+
+  /// Sends the self-rating back to the employee for revision, with a reason.
+  ///
+  /// Applies to every returnable month in the quarter, so one explanation covers
+  /// the sheet the manager is actually looking at rather than making them repeat
+  /// it per month. Scores are left alone — the employee revises what is there.
+  Future<void> _sendBackForRework(
+    List<MonthlyReview> targets,
+    ReviewScope scope,
+  ) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ReworkReasonDialog(),
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(monthlyReviewRepositoryProvider);
+      for (final review in targets) {
+        await repo.submitStage(
+          review.id,
+          ReviewStage.reportingManagerRating,
+          approved: false,
+          comment: reason,
+          actorId: scope.userId,
+          actorName: scope.userName,
+        );
+      }
+      ref.invalidate(quarterlySheetProvider);
+      // The manager's list badges this from the summary flag, so drop it too.
+      ref.invalidate(monthlyReviewListProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.sheetReworkDone)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not send back: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Commits the Management column across the whole quarter in one action.
+  ///
+  /// For every KRA in each month, the management score is written as: the
+  /// management override the reviewer set, else the Review-cycle score copied in
+  /// (the value the cell was pre-filled with). Rows with no Review score yet are
+  /// skipped — there's nothing to lock. Persisting these makes them the official
+  /// management scores, so the incentive is computed from the management review;
+  /// KRAs management didn't change keep the stage-2 Review score they inherited.
+  Future<void> _lockManagementReview(List<MonthlyReview?> reviews) async {
+    // How many KRA/months carry a Review or management score to commit.
+    var pending = 0;
+    for (final review in reviews) {
+      if (review == null) continue;
+      for (final row in review.rows) {
+        final hasMgmt =
+            row.scoreFor(ReviewStage.managementReview)?.value != null;
+        final hasReview = review.reviewPctForRow(row) != null;
+        if (hasReview || hasMgmt) pending++;
+      }
+    }
+    if (pending == 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Nothing to lock yet — the Review scores aren’t in '
+                'for these KRAs.')));
+      }
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceElevated,
+        title: const Text('Lock the management review?'),
+        content: const Text(
+            'This saves a Management score for every KRA this quarter — the '
+            'Review score for the ones you didn’t change, and your edits for '
+            'the rest — and the incentive is calculated from them. You can '
+            'still edit and lock again.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryPurple),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save & Lock'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(monthlyReviewRepositoryProvider);
+      for (final review in reviews) {
+        if (review == null) continue;
+        final rowScores = <String, RowScore>{};
+        for (final row in review.rows) {
+          final existing = row.scoreFor(ReviewStage.managementReview);
+          double? value;
+          if (existing?.value != null) {
+            value = existing!.value; // keep management's own edit
+          } else {
+            final rp = review.reviewPctForRow(row);
+            if (rp != null && row.maxScore > 0) {
+              value = rp / 100 * row.maxScore; // copy the Review score in
+            }
+          }
+          if (value != null) {
+            rowScores[row.id] = RowScore(
+              value: value,
+              remark: existing?.remark,
+              proofNote: existing?.proofNote,
+            );
+          }
+        }
+        if (rowScores.isNotEmpty) {
+          await repo.saveStageScores(
+            review.id,
+            ReviewStage.managementReview,
+            rowScores: rowScores,
+          );
+        }
+        // Lock the review so its management scores are fixed and the incentive
+        // is settled to them until it's explicitly reopened.
+        await repo.lockManagement(review.id);
+      }
+      ref.invalidate(quarterlySheetProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Management review saved and locked — incentive settled to it.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not save: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Reopens a locked management review across the quarter so its scores can be
+  /// revised, then re-locked.
+  Future<void> _reopenManagement(List<MonthlyReview?> reviews) async {
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(monthlyReviewRepositoryProvider);
+      for (final review in reviews) {
+        if (review == null || !review.isManagementLocked) continue;
+        await repo.unlockManagement(review.id);
+      }
+      ref.invalidate(quarterlySheetProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Management review reopened — you can edit again.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not reopen: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   /// Fetches a row's stored proof attachment and shows it.
   ///
@@ -512,34 +872,52 @@ class _QuarterlyKraSheetScreenState
           onRetry: () => ref.invalidate(quarterlySheetProvider(
               (employeeId: employeeId, anchor: _anchor!))),
         ),
-        data: (data) => _Sheet(
-          months: data.months,
-          reviews: [
+        data: (data) {
+          final mappedReviews = [
             for (final r in data.reviews) _applyReviewerMap(r, reviewerMap),
-          ],
-          scope: scope,
-          onPrevQuarter: () => setState(() => _anchor =
-              quarterMonthsFor(_anchor!)
-                  .first
-                  .let((m) => _shiftQuarter(m, -1))),
-          onNextQuarter: () => setState(() => _anchor =
-              quarterMonthsFor(_anchor!).first.let((m) => _shiftQuarter(m, 1))),
-          pct: _pct,
-          canEditSelf: (r) => _canEditSelf(r, scope),
-          canEditManager: (r) => _canEditManager(r, scope),
-          canEditHr: (r) => _canEditHr(r, scope),
-          canEditFinance: (r) => _canEditFinance(r, scope),
-          canEditManagement: (r) => _canEditManagement(r, scope),
-          onEdit: _editCell,
-          onJustify: _openJustification,
-          // Server value first: a viewer never picked the file, so only the
-          // stored name can tell them evidence exists. The local pick is just an
-          // optimistic echo for whoever uploaded it. Keyed by stage so the
-          // employee's and each reviewer's attachments are tracked separately.
-          fileNameFor: (review, rowId, stage) =>
-              _currentScore(review, rowId, stage)?.proofFileName ??
-              _proofFiles['${review.id}|$rowId|${stage.name}']?.name,
-        ),
+          ];
+          final canManage = _hasManagementRole(scope);
+          return _Sheet(
+            months: data.months,
+            reviews: mappedReviews,
+            scope: scope,
+            onPrevQuarter: () => setState(() => _anchor =
+                quarterMonthsFor(_anchor!)
+                    .first
+                    .let((m) => _shiftQuarter(m, -1))),
+            onNextQuarter: () => setState(() => _anchor =
+                quarterMonthsFor(_anchor!)
+                    .first
+                    .let((m) => _shiftQuarter(m, 1))),
+            pct: _pct,
+            canEditSelf: (r) => _canEditSelf(r, scope),
+            canEditManager: (r) => _canEditManager(r, scope),
+            canEditHr: (r) => _canEditHr(r, scope),
+            canEditFinance: (r) => _canEditFinance(r, scope),
+            canEditManagement: (r) => _canEditManagement(r, scope),
+            onEdit: _editCell,
+            onJustify: _openJustification,
+            // Server value first: a viewer never picked the file, so only the
+            // stored name can tell them evidence exists. The local pick is just
+            // an optimistic echo for whoever uploaded it. Keyed by stage so the
+            // employee's and each reviewer's attachments are tracked separately.
+            fileNameFor: (review, rowId, stage) =>
+                _currentScore(review, rowId, stage)?.proofFileName ??
+                _proofFiles['${review.id}|$rowId|${stage.name}']?.name,
+            // Management commits the whole column at once (copy Review → Mgmt
+            // for anything they didn't change) and locks the incentive to it,
+            // or reopens a locked review to revise it.
+            onLockManagement:
+                canManage ? () => _lockManagementReview(mappedReviews) : null,
+            onReopenManagement:
+                canManage ? () => _reopenManagement(mappedReviews) : null,
+            // The reporting manager can hand a self-rating back when it looks
+            // wrong. Null unless they actually have a month to return.
+            onSendBackForRework: _reworkAction(mappedReviews, scope),
+            // The employee finalises their own rating; null for everyone else.
+            onSubmitSelfRating: _submitAction(mappedReviews, scope),
+          );
+        },
       ),
     );
   }
@@ -574,6 +952,11 @@ Widget quarterlyKraSheetBodyForTest({
   bool editableManager = false,
   bool editableHr = false,
   bool editableFinance = false,
+  bool editableManagement = false,
+  Future<void> Function()? onLockManagement,
+  Future<void> Function()? onReopenManagement,
+  Future<void> Function()? onSendBackForRework,
+  Future<void> Function()? onSubmitSelfRating,
 }) {
   double? pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
@@ -601,7 +984,7 @@ Widget quarterlyKraSheetBodyForTest({
     canEditManager: (r) => editableManager && !r.isComplete,
     canEditHr: (r) => editableHr && !r.isComplete,
     canEditFinance: (r) => editableFinance && !r.isComplete,
-    canEditManagement: (_) => false,
+    canEditManagement: (r) => editableManagement && !r.isComplete,
     onEdit: ({
       required review,
       required rowId,
@@ -620,6 +1003,10 @@ Widget quarterlyKraSheetBodyForTest({
       required canEdit,
     }) async {},
     fileNameFor: (_, __, ___) => null,
+    onLockManagement: onLockManagement,
+    onReopenManagement: onReopenManagement,
+    onSendBackForRework: onSendBackForRework,
+    onSubmitSelfRating: onSubmitSelfRating,
   );
 }
 
@@ -662,6 +1049,24 @@ class _Sheet extends StatelessWidget {
   }) onJustify;
   final String? Function(MonthlyReview, String, ReviewStage) fileNameFor;
 
+  // Management-only: persist the whole Management column in one go — copying the
+  // Review score into every KRA management hasn't overridden, keeping the ones
+  // they have — so the incentive is locked to the management review. Null for
+  // non-management viewers (the "Save & Lock" bar is hidden for them).
+  final Future<void> Function()? onLockManagement;
+
+  // Management-only: reopen a locked management review so its scores can be
+  // revised, then re-locked. Null for non-management viewers.
+  final Future<void> Function()? onReopenManagement;
+
+  /// Non-null when the viewer is the reporting manager of at least one month in
+  /// this quarter whose self-rating they may send back for revision.
+  final Future<void> Function()? onSendBackForRework;
+
+  /// Non-null when the viewer owns at least one month in this quarter that is
+  /// still at Self-Rating and has something rated to submit.
+  final Future<void> Function()? onSubmitSelfRating;
+
   const _Sheet({
     required this.months,
     required this.reviews,
@@ -677,6 +1082,10 @@ class _Sheet extends StatelessWidget {
     required this.onEdit,
     required this.onJustify,
     required this.fileNameFor,
+    this.onLockManagement,
+    this.onReopenManagement,
+    this.onSendBackForRework,
+    this.onSubmitSelfRating,
   });
 
   MonthlyReview? get _any =>
@@ -822,6 +1231,16 @@ class _Sheet extends StatelessWidget {
                 ],
               ),
             ),
+            // Any month whose self-rating the manager handed back. Shown to
+            // everyone who can see the sheet, not just the employee: the reason
+            // is the audit trail for why the pipeline went backwards.
+            for (final r in reviews.whereType<MonthlyReview>())
+              if (r.selfRatingReturned)
+                _ReworkNotice(
+                  monthLabel: r.period.label,
+                  record:
+                      r.returnedRecordFor(ReviewStage.reportingManagerRating)!,
+                ),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: _ReviewerLegend(),
@@ -860,6 +1279,28 @@ class _Sheet extends StatelessWidget {
                 ),
               ),
             ),
+            // Sits directly under the table, at the END of the ratings — the
+            // employee scrolls through every KRA and then submits.
+            if (onSubmitSelfRating != null) ...[
+              const SizedBox(height: 14),
+              _SubmitSelfRatingBar(onSubmit: onSubmitSelfRating!),
+            ],
+            if (onSendBackForRework != null) ...[
+              const SizedBox(height: 14),
+              _ReworkBar(onSendBack: onSendBackForRework!),
+            ],
+            if (onLockManagement != null) ...[
+              const SizedBox(height: 14),
+              _LockManagementBar(
+                // Locked once every month present this quarter is locked.
+                locked: reviews.whereType<MonthlyReview>().isNotEmpty &&
+                    reviews
+                        .whereType<MonthlyReview>()
+                        .every((r) => r.isManagementLocked),
+                onSave: onLockManagement!,
+                onReopen: onReopenManagement,
+              ),
+            ],
             const SizedBox(height: 16),
             _PayoutCard(
               qSelf: qSelf,
@@ -870,6 +1311,136 @@ class _Sheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Management-only action bar. While the review is OPEN it offers "Save & Lock"
+/// — one tap copies the Review score into every KRA management hasn't overridden
+/// and persists the whole Management column, so the incentive is locked to the
+/// management review (unchanged rows keep the stage-2 Review score they
+/// inherited). Once LOCKED it reads as locked and offers "Reopen" to revise.
+class _LockManagementBar extends StatefulWidget {
+  final bool locked;
+  final Future<void> Function() onSave;
+  final Future<void> Function()? onReopen;
+  const _LockManagementBar({
+    required this.locked,
+    required this.onSave,
+    required this.onReopen,
+  });
+
+  @override
+  State<_LockManagementBar> createState() => _LockManagementBarState();
+}
+
+class _LockManagementBarState extends State<_LockManagementBar> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locked = widget.locked;
+    final accent = locked ? AppColors.success : AppColors.primaryPurple;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(locked ? Icons.lock_rounded : Icons.verified_rounded,
+                color: accent, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(locked ? 'Management review locked' : 'Management review',
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text(
+                  locked
+                      ? 'The incentive is locked to these management scores. '
+                          'Reopen to change them.'
+                      : 'Saves the Management column — the Review score for '
+                          'every KRA you haven’t changed, plus your edits — and '
+                          'locks the incentive to it.',
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (locked)
+            OutlinedButton.icon(
+              onPressed: (_busy || widget.onReopen == null)
+                  ? null
+                  : () => _run(widget.onReopen!),
+              icon: _busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    )
+                  : const Icon(Icons.lock_open_rounded, size: 18),
+              label: const Text('Reopen'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryPurple,
+                side: BorderSide(
+                    color: AppColors.primaryPurple.withValues(alpha: 0.5)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            )
+          else
+            FilledButton.icon(
+              onPressed: _busy ? null : () => _run(widget.onSave),
+              icon: _busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.2, color: Colors.white),
+                    )
+                  : const Icon(Icons.lock_rounded, size: 18),
+              label: const Text('Save & Lock'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryPurple,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -929,7 +1500,7 @@ class _HeaderCard extends StatelessWidget {
               _navBtn(Icons.chevron_left_rounded, onPrev),
               const SizedBox(width: 8),
               Text(
-                '${_shortMonth(months.first)} – ${_shortMonth(months.last)}',
+                '${months.first.shortLabel} – ${months.last.shortLabel}',
                 style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
@@ -1226,30 +1797,26 @@ class _GridState extends State<_Grid> {
       child: Row(children: [
         _cell(_wWt, Text('Wt', style: h), align: Alignment.centerLeft),
         _cell(_wKra, Text('KRA', style: h), align: Alignment.centerLeft),
-        _cell(_wTgt, Text('Target', style: h),
-            align: Alignment.centerLeft),
+        _cell(_wTgt, Text('Target', style: h), align: Alignment.centerLeft),
         _cell(_wTrk, Text('Tracking\nmethod', style: h),
             align: Alignment.centerLeft),
         for (final m in widget.months) ...[
           _cell(
               _wMon,
-              Text('${_shortMonth(m)}\nSelf',
+              Text('${m.shortLabel}\nSelf',
                   style: h, textAlign: TextAlign.right)),
           _cell(
               _wMon,
-              Text('${_shortMonth(m)}\nReview',
+              Text('${m.shortLabel}\nReview',
                   style: h, textAlign: TextAlign.right)),
           _cell(
               _wMon,
-              Text('${_shortMonth(m)}\nMgmt',
+              Text('${m.shortLabel}\nMgmt',
                   style: h, textAlign: TextAlign.right)),
         ],
-        _cell(_wQtr,
-            Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
-        _cell(_wQtr,
-            Text('Qtr\nReview', style: h, textAlign: TextAlign.right)),
-        _cell(_wQtr,
-            Text('Qtr\nFinal', style: h, textAlign: TextAlign.right)),
+        _cell(_wQtr, Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
+        _cell(_wQtr, Text('Qtr\nReview', style: h, textAlign: TextAlign.right)),
+        _cell(_wQtr, Text('Qtr\nFinal', style: h, textAlign: TextAlign.right)),
       ]),
     );
   }
@@ -1309,7 +1876,8 @@ class _GridState extends State<_Grid> {
         _cell(
             _wMon,
             _scoreCell(i, rowId, maxScore, name, ReviewStage.managementReview,
-                canEdit: widget.canEditManagement)),
+                canEdit: (r) =>
+                    widget.canEditManagement(r) && !r.isManagementLocked)),
       ],
       _cell(
           _wQtr,
@@ -1429,8 +1997,8 @@ class _GridState extends State<_Grid> {
           style: TextStyle(fontSize: 11, color: AppColors.textMuted));
     }
     return Text(tracking.trim(),
-        style: TextStyle(
-            fontSize: 11, height: 1.3, color: AppColors.textMuted));
+        style:
+            TextStyle(fontSize: 11, height: 1.3, color: AppColors.textMuted));
   }
 
   Widget _scoreCell(int monthIdx, String rowId, double maxScore, String name,
@@ -1439,14 +2007,32 @@ class _GridState extends State<_Grid> {
     final review = widget.reviews[monthIdx];
     final p = widget.pct(review, rowId, stage);
     final editable = review != null && canEdit(review);
-    final text = Text(_fmt(p),
+
+    // Management review inherits the Review-cycle score. Once this KRA's
+    // assigned reviewer has rated it (Review done) and management hasn't
+    // entered an override yet, pre-fill the Mgmt cell with that Review score so
+    // management starts from it — accept it as-is or change it. The Qtr Final
+    // already falls back to the Review score, so this just surfaces the value
+    // that's effectively standing and seeds the editor with it. It's shown
+    // muted + italic until management saves, so an inherited value reads apart
+    // from one management has actually set.
+    final double? reviewPct = stage == ReviewStage.managementReview
+        ? _reviewPct(review, rowId)
+        : null;
+    final bool inheritsReview = editable && p == null && reviewPct != null;
+    final double? shownPct = inheritsReview ? reviewPct : p;
+
+    final text = Text(_fmt(shownPct),
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.clip,
         style: TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 12,
-          color: editable ? AppColors.primaryPurple : AppColors.textSecondary,
+          fontStyle: inheritsReview ? FontStyle.italic : FontStyle.normal,
+          color: inheritsReview
+              ? AppColors.primaryPurple.withValues(alpha: 0.55)
+              : (editable ? AppColors.primaryPurple : AppColors.textSecondary),
         ));
     if (!editable) return text;
     return InkWell(
@@ -1456,9 +2042,9 @@ class _GridState extends State<_Grid> {
         rowId: rowId,
         maxScore: maxScore,
         stage: stage,
-        currentPct: p,
+        currentPct: shownPct,
         kraName: name,
-        monthLabel: _shortMonth(widget.months[monthIdx]),
+        monthLabel: widget.months[monthIdx].shortLabel,
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
@@ -1556,7 +2142,7 @@ class _GridState extends State<_Grid> {
           stage: stage,
           currentPct: p,
           kraName: name,
-          monthLabel: _shortMonth(widget.months[monthIdx]),
+          monthLabel: widget.months[monthIdx].shortLabel,
         );
 
     // Already rated → show the reviewer's single score.
@@ -1710,8 +2296,7 @@ class _GridState extends State<_Grid> {
                       if (c > 0) const SizedBox(width: 12),
                       Expanded(
                         child: (start + c) < 3
-                            ? _monthCard(
-                                row, start + c, rowId, name, reviewer)
+                            ? _monthCard(row, start + c, rowId, name, reviewer)
                             : const SizedBox.shrink(),
                       ),
                     ],
@@ -1728,7 +2313,7 @@ class _GridState extends State<_Grid> {
   Widget _monthCard(
       dynamic row, int i, String rowId, String name, KraReviewer? reviewer) {
     final review = widget.reviews[i];
-    final label = _shortMonth(widget.months[i]);
+    final label = widget.months[i].shortLabel;
     final ReviewStage? rs = row.reviewStage as ReviewStage?;
     return Container(
       padding: const EdgeInsets.all(10),
@@ -2022,11 +2607,22 @@ class _RatingSheet extends StatefulWidget {
   final String monthLabel;
   final String stageLabel;
   final double? currentPct;
+
+  /// Hard ceiling for this rating, or null for the full 0–100 range.
+  ///
+  /// Used by the reporting-manager column, which may not exceed the employee's
+  /// own score for the same KRA: a manager moderates a self-assessment downward,
+  /// never inflates it. Enforced on the slider, the presets AND the commit, so
+  /// there is no route past it.
+  final double? maxPct;
+  final String? capNote;
   const _RatingSheet({
     required this.kraName,
     required this.monthLabel,
     required this.stageLabel,
     required this.currentPct,
+    this.maxPct,
+    this.capNote,
   });
 
   @override
@@ -2036,14 +2632,17 @@ class _RatingSheet extends StatefulWidget {
 class _RatingSheetState extends State<_RatingSheet> {
   late double _val;
 
+  /// The ceiling, normalised into range. Never null so callers can clamp freely.
+  double get _ceiling => (widget.maxPct ?? 100).clamp(0, 100).toDouble();
+
   @override
   void initState() {
     super.initState();
-    _val = (widget.currentPct ?? 0).clamp(0, 100).toDouble();
+    _val = (widget.currentPct ?? 0).clamp(0, _ceiling).toDouble();
   }
 
   void _commit(double v) =>
-      Navigator.of(context).pop(v.clamp(0, 100).toDouble());
+      Navigator.of(context).pop(v.clamp(0, _ceiling).toDouble());
 
   @override
   Widget build(BuildContext context) {
@@ -2112,9 +2711,33 @@ class _RatingSheetState extends State<_RatingSheet> {
                 max: 100,
                 divisions: 100,
                 label: '${_val.round()}%',
-                onChanged: (v) => setState(() => _val = v),
+                // Clamped rather than capping the slider's own `max`, so the
+                // track still shows the full 0-100 scale and the ceiling reads as
+                // a limit rather than a rescaled axis. Also avoids a degenerate
+                // min == max slider when the ceiling is 0.
+                onChanged: (v) =>
+                    setState(() => _val = v.clamp(0, _ceiling).toDouble()),
               ),
             ),
+            if (widget.capNote != null) ...[
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.lock_outline_rounded,
+                      size: 13, color: AppColors.accentOrange),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      widget.capNote!,
+                      style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accentOrange),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 4),
             Text('Quick set',
                 style: TextStyle(
@@ -2128,25 +2751,19 @@ class _RatingSheetState extends State<_RatingSheet> {
               runSpacing: 8,
               children: [
                 for (final p in presets)
-                  InkWell(
-                    onTap: () => _commit(p.toDouble()),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryPurple.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: AppColors.primaryPurple
-                                .withValues(alpha: 0.30)),
-                      ),
-                      child: Text('$p%',
-                          style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primaryPurpleLight)),
-                    ),
+                  // Presets SET the value; they no longer save on tap. Every
+                  // rating — self, the stage-2 reviewers and management — now
+                  // commits through the explicit Save button below, so a stray
+                  // tap can't write a score.
+                  //
+                  // A preset above the ceiling is shown disabled rather than
+                  // hidden, so the manager can see the limit instead of
+                  // wondering where the option went.
+                  _PresetChip(
+                    percent: p,
+                    selected: _val.round() == p,
+                    enabled: p <= _ceiling,
+                    onTap: () => setState(() => _val = p.toDouble()),
                   ),
               ],
             ),
@@ -2180,6 +2797,337 @@ class _RatingSheetState extends State<_RatingSheet> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The employee's "I'm done" action, at the end of the ratings.
+///
+/// Deliberately a prominent filled button rather than one more tap-target in the
+/// grid: it is the only irreversible thing the employee does on this screen —
+/// it moves the review to their manager and emails them.
+class _SubmitSelfRatingBar extends StatefulWidget {
+  final Future<void> Function() onSubmit;
+  const _SubmitSelfRatingBar({required this.onSubmit});
+
+  @override
+  State<_SubmitSelfRatingBar> createState() => _SubmitSelfRatingBarState();
+}
+
+class _SubmitSelfRatingBarState extends State<_SubmitSelfRatingBar> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onSubmit();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border:
+            Border.all(color: AppColors.primaryPurple.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.task_alt_rounded,
+                  size: 18, color: AppColors.primaryPurple),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  AppStrings.selfSubmitHint,
+                  style: TextStyle(
+                      fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _busy ? null : _run,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: _busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send_rounded, size: 18),
+            label: const Text(
+              AppStrings.selfSubmitAction,
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Your manager sent this month back" — who, when, and why.
+///
+/// The reason is the whole point: without it the employee sees their sheet
+/// reopen with no idea what to change. Rendered for every viewer, so the return
+/// is visible to HR and management as part of the review's history too.
+class _ReworkNotice extends StatelessWidget {
+  final String monthLabel;
+  final StageRecord record;
+  const _ReworkNotice({required this.monthLabel, required this.record});
+
+  @override
+  Widget build(BuildContext context) {
+    final by = record.actorName.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: AppColors.accentOrange.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(12),
+          border:
+              Border.all(color: AppColors.accentOrange.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.assignment_return_rounded,
+                size: 16, color: AppColors.accentOrange),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    by.isEmpty
+                        ? '$monthLabel · sent back for rework'
+                        : '$monthLabel · sent back by $by',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.accentOrange,
+                    ),
+                  ),
+                  if ((record.comment ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      record.comment!.trim(),
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.3,
+                          color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The reporting manager's "send the self-rating back" action.
+///
+/// Separate from the rating cells on purpose: returning the work is a decision
+/// about the whole month, not one KRA, and it is destructive enough to the
+/// employee's flow that it should not sit inside a tap-to-rate cell.
+class _ReworkBar extends StatefulWidget {
+  final Future<void> Function() onSendBack;
+  const _ReworkBar({required this.onSendBack});
+
+  @override
+  State<_ReworkBar> createState() => _ReworkBarState();
+}
+
+class _ReworkBarState extends State<_ReworkBar> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onSendBack();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.accentOrange.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.undo_rounded,
+              size: 18, color: AppColors.accentOrange),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              AppStrings.sheetReworkMessage,
+              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+            ),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton(
+            onPressed: _busy ? null : _run,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.accentOrange,
+              side: const BorderSide(color: AppColors.accentOrange),
+            ),
+            child: _busy
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(AppStrings.sheetReworkAction),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Asks the manager WHY the self-rating is going back. The reason is required —
+/// an unexplained return leaves the employee guessing what to change, and it is
+/// the only thing that reaches them.
+class _ReworkReasonDialog extends StatefulWidget {
+  const _ReworkReasonDialog();
+
+  @override
+  State<_ReworkReasonDialog> createState() => _ReworkReasonDialogState();
+}
+
+class _ReworkReasonDialogState extends State<_ReworkReasonDialog> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = AppStrings.sheetReworkReasonRequired);
+      return;
+    }
+    Navigator.of(context).pop(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surfaceElevated,
+      title: const Text(AppStrings.sheetReworkTitle,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppStrings.sheetReworkMessage,
+              style:
+                  TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLines: 3,
+            minLines: 2,
+            textCapitalization: TextCapitalization.sentences,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            decoration: InputDecoration(
+              labelText: AppStrings.sheetReworkReasonLabel,
+              hintText: AppStrings.sheetReworkReasonHint,
+              errorText: _error,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(AppStrings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          style:
+              FilledButton.styleFrom(backgroundColor: AppColors.accentOrange),
+          child: const Text(AppStrings.sheetReworkConfirm),
+        ),
+      ],
+    );
+  }
+}
+
+/// One "quick set" chip in the rating sheet. Sets the pending value — it does
+/// not save; that is the Save button's job. Disabled when the percentage is
+/// above the rating's ceiling (see [_RatingSheet.maxPct]).
+class _PresetChip extends StatelessWidget {
+  final int percent;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _PresetChip({
+    required this.percent,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final base = enabled ? AppColors.primaryPurple : AppColors.textMuted;
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: base.withValues(alpha: selected ? 0.28 : 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: base.withValues(alpha: selected ? 0.85 : 0.30),
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Text(
+          '$percent%',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: enabled
+                ? AppColors.primaryPurpleLight
+                : AppColors.textMuted,
+            decoration: enabled ? null : TextDecoration.lineThrough,
+          ),
         ),
       ),
     );

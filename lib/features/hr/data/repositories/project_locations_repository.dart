@@ -91,7 +91,8 @@ class ApiProjectLocationsRepository implements ProjectLocationsRepository {
   }
 
   @override
-  Future<ProjectLocation> update(String id, Map<String, dynamic> changes) async {
+  Future<ProjectLocation> update(
+      String id, Map<String, dynamic> changes) async {
     try {
       final response = await _dio.patch(
         '${ApiConstants.locations}/$id',

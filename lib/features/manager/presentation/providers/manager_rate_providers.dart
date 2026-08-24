@@ -201,8 +201,7 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
   /// doesn't silently drop them.
   String _lastSavedComment = '';
 
-  ManagerRateNotifier(this._ref, this._repo)
-      : super(const ManagerRateState());
+  ManagerRateNotifier(this._ref, this._repo) : super(const ManagerRateState());
 
   // ───── Load ─────
 
@@ -259,8 +258,7 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
     _scheduleAutoSave();
   }
 
-  void _updateCell(
-      String cellId, MonthlyScore Function(MonthlyScore c) edit) {
+  void _updateCell(String cellId, MonthlyScore Function(MonthlyScore c) edit) {
     final review = state.review;
     if (review == null) return;
     ReviewRow? touchedRow;
@@ -343,9 +341,8 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
         reviewId: reviewId,
         scores: ManagerRateRequest(
           scores: scores,
-          managerComment: state.managerComment.isEmpty
-              ? null
-              : state.managerComment,
+          managerComment:
+              state.managerComment.isEmpty ? null : state.managerComment,
           autoSubmit: false,
         ),
       );
@@ -357,8 +354,7 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
         // After a successful flush, anything in `_dirtyCellIds`
         // that arrived during the in-flight save is still dirty;
         // otherwise we're clean.
-        isDirty:
-            _hasDirtyChangesSinceSave || _dirtyCellIds.isNotEmpty,
+        isDirty: _hasDirtyChangesSinceSave || _dirtyCellIds.isNotEmpty,
       );
     } catch (e, st) {
       assert(() {
@@ -389,8 +385,8 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
     final review = state.review;
     if (reviewId == null || review == null) return null;
     if (!state.isComplete) {
-      state = state.copyWith(
-          submitError: AppStrings.managerRateIncompleteScores);
+      state =
+          state.copyWith(submitError: AppStrings.managerRateIncompleteScores);
       return null;
     }
 
@@ -471,8 +467,9 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
   }
 }
 
-final managerRateProvider = StateNotifierProvider.autoDispose<
-    ManagerRateNotifier, ManagerRateState>((ref) {
+final managerRateProvider =
+    StateNotifierProvider.autoDispose<ManagerRateNotifier, ManagerRateState>(
+        (ref) {
   return ManagerRateNotifier(
     ref,
     ref.watch(managerRateRepositoryProvider),

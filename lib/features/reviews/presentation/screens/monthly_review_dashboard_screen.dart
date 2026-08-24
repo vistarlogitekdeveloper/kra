@@ -75,7 +75,17 @@ class _MonthlyReviewDashboardScreenState
     final role = scope?.role;
     final userId = scope?.userId;
     final periods = ref.watch(availablePeriodsProvider);
-    final selected = ref.watch(selectedPeriodProvider) ?? periods.first;
+    // Land on the newest month that actually has something to show rather than
+    // blindly on the current one, which early in a month is untouched and reads
+    // as though no review had ever happened. An explicit pick always wins, and
+    // if the probe fails we simply fall back to the newest month.
+    final picked = ref.watch(selectedPeriodProvider);
+    final landing = ref.watch(defaultReviewPeriodProvider);
+    final selected = picked ?? landing.valueOrNull ?? periods.first;
+    // Hold the skeleton while the landing month resolves: rendering the current
+    // month meanwhile would flash the very "everyone at 0%" snapshot this is
+    // meant to avoid, then jump.
+    final resolvingLanding = picked == null && landing.isLoading;
     // HR / Accounts land here as their home and have no bottom-nav Profile to
     // log out from, so surface logout in the app bar for those review roles.
     final reviewOnly = role == UserRole.hr || role == UserRole.finance;
@@ -158,13 +168,15 @@ class _MonthlyReviewDashboardScreenState
             ),
           ),
           Expanded(
-            child: _ReviewList(
-              period: selected,
-              role: role,
-              userId: userId,
-              search: _search,
-              awaitingMine: _awaitingMine,
-            ),
+            child: resolvingLanding
+                ? const _DashboardSkeleton()
+                : _ReviewList(
+                    period: selected,
+                    role: role,
+                    userId: userId,
+                    search: _search,
+                    awaitingMine: _awaitingMine,
+                  ),
           ),
         ],
       ),
@@ -251,8 +263,7 @@ class _ReviewList extends ConsumerWidget {
     final listAsync = ref.watch(monthlyReviewListProvider(period));
     return RefreshIndicator(
       color: AppColors.primaryPurple,
-      onRefresh: () async =>
-          ref.invalidate(monthlyReviewListProvider(period)),
+      onRefresh: () async => ref.invalidate(monthlyReviewListProvider(period)),
       child: listAsync.when(
         loading: () => const _DashboardSkeleton(),
         error: (e, _) {
@@ -320,8 +331,7 @@ class _ReviewList extends ConsumerWidget {
             final cols = w >= 1080 ? 3 : (w >= 680 ? 2 : 1);
             const gap = 10.0;
             final inner = w - 32; // horizontal padding (16 each side)
-            final tileW =
-                cols == 1 ? inner : (inner - gap * (cols - 1)) / cols;
+            final tileW = cols == 1 ? inner : (inner - gap * (cols - 1)) / cols;
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
@@ -408,7 +418,7 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
   Widget build(BuildContext context) {
     final needsYou =
         role != null && summary.needsActionBy(role!, userId: userId);
-    final completed = summary.currentStage.isTerminal;
+    final completed = summary.displayStage.isTerminal;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
@@ -448,10 +458,10 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                     Row(
                       children: [
                         StagePill(
-                          stage: summary.currentStage,
+                          stage: summary.displayStage,
                           status: completed
                               ? StageStatus.submitted
-                              : summary.currentStageStatus,
+                              : summary.displayStatus,
                         ),
                         if (needsYou) ...[
                           const SizedBox(width: 8),
@@ -499,13 +509,14 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                 ],
               ),
               _PayoutControl(
-                paid: summary.payoutPaid,
+                // Corroborated by a score — a "Paid" badge on a review nobody
+                // ever rated reads as money already gone.
+                paid: summary.payoutSettled,
                 canMarkPaid: role != null && summary.canMarkPaidBy(role!),
                 busy: _payingOut,
                 onMarkPaid: _markPaid,
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textMuted),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             ],
           ),
         ),
@@ -540,10 +551,12 @@ class _PayoutControl extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+            border:
+                Border.all(color: AppColors.success.withValues(alpha: 0.35)),
           ),
           child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
+            Icon(Icons.check_circle_rounded,
+                size: 14, color: AppColors.success),
             SizedBox(width: 4),
             Text(AppStrings.monthlyReviewPaidBadge,
                 style: TextStyle(
