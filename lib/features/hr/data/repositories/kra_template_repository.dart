@@ -20,5 +20,11 @@ abstract class KraTemplateRepository {
 
   /// Server-side clone — returns the new template with a fresh id.
   /// Cheaper and safer than rebuilding the payload client-side.
-  Future<KraTemplate> clone(String id);
+  ///
+  /// [name] is REQUIRED by the API and must be unique across the org: the
+  /// clone endpoint validates it (a missing name is a 400 VAL_001) and rejects
+  /// a duplicate with 409. It is a parameter rather than something derived
+  /// server-side because the caller is the only one who can pick a name that
+  /// is both free and meaningful. [role] defaults to the source template's.
+  Future<KraTemplate> clone(String id, {required String name, String? role});
 }

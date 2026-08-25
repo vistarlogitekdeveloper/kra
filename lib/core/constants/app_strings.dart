@@ -357,6 +357,27 @@ class AppStrings {
   static const String kraTemplatesEmptyCta = 'Create Template';
   static const String kraTemplatesItems = 'KRAs';
   static const String kraTemplatesCloneSuccess = 'Template duplicated.';
+
+  // ── Duplicating a template ──
+  //
+  // The API requires a NAME for the copy and rejects a duplicate name with
+  // 409, so the copy is named up front rather than silently suffixed. That
+  // also matches what HR does next: a duplicate almost always exists to be
+  // an exception for one employee, and wants saying so in its name.
+  static const String kraTemplatesCloneTitle = 'Duplicate template';
+  static const String kraTemplatesCloneMessage =
+      'The copy keeps every KRA, weightage and reviewer of the original. '
+      'Give it a name you will recognise.';
+  static const String kraTemplatesCloneNameLabel = 'Name for the copy';
+  static const String kraTemplatesCloneCta = 'Duplicate';
+  static const String kraTemplatesCloneNameRequired = 'Enter a name.';
+
+  /// [max] is the API's own cap (`kKraTemplateNameMaxLength`), passed in so
+  /// this file stays free of feature imports and the two cannot drift.
+  static String kraTemplatesCloneNameTooLong(int max) =>
+      'Name is too long (max $max characters).';
+  static const String kraTemplatesCloneNameTaken =
+      'A template with that name already exists. Try another name.';
   static const String kraTemplatesDeleteSuccess = 'Template deleted.';
   static const String kraTemplatesDeleteConfirmTitle = 'Delete template?';
   static const String kraTemplatesDeleteConfirmMessage =

@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
+import '../../data/models/kra_template.dart';
 import '../providers/kra_template_providers.dart';
 import '../widgets/confirm_action_dialog.dart';
 import '../widgets/empty_state.dart';
@@ -116,7 +117,12 @@ class KraTemplatesScreen extends ConsumerWidget {
                   template: template,
                   onTap: () =>
                       context.push(AppRoutes.hrTemplateEdit(template.id)),
-                  onClone: () => _clone(context, ref, template.id),
+                  onClone: () => _clone(
+                    context,
+                    ref,
+                    template,
+                    list.map((t) => t.name),
+                  ),
                   onDelete: () => _delete(context, ref, template.id),
                 );
               },
@@ -127,9 +133,25 @@ class KraTemplatesScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _clone(BuildContext context, WidgetRef ref, String id) async {
+  /// Duplicates [template] under a name the user confirms.
+  ///
+  /// The name is asked for rather than derived because the API demands one and
+  /// rejects duplicates with 409 — and because a copy almost always exists to
+  /// be an exception for one employee, which is worth saying in its name.
+  Future<void> _clone(
+    BuildContext context,
+    WidgetRef ref,
+    KraTemplate template,
+    Iterable<String> existingNames,
+  ) async {
+    final name = await _CloneNameDialog.show(
+      context,
+      initialName: suggestedCloneName(template.name, existingNames),
+    );
+    if (name == null || !context.mounted) return; // cancelled
+
     try {
-      await ref.read(kraTemplateActionsProvider).clone(id);
+      await ref.read(kraTemplateActionsProvider).clone(template.id, name: name);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -138,9 +160,14 @@ class KraTemplatesScreen extends ConsumerWidget {
       );
     } on ApiError catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      // A 409 means the name is taken — the only failure the user can fix
+      // themselves, so say so in those words instead of echoing the raw
+      // "Template \"X\" already exists".
+      final message = e.statusCode == 409
+          ? AppStrings.kraTemplatesCloneNameTaken
+          : e.message;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -269,6 +296,110 @@ class KraTemplatesScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Asks for the copy's name before duplicating a template.
+///
+/// Exists because the clone endpoint validates `name` (a missing one is a 400
+/// VAL_001) and enforces uniqueness (409). Pre-filled with a free-looking
+/// suggestion and fully selected, so confirming is one tap while renaming needs
+/// no clearing first.
+class _CloneNameDialog extends StatefulWidget {
+  final String initialName;
+  const _CloneNameDialog({required this.initialName});
+
+  /// Returns the chosen name, or null if the user cancelled.
+  static Future<String?> show(
+    BuildContext context, {
+    required String initialName,
+  }) =>
+      showDialog<String>(
+        context: context,
+        builder: (_) => _CloneNameDialog(initialName: initialName),
+      );
+
+  @override
+  State<_CloneNameDialog> createState() => _CloneNameDialogState();
+}
+
+class _CloneNameDialogState extends State<_CloneNameDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialName,
+  )..selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: widget.initialName.length,
+    );
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Validates against the API's own rules, so an invalid name is caught here
+  /// rather than coming back as a VAL_001 the user has to decode.
+  void _submit() {
+    final name = _controller.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = AppStrings.kraTemplatesCloneNameRequired);
+      return;
+    }
+    if (name.length > kKraTemplateNameMaxLength) {
+      setState(() => _error =
+          AppStrings.kraTemplatesCloneNameTooLong(kKraTemplateNameMaxLength));
+      return;
+    }
+    Navigator.of(context).pop(name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: const Text(AppStrings.kraTemplatesCloneTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            AppStrings.kraTemplatesCloneMessage,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLength: kKraTemplateNameMaxLength,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            decoration: InputDecoration(
+              labelText: AppStrings.kraTemplatesCloneNameLabel,
+              errorText: _error,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(AppStrings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text(AppStrings.kraTemplatesCloneCta),
+        ),
+      ],
     );
   }
 }
