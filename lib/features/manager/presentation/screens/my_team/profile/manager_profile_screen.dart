@@ -64,6 +64,29 @@ class ManagerProfileScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             _LinksSection(),
             const SizedBox(height: 20),
+            // The manager shell has its own Profile screen, separate from the
+            // employee one, so the change-password entry has to be added here
+            // too — it is not inherited.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: OutlinedButton.icon(
+                onPressed: () => context.push(AppRoutes.changePassword),
+                icon: const Icon(Icons.password_rounded),
+                label: const Text(
+                  AppStrings.profileChangePassword,
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryPurple,
+                  side: const BorderSide(color: AppColors.primaryPurple),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: OutlinedButton.icon(
