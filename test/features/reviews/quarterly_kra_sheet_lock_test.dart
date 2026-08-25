@@ -50,6 +50,11 @@ void main() {
         child: MaterialApp(home: Scaffold(body: child)),
       );
 
+  // Pinned "today", deliberately AFTER the quarter. The sheet re-words its
+  // hint when one of these months is the current calendar month, so a test
+  // reading the real clock would assert different copy from September onwards.
+  final afterTheQuarter = DateTime(2026, 11, 3);
+
   const months = [
     ReviewPeriod(2026, 7),
     ReviewPeriod(2026, 8),
@@ -61,9 +66,9 @@ void main() {
 
   testWidgets('a completed month offers the employee no Self edit affordance',
       (tester) async {
-    final completed =
-        reviewWith(oneRow(), currentStage: ReviewStage.completed);
+    final completed = reviewWith(oneRow(), currentStage: ReviewStage.completed);
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
+      now: afterTheQuarter,
       months: months,
       reviews: [completed, null, null],
       // Signed in as the employee whose sheet this is — identity says yes,
@@ -82,10 +87,12 @@ void main() {
         findsNothing);
   });
 
-  testWidgets('an open month still offers the employee the Self edit affordance',
+  testWidgets(
+      'an open month still offers the employee the Self edit affordance',
       (tester) async {
     final open = reviewWith(oneRow(), currentStage: ReviewStage.selfRating);
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
+      now: afterTheQuarter,
       months: months,
       reviews: [open, null, null],
       editableSelf: true,
@@ -100,9 +107,9 @@ void main() {
 
   testWidgets('a completed month offers the assigned reviewer no Rate button',
       (tester) async {
-    final completed =
-        reviewWith(oneRow(), currentStage: ReviewStage.completed);
+    final completed = reviewWith(oneRow(), currentStage: ReviewStage.completed);
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
+      now: afterTheQuarter,
       months: months,
       reviews: [completed, null, null],
       // The reporting manager owns this KRA's Review cell by relationship.
@@ -120,6 +127,7 @@ void main() {
       currentStage: ReviewStage.completed,
     );
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
+      now: afterTheQuarter,
       months: months,
       reviews: [completed, null, null],
       editableHr: true,
@@ -144,6 +152,7 @@ void main() {
         period: const ReviewPeriod(2026, 8));
 
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
+      now: afterTheQuarter,
       months: months,
       reviews: [july, august, null],
       editableSelf: true,

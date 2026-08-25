@@ -277,12 +277,11 @@ class _DeadlineBannerSection extends ConsumerWidget {
         // Same legacy-vs-monthly mismatch as the current-month card: without
         // the monthly cross-check this nags "Self-rating overdue — submit now"
         // at someone who has already rated every KRA.
-        final selfDone = ref
-                .watch(myMonthlyReviewProvider(
-                    _CurrentMonthSection._periodFor(dashboard)))
-                .maybeWhen(
-                    data: (r) => r?.selfRatingSubmitted, orElse: () => null) ??
-            false;
+        final period = _CurrentMonthSection._periodFor(dashboard);
+        final monthly = ref
+            .watch(myMonthlyReviewProvider(period))
+            .maybeWhen(data: (r) => r, orElse: () => null);
+        final selfDone = monthly?.selfRatingSubmitted ?? false;
         final submittedAll =
             selfDone || (dashboard.scorecard?.state.hasSubmittedAll ?? false);
         final days = dashboard.selfRatingDaysRemaining;
@@ -290,9 +289,17 @@ class _DeadlineBannerSection extends ConsumerWidget {
             days != null &&
             (dashboard.isSelfRatingOverdue || days <= _bannerThresholdDays);
         if (!showBanner) return const SizedBox.shrink();
+        // Scores typed in but never submitted. Worth its own wording: the
+        // employee HAS done the rating, so "overdue — submit now" alone left
+        // people hunting for work they had already finished.
+        final rated = (monthly?.selfScorePct ?? 0) > 0;
         return DeadlineBanner(
           daysRemaining: days,
           isOverdue: dashboard.isSelfRatingOverdue,
+          // Name the month. The self-rate sheet shows a whole quarter, so
+          // "self-rating overdue" on its own does not say which column.
+          monthLabel: period.shortLabel,
+          ratedButNotSubmitted: rated,
           onTap: () => context.go(AppRoutes.employeeSelfRate),
         );
       },
