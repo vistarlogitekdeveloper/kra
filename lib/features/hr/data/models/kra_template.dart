@@ -115,3 +115,39 @@ class KraTemplate {
     );
   }
 }
+
+/// Longest template name the API accepts (`z.string().min(1).max(200)`).
+const int kKraTemplateNameMaxLength = 200;
+
+/// A name for a copy of [sourceName] that none of [existingNames] already uses.
+///
+/// The clone endpoint REQUIRES a name and rejects a duplicate with 409, so a
+/// fixed "(Copy)" suffix would fail the second time anyone duplicates the same
+/// template. Numbers the suffix instead: "(Copy)", "(Copy 2)", "(Copy 3)"…
+///
+/// Compared case-insensitively and trimmed, which is STRICTER than the server
+/// (its uniqueness check is an exact match). Erring that way can only ever
+/// suggest a more distinct name — never a colliding one. The suggestion is
+/// still only a suggestion: the visible list may be filtered or paginated, so
+/// the caller must handle a 409 rather than assume this cannot collide.
+String suggestedCloneName(String sourceName, Iterable<String> existingNames) {
+  final taken = {
+    for (final n in existingNames) n.trim().toLowerCase(),
+  };
+  final base = sourceName.trim().isEmpty ? 'Template' : sourceName.trim();
+
+  String withSuffix(String suffix) {
+    // Trim the BASE, not the suffix, when the cap bites — a name ending in a
+    // half-written "(Cop" reads as corruption, and the suffix is what makes
+    // the name unique.
+    final room = kKraTemplateNameMaxLength - suffix.length;
+    final head =
+        base.length <= room ? base : base.substring(0, room).trimRight();
+    return '$head$suffix';
+  }
+
+  for (var n = 1;; n++) {
+    final candidate = withSuffix(n == 1 ? ' (Copy)' : ' (Copy $n)');
+    if (!taken.contains(candidate.toLowerCase())) return candidate;
+  }
+}

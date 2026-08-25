@@ -97,10 +97,21 @@ class ApiKraTemplateRepository implements KraTemplateRepository {
   }
 
   @override
-  Future<KraTemplate> clone(String id) async {
+  Future<KraTemplate> clone(String id,
+      {required String name, String? role}) async {
     try {
-      final response =
-          await _dio.post('${ApiConstants.kraTemplates}/$id/clone');
+      // The name is MANDATORY. Posting no body (as this used to) fails the
+      // clone schema with 400 VAL_001 `name: expected string, received
+      // undefined`, so Clone was dead for every template.
+      final response = await _dio.post(
+        '${ApiConstants.kraTemplates}/$id/clone',
+        data: {
+          'name': name,
+          // Omitted on purpose when null — the API then copies the source
+          // template's role, which is what a clone should inherit.
+          if (role != null && role.isNotEmpty) 'role': role,
+        },
+      );
       return KraTemplate.fromJson(unwrapObject(response));
     } catch (e, st) {
       rethrowAsApiError(e, st);

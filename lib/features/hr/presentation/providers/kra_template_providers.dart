@@ -164,8 +164,9 @@ class KraTemplateActions {
     return e.message;
   }
 
-  Future<KraTemplate> clone(String id) async {
-    final cloned = await _repo.clone(id);
+  Future<KraTemplate> clone(String id,
+      {required String name, String? role}) async {
+    final cloned = await _repo.clone(id, name: name, role: role);
     ref.invalidate(kraTemplatesProvider);
     return cloned;
   }
