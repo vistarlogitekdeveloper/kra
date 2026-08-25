@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -212,15 +212,11 @@ class _QuarterlyKraSheetScreenState
   }
 
   // The three Review-cycle raters are entered in parallel. Two are gated by
-  // ROLE (HR, Finance); the reporting-manager one stays a RELATIONSHIP (above).
-  //   * HR rating       → HR / HR_ADMIN
-  //   * Finance rating  → FINANCE
+  // ROLE (HR, Accounts); the reporting-manager one stays a RELATIONSHIP (above).
   bool _canEditHr(MonthlyReview r, ReviewScope? scope) =>
-      scope != null &&
-      !r.isComplete &&
-      (scope.role == UserRole.hr || scope.role == UserRole.hrAdmin);
+      canRateReviewStage(ReviewStage.accountHrRating, scope, r);
   bool _canEditFinance(MonthlyReview r, ReviewScope? scope) =>
-      scope != null && !r.isComplete && scope.role == UserRole.finance;
+      canRateReviewStage(ReviewStage.financeRating, scope, r);
 
   // Management review (cycle 3) — HR either approves the Review average or, on
   // rework, overrides it per KRA. Done by HR_ADMIN / ADMIN.
@@ -3653,6 +3649,31 @@ class _JustificationView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Whether [scope] may enter the Review score for a ROLE-GATED stage — the HR
+/// rater and the Accounts rater. (The reporting-manager rater is a
+/// relationship, not a role, and is gated separately.)
+///
+/// Resolved through [ReviewStage.actorRoles] against the caller's FULL role
+/// set, so this gate cannot disagree with the badges, chips and "needs your
+/// action" counts — which already resolve through `actorRoles`. It did disagree:
+/// this used to test `scope.role == UserRole.finance` while
+/// `financeRating.actorRoles` is `{finance, hrAdmin}`, so moving a KRA to
+/// Accounts left it ratable by nobody unless someone held the literal FINANCE
+/// role — the HR-admin who covers the Accounts seat was told the KRA needed
+/// their action and then handed a read-only cell.
+///
+/// Also reads the whole role set rather than the primary role, so someone
+/// holding two seats (HR *and* Accounts) can act on either.
+@visibleForTesting
+bool canRateReviewStage(
+  ReviewStage stage,
+  ReviewScope? scope,
+  MonthlyReview review,
+) {
+  if (scope == null || review.isComplete) return false;
+  return stage.isActionableByAny(scope.effectiveRoles);
 }
 
 /// The month in this quarter that is the CURRENT calendar month and still has
