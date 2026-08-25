@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_strings.dart';
 import 'core/router/app_router.dart';
+import 'core/widgets/keyboard_scroll_scope.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/widgets/shimmer_skeletons.dart';
@@ -55,9 +56,14 @@ class VistarApp extends ConsumerWidget {
       // brightness tears it down and rebuilds every screen fresh on a toggle, so
       // the whole app repaints at once. GoRouter keeps the current route + back
       // stack (it lives in the provider), so nothing navigates away.
-      builder: (context, child) => KeyedSubtree(
-        key: ValueKey(theme.brightness),
-        child: child ?? const SizedBox.shrink(),
+      // KeyboardScrollScope sits OUTSIDE the KeyedSubtree on purpose: a theme
+      // flip rebuilds everything inside that subtree, and the scope owns the
+      // shared ScrollController, which must survive the rebuild.
+      builder: (context, child) => KeyboardScrollScope(
+        child: KeyedSubtree(
+          key: ValueKey(theme.brightness),
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }
