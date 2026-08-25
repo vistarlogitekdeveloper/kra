@@ -617,6 +617,26 @@ class AppStrings {
   static const String deadlineDays = 'days';
   static const String deadlineOverdue = 'Self-rating overdue — submit now';
 
+  /// Overdue wording that NAMES the month.
+  ///
+  /// The plain "Self-rating overdue" was read as "my self-rating", full stop —
+  /// so an employee who had rated an earlier month of the quarter saw it as a
+  /// bug rather than as a different month being due. The sheet covers three
+  /// months; the banner has to say which one it means.
+  static String deadlineOverdueFor(String monthLabel) =>
+      "$monthLabel self-rating is overdue — submit now";
+
+  /// Overdue, but the scores are already typed in and never submitted.
+  /// Saying "overdue" alone to someone who has filled the whole column reads
+  /// as the app losing their work.
+  static String deadlineUnsubmittedFor(String monthLabel) =>
+      "$monthLabel self-rating is filled in but not submitted — tap to submit";
+
+  /// Due-soon wording that names the month, for the same reason.
+  static String deadlineClosesInFor(String monthLabel, int days) =>
+      "$monthLabel self-rating closes in $days "
+      "${days == 1 ? deadlineDay : deadlineDays}";
+
   // ───── Monthly deadline notices (self 7th / manager 10th) ─────
   static const String deadlineSelfRatingTitle = 'Self-rating deadline';
   static const String deadlineManagerRatingTitle = 'Manager rating deadline';

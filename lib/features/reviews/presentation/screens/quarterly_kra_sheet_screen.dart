@@ -253,7 +253,8 @@ class _QuarterlyKraSheetScreenState
     double? capPct;
     String? capNote;
     if (stage == ReviewStage.reportingManagerRating) {
-      final selfValue = _currentScore(review, rowId, ReviewStage.selfRating)?.value;
+      final selfValue =
+          _currentScore(review, rowId, ReviewStage.selfRating)?.value;
       if (selfValue == null) {
         // Nothing to moderate yet. Rating first would let the manager set the
         // ceiling for the employee's own rating, which inverts the order.
@@ -672,10 +673,9 @@ class _QuarterlyKraSheetScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(
-                content: Text(_saveErrorText(
-                    e, 'Could not reopen. Please try again.'))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                _saveErrorText(e, 'Could not reopen. Please try again.'))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -960,6 +960,9 @@ Widget quarterlyKraSheetBodyForTest({
   Future<void> Function()? onReopenManagement,
   Future<void> Function()? onSendBackForRework,
   Future<void> Function()? onSubmitSelfRating,
+
+  /// Pins "today" so a test can assert the current-month copy deterministically.
+  DateTime? now,
 }) {
   double? pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
@@ -975,6 +978,7 @@ Widget quarterlyKraSheetBodyForTest({
   }
 
   return _Sheet(
+    clock: now,
     months: months,
     reviews: reviews,
     scope: null,
@@ -1014,6 +1018,13 @@ Widget quarterlyKraSheetBodyForTest({
 }
 
 class _Sheet extends StatelessWidget {
+  /// Stands in for "now" when deciding which month is the current one.
+  ///
+  /// Injectable because the sheet CHANGES ITS COPY around the current month, so
+  /// a widget that read the wall clock directly would make that copy untestable
+  /// — and would leave the tests quietly asserting something different every
+  /// month.
+  final DateTime? clock;
   final List<ReviewPeriod> months;
   final List<MonthlyReview?> reviews;
   final ReviewScope? scope;
@@ -1071,6 +1082,7 @@ class _Sheet extends StatelessWidget {
   final Future<void> Function()? onSubmitSelfRating;
 
   const _Sheet({
+    this.clock,
     required this.months,
     required this.reviews,
     required this.scope,
@@ -1165,8 +1177,16 @@ class _Sheet extends StatelessWidget {
     // different words — a finished quarter is nobody's to edit.
     final allComplete =
         present.isNotEmpty && present.every((r) => r.isComplete);
+    // Name the month that is actually outstanding rather than saying "this
+    // sheet". The sheet covers a quarter, so a generic hint lets someone fill in
+    // the wrong month, believe they are finished, and still be chased as overdue.
+    final dueMonth = _currentMonthNeedingSelfRating(
+        months, reviews, clock ?? DateTime.now());
     final scopeLabel = canSelf
-        ? 'You can edit the Self ratings on this sheet.'
+        ? (dueMonth != null
+            ? 'Rate your ${dueMonth.shortLabel} Self column — that is the '
+                'current month, and it is still empty.'
+            : 'You can edit the Self ratings on this sheet.')
         : canMgr
             ? 'You can rate the KRAs assigned to you as Reporting Manager — '
                 'tap a Review cell.'
@@ -1265,6 +1285,7 @@ class _Sheet extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: _Grid(
+                  now: clock ?? DateTime.now(),
                   rows: rows,
                   months: months,
                   reviews: reviews,
@@ -1635,6 +1656,8 @@ class _ReviewerLegend extends StatelessWidget {
 }
 
 class _Grid extends StatefulWidget {
+  /// See [_Sheet.clock] — the sheet resolves it once and passes it down.
+  final DateTime now;
   final List<dynamic> rows; // MonthlyKraRow
   final List<ReviewPeriod> months;
   final List<MonthlyReview?> reviews;
@@ -1668,6 +1691,7 @@ class _Grid extends StatefulWidget {
   final double Function(ReviewStage) qAvg;
 
   const _Grid({
+    required this.now,
     required this.rows,
     required this.months,
     required this.reviews,
@@ -1786,12 +1810,18 @@ class _GridState extends State<_Grid> {
     );
   }
 
+  /// True when [m] is the calendar month we are actually in.
+  ///
+  /// Drives the "this is the month that is due" emphasis in the header.
   Widget _headerRow() {
     final h = TextStyle(
         fontSize: 10.5,
         fontWeight: FontWeight.w800,
         color: AppColors.textMuted,
         height: 1.15);
+    // Current month: brand-coloured instead of muted, so the column that needs
+    // filling in reads differently from the two that do not.
+    final hNow = h.copyWith(color: AppColors.primaryPurple);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -1803,19 +1833,26 @@ class _GridState extends State<_Grid> {
         _cell(_wTgt, Text('Target', style: h), align: Alignment.centerLeft),
         _cell(_wTrk, Text('Tracking\nmethod', style: h),
             align: Alignment.centerLeft),
+        // The current month is called out, because the sheet spans a whole
+        // quarter and its FIRST Self column is the quarter's first month — so
+        // someone opening this to "do my self-rating" can easily fill in the
+        // wrong month, believe they are done, and still be shown as overdue.
         for (final m in widget.months) ...[
           _cell(
               _wMon,
               Text('${m.shortLabel}\nSelf',
-                  style: h, textAlign: TextAlign.right)),
+                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  textAlign: TextAlign.right)),
           _cell(
               _wMon,
               Text('${m.shortLabel}\nReview',
-                  style: h, textAlign: TextAlign.right)),
+                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  textAlign: TextAlign.right)),
           _cell(
               _wMon,
               Text('${m.shortLabel}\nMgmt',
-                  style: h, textAlign: TextAlign.right)),
+                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  textAlign: TextAlign.right)),
         ],
         _cell(_wQtr, Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
         _cell(_wQtr, Text('Qtr\nReview', style: h, textAlign: TextAlign.right)),
@@ -2852,8 +2889,8 @@ class _SubmitSelfRatingBarState extends State<_SubmitSelfRatingBar> {
               Expanded(
                 child: Text(
                   AppStrings.selfSubmitHint,
-                  style: TextStyle(
-                      fontSize: 11.5, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                 ),
               ),
             ],
@@ -2979,7 +3016,8 @@ class _ReworkBarState extends State<_ReworkBar> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accentOrange.withValues(alpha: 0.4)),
+        border:
+            Border.all(color: AppColors.accentOrange.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -3053,8 +3091,7 @@ class _ReworkReasonDialogState extends State<_ReworkReasonDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(AppStrings.sheetReworkMessage,
-              style:
-                  TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
           const SizedBox(height: 14),
           TextField(
             controller: _controller,
@@ -3126,9 +3163,7 @@ class _PresetChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: enabled
-                ? AppColors.primaryPurpleLight
-                : AppColors.textMuted,
+            color: enabled ? AppColors.primaryPurpleLight : AppColors.textMuted,
             decoration: enabled ? null : TextDecoration.lineThrough,
           ),
         ),
@@ -3619,3 +3654,25 @@ class _JustificationView extends StatelessWidget {
     );
   }
 }
+
+/// The month in this quarter that is the CURRENT calendar month and still has
+/// no self score, or null when there is nothing outstanding.
+///
+/// Only ever the current month: an untouched earlier month is water under the
+/// bridge, and nagging about it would bury the one that actually matters.
+ReviewPeriod? _currentMonthNeedingSelfRating(
+    List<ReviewPeriod> months, List<MonthlyReview?> reviews, DateTime now) {
+  for (var i = 0; i < months.length && i < reviews.length; i++) {
+    final month = months[i];
+    if (!_isCurrentMonth(month, now)) continue;
+    final review = reviews[i];
+    if (review == null) return month; // not generated yet — still outstanding
+    final rated = review.rows
+        .any((r) => r.scoreFor(ReviewStage.selfRating)?.value != null);
+    return rated ? null : month;
+  }
+  return null;
+}
+
+bool _isCurrentMonth(ReviewPeriod m, DateTime now) =>
+    m.year == now.year && m.month == now.month;
