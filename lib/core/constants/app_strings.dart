@@ -325,6 +325,26 @@ class AppStrings {
   static const String employeesDeactivateSuccess = 'Employee deleted.';
   static const String employeesDeactivateFailed =
       'Could not delete. Please try again.';
+
+  /// Shown when the server refuses the delete because the employee still has
+  /// an unfinished review of their OWN.
+  ///
+  /// The explicit warning about the cycle is the point. The old message was a
+  /// flat "Could not delete. Please try again." — retrying never works, and the
+  /// raw server text ("in-progress review(s)") reads as though the shared
+  /// review cycle is in the way. Deleting that cycle cascades away every
+  /// employee's KRA assignments, the cycle's months and the bonus slabs, so the
+  /// message has to say which review it means and which one not to touch.
+  static const String employeesDeactivateBlockedReviews =
+      'Cannot delete: this employee still has an unfinished review of their '
+      'own. Finalise or close THAT review first. Do not delete the review '
+      'cycle — it is shared by everyone and removing it would wipe all KRA '
+      'assignments and incentive slabs.';
+
+  /// Shown when the employee is still somebody's reporting manager.
+  static const String employeesDeactivateBlockedReports =
+      'Cannot delete: they still have direct reports. Move that team to '
+      'another reporting manager first.';
   static const String employeesLoadMoreFailed =
       'Could not load more employees. Tap to retry.';
 

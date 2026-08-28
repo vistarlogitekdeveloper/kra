@@ -208,18 +208,19 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
       confirmLabel: AppStrings.employeesActionDeactivate,
     );
     if (ok != true || !mounted) return;
-    final success = await ref
+    final failure = await ref
         .read(employeeListProvider.notifier)
         .deactivateOptimistic(employeeId);
     if (!mounted) return;
+    final success = failure == null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          success
-              ? AppStrings.employeesDeactivateSuccess
-              : AppStrings.employeesDeactivateFailed,
-        ),
+        content:
+            Text(success ? AppStrings.employeesDeactivateSuccess : failure),
         backgroundColor: success ? AppColors.textPrimary : AppColors.error,
+        // A refusal names what is blocking and what to do about it, which is
+        // more than four seconds of reading.
+        duration: Duration(seconds: success ? 4 : 10),
       ),
     );
   }

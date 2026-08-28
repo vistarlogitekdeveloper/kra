@@ -246,17 +246,17 @@ class _DetailContent extends StatelessWidget {
       confirmLabel: AppStrings.employeesActionDeactivate,
     );
     if (ok != true || !context.mounted) return;
-    final success = await ref
+    final failure = await ref
         .read(employeeListProvider.notifier)
         .deactivateOptimistic(employee.id);
     if (!context.mounted) return;
+    final success = failure == null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          success
-              ? AppStrings.employeesDeactivateSuccess
-              : AppStrings.employeesDeactivateFailed,
-        ),
+        content:
+            Text(success ? AppStrings.employeesDeactivateSuccess : failure),
+        backgroundColor: success ? null : AppColors.error,
+        duration: Duration(seconds: success ? 4 : 10),
       ),
     );
     if (success) {
