@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_error.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../data/models/employee.dart';
 import '../../data/repositories/api_employee_repository.dart';
@@ -257,9 +258,17 @@ class EmployeeListController extends StateNotifier<EmployeeListState> {
 
   /// Optimistic deactivate: flip locally, call server, revert on failure.
   /// Returns true on success so the caller can show the right snackbar.
-  Future<bool> deactivateOptimistic(String id) async {
+  /// Deactivates [id], returning null on success or a user-facing REASON on
+  /// failure.
+  ///
+  /// It used to return a bare bool and swallow the exception, so both call
+  /// sites could only say "Could not delete. Please try again." — advice that
+  /// never works, because every real failure here is a 409 the user has to go
+  /// and resolve. Worse, it hid WHICH thing was blocking, which is how deleting
+  /// a test employee turns into an attempt to delete the shared review cycle.
+  Future<String?> deactivateOptimistic(String id) async {
     final idx = state.employees.indexWhere((e) => e.id == id);
-    if (idx == -1) return false;
+    if (idx == -1) return AppStrings.employeesDeactivateFailed;
     final original = state.employees[idx];
     final patched = original.copyWith(isActive: false);
     final next = [...state.employees];
@@ -269,8 +278,8 @@ class EmployeeListController extends StateNotifier<EmployeeListState> {
     try {
       await _repository.deactivate(id);
       // If filter excludes inactive, the next refresh will drop it.
-      return true;
-    } catch (_) {
+      return null;
+    } catch (e) {
       final revert = [...state.employees];
       // The list may have moved on; defensively look the row up again.
       final ridx = revert.indexWhere((e) => e.id == id);
@@ -278,9 +287,30 @@ class EmployeeListController extends StateNotifier<EmployeeListState> {
         revert[ridx] = original;
         state = state.copyWith(employees: revert);
       }
-      return false;
+      return deactivateFailureReason(e);
     }
   }
+}
+
+/// Turns a failed deactivate into something the user can act on.
+///
+/// The server refuses with 409 and a message naming the blocker; both are
+/// mapped to guidance rather than echoed, because the raw text for the review
+/// case ("in-progress review(s). Finalize or close them first.") reads as if
+/// the shared review cycle is the problem.
+@visibleForTesting
+String deactivateFailureReason(Object error) {
+  if (error is! ApiError) return AppStrings.employeesDeactivateFailed;
+  final message = error.message;
+  final lower = message.toLowerCase();
+  if (lower.contains('direct report')) {
+    return AppStrings.employeesDeactivateBlockedReports;
+  }
+  if (lower.contains('review')) {
+    return AppStrings.employeesDeactivateBlockedReviews;
+  }
+  // Anything else: the server's own words beat a generic retry prompt.
+  return message.isEmpty ? AppStrings.employeesDeactivateFailed : message;
 }
 
 /// Paginated employee list driven by the current filter. autoDispose
