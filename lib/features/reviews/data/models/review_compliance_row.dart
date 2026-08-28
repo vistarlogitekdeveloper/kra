@@ -67,35 +67,62 @@ class ReviewComplianceRow {
 
   /// The employee has finished, by either proof:
   ///   * a Self-Rating stage record — the explicit Submit action; or
-  ///   * the cursor having moved past Self-Rating, which is how a review looks
-  ///     on a deployment that still auto-advances on save.
+  ///   * every KRA carrying a self score, which is how a finished rating looks
+  ///     on a deployment that advances the cursor on save without writing a
+  ///     stage record.
   ///
-  /// Accepting both means the report is correct before AND after that backend
-  /// change ships, instead of showing every employee as "Not submitted".
-  static bool _selfSubmitted(MonthlyReview r) =>
-      r.recordFor(ReviewStage.selfRating) != null ||
-      r.currentStage.pipelineIndex > ReviewStage.selfRating.pipelineIndex;
+  /// It deliberately does NOT accept the cursor being past Self-Rating. The
+  /// stored stage can outrun the scores — that mismatch is why dashboards
+  /// elsewhere resolve through `displayStage` rather than the raw cursor — and
+  /// trusting it here reported "Submitted" for employees who had rated nothing,
+  /// which is the one thing a chase-list must never get wrong.
+  ///
+  /// Partial work is not submitted, matching [_progressFor]: an employee who
+  /// rated three of twelve KRAs still owes the other nine.
+  static bool _selfSubmitted(MonthlyReview r) {
+    if (r.recordFor(ReviewStage.selfRating) != null) return true;
+    if (r.rows.isEmpty) return false;
+    return r.rows
+        .every((row) => row.scoreFor(ReviewStage.selfRating)?.value != null);
+  }
 
   /// Done when every KRA assigned to [stage]'s reviewer carries a score.
   ///
   /// Partial work counts as NOT done: a reviewer who has scored three of eight
   /// KRAs still owes the other five, and reporting "Yes" would hide that.
+  ///
+  /// A KRA with NO assigned reviewer counts as the reporting manager's, which
+  /// is the same default the KRA sheet applies. Leaving it unowned instead made
+  /// this report disagree with the sheet HR works from: a review whose rows
+  /// predate per-KRA assignment showed N/A in all three reviewer columns — the
+  /// report claiming there was nothing to do, next to a sheet showing twelve
+  /// KRAs awaiting the manager.
+  ///
+  /// "Scored" means a score with a VALUE. A reviewer who has only attached a
+  /// reason or proof has not rated the KRA.
   static ReviewerProgress _progressFor(MonthlyReview r, ReviewStage stage) {
-    final owned = r.rows.where((row) => row.reviewStage == stage).toList();
+    final owned = r.rows
+        .where((row) =>
+            (row.reviewStage ?? ReviewStage.reportingManagerRating) == stage)
+        .toList();
     if (owned.isEmpty) return ReviewerProgress.notApplicable;
     final scored =
         owned.where((row) => row.scoreFor(stage)?.value != null).length;
     return scored == owned.length ? ReviewerProgress.yes : ReviewerProgress.no;
   }
 
-  /// Signed off when management has locked the review, or has scored any KRA in
-  /// the Management column, or the review has already run past that stage.
+  /// Signed off when management has locked the review, has scored any KRA in
+  /// the Management column, or has submitted the Management Review stage.
+  ///
+  /// All three are acts management actually performed. The cursor being past
+  /// Management Review is NOT accepted, for the same reason as
+  /// [_selfSubmitted]: the stored stage can outrun the work, and this column is
+  /// the last gate before money moves.
   static bool _finalApproved(MonthlyReview r) =>
       r.isManagementLocked ||
-      r.rows.any((row) =>
-          row.scoreFor(ReviewStage.managementReview)?.value != null) ||
-      r.currentStage.pipelineIndex >
-          ReviewStage.managementReview.pipelineIndex;
+      r.recordFor(ReviewStage.managementReview) != null ||
+      r.rows.any(
+          (row) => row.scoreFor(ReviewStage.managementReview)?.value != null);
 
   /// True when nothing at all has happened yet — used to grey the row.
   bool get untouched =>

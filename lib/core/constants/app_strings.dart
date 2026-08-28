@@ -54,6 +54,20 @@ class AppStrings {
       'owned by the reporting manager, HR or Accounts — so that column is not '
       'tracked.';
 
+  /// Told to the user, because a table row gives no visual hint that it opens
+  /// anything.
+  static const String complianceTapHint =
+      "Tap any row to open that employee's KRA sheet and fill in what is "
+      'missing.';
+  static String complianceOpenSheet(String name) => "Open $name's KRA sheet";
+
+  /// Shown when some reviews could not be fetched. Named plainly, because the
+  /// figures above it are then a SAMPLE and acting on them as a full list would
+  /// miss people.
+  static String complianceSkipped(int count) =>
+      '$count review${count == 1 ? '' : 's'} could not be loaded, so the '
+      'counts below exclude them. Retry to try again.';
+
   // ───── Quarterly KRA sheet ─────
   static const String quarterlySheetTitle = 'Quarterly KRA Sheet';
   static const String quarterlyPayoutTitle = 'Quarter payout';

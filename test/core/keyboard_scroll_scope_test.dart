@@ -16,7 +16,8 @@ void main() {
           -kKeyboardScrollLine);
     });
 
-    test('page keys move by most of the viewport, not all of it — leaving some '
+    test(
+        'page keys move by most of the viewport, not all of it — leaving some '
         'previous content visible is what stops the reader losing their place',
         () {
       final down = keyboardScrollDelta(LogicalKeyboardKey.pageDown, 800)!;
@@ -41,6 +42,29 @@ void main() {
         LogicalKeyboardKey.arrowRight,
       ]) {
         expect(keyboardScrollDelta(k, 800), isNull, reason: '$k');
+      }
+    });
+
+    test('isKeyboardScrollKey covers exactly the keys handled', () {
+      for (final k in [
+        LogicalKeyboardKey.arrowUp,
+        LogicalKeyboardKey.arrowDown,
+        LogicalKeyboardKey.pageUp,
+        LogicalKeyboardKey.pageDown,
+        LogicalKeyboardKey.home,
+        LogicalKeyboardKey.end,
+      ]) {
+        expect(isKeyboardScrollKey(k), isTrue, reason: '$k');
+      }
+      for (final k in [
+        LogicalKeyboardKey.keyA,
+        LogicalKeyboardKey.enter,
+        LogicalKeyboardKey.tab,
+        LogicalKeyboardKey.space,
+        LogicalKeyboardKey.arrowLeft,
+        LogicalKeyboardKey.arrowRight,
+      ]) {
+        expect(isKeyboardScrollKey(k), isFalse, reason: '$k');
       }
     });
 
@@ -173,7 +197,8 @@ void main() {
       });
     });
 
-    testWidgets('inert on touch platforms — there is no keyboard to serve, so '
+    testWidgets(
+        'inert on touch platforms — there is no keyboard to serve, so '
         'the shared controller is never installed there', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       try {
@@ -187,6 +212,109 @@ void main() {
       }
     });
   });
+
+  group('a scroll view that owns its controller', () {
+    // The regression that mattered: keyboard scrolling did nothing on every
+    // paginated screen in the shipped app, because the scope only looked at
+    // positions attached to a PrimaryScrollController it supplied, and a scroll
+    // view given its own controller never attaches to that.
+    Widget app() => const MaterialApp(
+          home: KeyboardScrollScope(
+            child: Scaffold(body: _OwnControllerList()),
+          ),
+        );
+
+    ScrollPosition positionOf(WidgetTester tester) =>
+        tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+
+    testWidgets('arrow down still scrolls it', (tester) async {
+      await onDesktop(() async {
+        await tester.pumpWidget(app());
+        await tester.pumpAndSettle();
+
+        final position = positionOf(tester);
+        expect(position.pixels, 0);
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(0),
+            reason: 'an own-controller list must scroll too');
+      });
+    });
+
+    testWidgets('end jumps to the bottom', (tester) async {
+      await onDesktop(() async {
+        await tester.pumpWidget(app());
+        await tester.pumpAndSettle();
+        final position = positionOf(tester);
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.end);
+        await tester.pumpAndSettle();
+        expect(position.pixels, position.maxScrollExtent);
+      });
+    });
+
+    testWidgets('a focused field still keeps the arrows for its caret',
+        (tester) async {
+      await onDesktop(() async {
+        await tester.pumpWidget(MaterialApp(
+          home: KeyboardScrollScope(
+            child: Scaffold(
+              body: Column(
+                children: [
+                  TextField(
+                    controller: TextEditingController(text: 'hello'),
+                    autofocus: true,
+                  ),
+                  const Expanded(child: _OwnControllerList()),
+                ],
+              ),
+            ),
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pumpAndSettle();
+        expect(positionOf(tester).pixels, 0,
+            reason: 'typing in a form must never scroll the page');
+      });
+    });
+  });
+}
+
+/// A list that supplies its OWN ScrollController — the shape that made this
+/// feature look broken in the shipped web app.
+///
+/// `PagedListView` (every paginated list here), the employees list and the
+/// audit log all construct their own controller, and a scroll view given a
+/// controller never attaches to the PrimaryScrollController the scope used to
+/// read. So on exactly the screens with the most to scroll, the keys did
+/// nothing — while the tests above passed, because a bare ListView does attach.
+class _OwnControllerList extends StatefulWidget {
+  const _OwnControllerList();
+
+  @override
+  State<_OwnControllerList> createState() => _OwnControllerListState();
+}
+
+class _OwnControllerListState extends State<_OwnControllerList> {
+  final ScrollController _own = ScrollController();
+
+  @override
+  void dispose() {
+    _own.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        controller: _own,
+        children: [
+          for (var i = 0; i < 60; i++)
+            SizedBox(height: 60, child: Text('own $i')),
+        ],
+      );
 }
 
 /// Runs [body] with a desktop target platform.
