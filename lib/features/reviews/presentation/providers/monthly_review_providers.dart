@@ -270,7 +270,8 @@ final defaultReviewPeriodProvider =
   if (worthLanding(newest)) return periods.first;
 
   for (final period in periods.skip(1)) {
-    if (worthLanding(await ref.read(monthlyReviewListProvider(period).future))) {
+    if (worthLanding(
+        await ref.read(monthlyReviewListProvider(period).future))) {
       return period;
     }
   }
@@ -401,32 +402,49 @@ List<ReviewPeriod> quarterMonthsFor(ReviewPeriod p) {
 /// it parallel enough to be quick while staying polite.
 ///
 /// A review that fails to load is skipped rather than failing the whole report —
-/// one bad row should not blank the page for everyone else.
+/// one bad row should not blank the page for everyone else. The count of
+/// skipped reviews is REPORTED alongside the rows: silently dropping them made
+/// a partial report look like a complete one, so "everyone has submitted" could
+/// mean "everyone we managed to fetch", and the stat line under-counted the
+/// team without saying so.
+typedef ReviewComplianceReport = ({
+  List<ReviewComplianceRow> rows,
+  int skipped,
+});
+
 final reviewComplianceProvider = FutureProvider.autoDispose
-    .family<List<ReviewComplianceRow>, ReviewPeriod>((ref, period) async {
+    .family<ReviewComplianceReport, ReviewPeriod>((ref, period) async {
   ref.keepAlive();
   final scope = ref.watch(currentReviewScopeProvider);
-  if (scope == null) return const [];
+  if (scope == null) return (rows: const <ReviewComplianceRow>[], skipped: 0);
 
   final summaries = await ref.watch(monthlyReviewListProvider(period).future);
   final repo = ref.read(monthlyReviewRepositoryProvider);
 
   const batchSize = 6;
   final rows = <ReviewComplianceRow>[];
+  var skipped = 0;
   for (var i = 0; i < summaries.length; i += batchSize) {
     final batch = summaries.skip(i).take(batchSize);
     final loaded = await Future.wait([
       for (final s in batch)
-        repo.getReview(s.id).then<MonthlyReview?>((r) => r).catchError((_) => null),
+        repo
+            .getReview(s.id)
+            .then<MonthlyReview?>((r) => r)
+            .catchError((_) => null),
     ]);
     for (final review in loaded) {
-      if (review != null) rows.add(ReviewComplianceRow.from(review));
+      if (review == null) {
+        skipped++;
+      } else {
+        rows.add(ReviewComplianceRow.from(review));
+      }
     }
   }
 
   rows.sort((a, b) =>
       a.employeeName.toLowerCase().compareTo(b.employeeName.toLowerCase()));
-  return rows;
+  return (rows: rows, skipped: skipped);
 });
 
 /// Drops every cached review surface.

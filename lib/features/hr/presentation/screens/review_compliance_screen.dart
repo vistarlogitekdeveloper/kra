@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../reviews/data/models/review_compliance_row.dart';
 import '../../../reviews/presentation/providers/monthly_review_providers.dart';
@@ -56,7 +58,7 @@ class ReviewComplianceScreen extends ConsumerWidget {
                 onRetry: () =>
                     ref.invalidate(reviewComplianceProvider(selected)),
               ),
-              data: (rows) => rows.isEmpty
+              data: (report) => report.rows.isEmpty
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(32),
@@ -67,7 +69,7 @@ class ReviewComplianceScreen extends ConsumerWidget {
                         ),
                       ),
                     )
-                  : _Table(rows: rows),
+                  : _Table(rows: report.rows, skipped: report.skipped),
             ),
           ),
         ],
@@ -89,7 +91,12 @@ const double _minTableWidth = 760;
 
 class _Table extends StatelessWidget {
   final List<ReviewComplianceRow> rows;
-  const _Table({required this.rows});
+
+  /// Reviews that could not be fetched. Shown rather than swallowed: without
+  /// it the stat line reads as the whole team when it is only the part that
+  /// loaded, and HR would chase the wrong list.
+  final int skipped;
+  const _Table({required this.rows, required this.skipped});
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +105,7 @@ class _Table extends StatelessWidget {
 
     return Column(
       children: [
+        if (skipped > 0) _SkippedNotice(count: skipped),
         // Counts first: HR opens this to see how far off "everyone done" is.
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -197,6 +205,23 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The report is a chase-list, so every row leads to the thing you chase:
+    // that employee's own quarterly KRA sheet, where the missing ratings are
+    // entered. Same destination and same `push` the Review Dashboard uses, so
+    // the back button returns here.
+    return InkWell(
+      onTap: () => context.push(AppRoutes.reviewsQuarterlyFor(row.employeeId)),
+      // Named for screen readers and for the web tooltip, since a bare table
+      // row gives no hint that it is actionable.
+      child: Tooltip(
+        message: AppStrings.complianceOpenSheet(row.employeeName),
+        waitDuration: const Duration(milliseconds: 600),
+        child: _rowBody(),
+      ),
+    );
+  }
+
+  Widget _rowBody() {
     return Container(
       // Faintly tint rows where something has happened, so the untouched ones
       // stand out as the list to chase.
@@ -239,7 +264,8 @@ class _Row extends StatelessWidget {
             flex: _flexSelf,
             child: Center(child: _SelfPill(submitted: row.selfSubmitted)),
           ),
-          Expanded(flex: _flexCell, child: Center(child: _YesNo(row.byFinance))),
+          Expanded(
+              flex: _flexCell, child: Center(child: _YesNo(row.byFinance))),
           Expanded(flex: _flexCell, child: Center(child: _YesNo(row.byHr))),
           Expanded(
             flex: _flexCell,
@@ -255,6 +281,41 @@ class _Row extends StatelessWidget {
               child: _YesNo(row.finalApproval
                   ? ReviewerProgress.yes
                   : ReviewerProgress.no),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Says how many reviews were dropped, so a partial report is never mistaken
+/// for a complete one.
+class _SkippedNotice extends StatelessWidget {
+  final int count;
+  const _SkippedNotice({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.accentOrange.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border:
+            Border.all(color: AppColors.accentOrange.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              size: 16, color: AppColors.accentOrange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              AppStrings.complianceSkipped(count),
+              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
             ),
           ),
         ],
@@ -349,6 +410,9 @@ class _Legend extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 5),
+          Text(AppStrings.complianceTapHint,
+              style: s.copyWith(color: AppColors.primaryPurple)),
+          const SizedBox(height: 3),
           Text(AppStrings.complianceOpsNote, style: s),
         ],
       ),
