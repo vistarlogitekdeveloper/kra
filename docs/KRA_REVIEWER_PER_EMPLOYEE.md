@@ -185,3 +185,38 @@ Implementation notes:
 Once that ships, the app can put a reviewer picker on the KRA row for HR-tier
 users; the read path (`kraReviewerMapProvider`, which already reads assignment
 items before the template) needs no change.
+
+---
+
+## Auditing the mapping for EVERY employee
+
+`scripts/audit-kra-mapping.mjs` checks the whole roster for one month instead of
+opening sheets one at a time. Read-only — every request is a GET.
+
+```bash
+node scripts/audit-kra-mapping.mjs --email hr.admin@example --password '…' --month 2026-07
+node scripts/audit-kra-mapping.mjs --json > audit.json     # machine-readable
+```
+
+Needs an HR_ADMIN/ADMIN login, because the templates and assignments endpoints
+are HR-tier and the audit exists to compare them against the reviews.
+Credentials can come from `KRA_EMAIL` / `KRA_PASSWORD` instead of argv. Exits
+non-zero when it finds a blocker, so it can gate a release.
+
+What it flags, per employee:
+
+| Finding | Why it matters |
+|---|---|
+| `REVIEWER_MISMATCH` | the review row's `reviewer_group` disagrees with the assignment item / template it came from. The row is what every screen reads, so the sheet is showing the wrong owner. |
+| `NO_REVIEWER` | a row with no reviewer. Screens default these to the reporting manager and the backend self-heals them to `MANAGER` on read, so a surviving one means the self-heal did not cover that review. |
+| `UNKNOWN_REVIEWER` | a reviewer value outside Manager / HR / Accounts — nobody can rate it. |
+| `WEIGHTAGE` | weightages that do not sum to 100%. Every score is weighted by these, so it silently distorts the final percentage. |
+| `CURSOR_AHEAD_OF_WORK` | the stored `currentStage` has passed stages whose scores do not exist. |
+| `CURSOR_PAST_UNDONE_MANAGEMENT` | the review passed its last gate without management scoring or locking anything. |
+| `NO_ASSIGNMENT` | no KRA assignment, so the reviewer can only come from the default template. |
+
+The two cursor findings are the data behind the compliance report reading
+"Submitted" and "Approved" for employees who had rated almost nothing. The
+client no longer trusts the cursor, so the report is honest either way — but a
+review whose cursor has run to the end of the pipeline with one KRA scored is
+still wrong in the database, and only the backend can put it back.
