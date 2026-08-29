@@ -959,6 +959,15 @@ Widget quarterlyKraSheetBodyForTest({
 
   /// Pins "today" so a test can assert the current-month copy deterministically.
   DateTime? now,
+
+  /// Observes which (review, row, stage) an edit was aimed at. The row id in
+  /// particular is worth asserting: it differs per month on the real backend,
+  /// so a save handed the wrong one would target another month's row.
+  void Function({
+    required MonthlyReview review,
+    required String rowId,
+    required ReviewStage stage,
+  })? onEdit,
 }) {
   double? pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
@@ -996,7 +1005,9 @@ Widget quarterlyKraSheetBodyForTest({
       required currentPct,
       required kraName,
       required monthLabel,
-    }) async {},
+    }) async {
+      onEdit?.call(review: review, rowId: rowId, stage: stage);
+    },
     onJustify: ({
       required review,
       required rowId,
@@ -1727,15 +1738,54 @@ class _GridState extends State<_Grid> {
 
   String _fmt(double? p) => p == null ? '—' : '${p.round()}%';
 
-  // Locate row [rowId] within a specific month's review — each month carries
-  // its own scores AND the row's reviewer assignment.
+  /// The canonical row (from the sheet's row list) carrying [rowId].
+  MonthlyKraRow? _canonicalRow(String rowId) {
+    for (final row in widget.rows) {
+      if ((row as MonthlyKraRow).id == rowId) return row;
+    }
+    return null;
+  }
+
+  /// Locate the row for the same KRA within a specific month's review — each
+  /// month carries its own scores AND the row's reviewer assignment.
+  ///
+  /// Matching by id alone was WRONG, and quietly so. The backend mints row ids
+  /// with `randomUUID()` per row PER REVIEW, so the same KRA has a different id
+  /// every month — while the sheet takes its canonical row list from the first
+  /// month present. Every lookup for the other two months therefore missed, and
+  /// the second and third columns of the quarter rendered blank no matter what
+  /// anyone had entered. It reads exactly like "that month has not started".
+  ///
+  /// So: id first (cheap, and right when a caller already holds the month's own
+  /// row), then display order — the backend's OWN join key, `display_order =
+  /// sort_order` — then the normalised name, for a review generated before the
+  /// orders lined up.
   MonthlyKraRow? _rowIn(MonthlyReview? r, String rowId) {
     if (r == null) return null;
     for (final row in r.rows) {
       if (row.id == rowId) return row;
     }
+    final canonical = _canonicalRow(rowId);
+    if (canonical == null) return null;
+    for (final row in r.rows) {
+      if (row.displayOrder == canonical.displayOrder) return row;
+    }
+    final key = kraNameKey(canonical.name);
+    for (final row in r.rows) {
+      if (kraNameKey(row.name) == key) return row;
+    }
     return null;
   }
+
+  /// The id to use for one KRA in one month: that month's own row id, falling
+  /// back to the canonical one when the month has no matching row.
+  ///
+  /// Every per-month callback — the score lookup, the editor, the proof-file
+  /// lookup — is keyed by row id, so they all have to be handed the id that
+  /// exists in THAT month's review. Passing the canonical id made reads miss;
+  /// it would also have aimed a save at a row id the month does not contain.
+  String _monthRowId(int monthIdx, String rowId) =>
+      _rowIn(widget.reviews[monthIdx], rowId)?.id ?? rowId;
 
   // Review-cycle score for ONE KRA/month, straight from the model so every
   // surface agrees: the ASSIGNED reviewer's rating (null until they score),
@@ -1886,10 +1936,16 @@ class _GridState extends State<_Grid> {
     final name = row.name as String;
     // Quarter average of a per-row extractor across the three months (missing
     // months count as 0, matching the totals row).
-    double qAvgRow(double? Function(MonthlyReview?) f) {
+    //
+    // The extractor takes the MONTH INDEX, not just the review, because every
+    // per-row lookup has to be keyed by that month's own row id — ids differ
+    // per month (see [_rowIn]). Passing the canonical id here averaged the
+    // first month against two zeroes and quietly under-reported the quarter for
+    // every employee: a KRA scored 60 in all three months read as 20%.
+    double qAvgRow(double? Function(int monthIdx) f) {
       double sum = 0;
       for (var i = 0; i < 3; i++) {
-        sum += f(widget.reviews[i]) ?? 0;
+        sum += f(i) ?? 0;
       }
       return sum / 3;
     }
@@ -1907,29 +1963,33 @@ class _GridState extends State<_Grid> {
         _cell(
             _wMon,
             _scoreCell(i, rowId, maxScore, name, ReviewStage.selfRating,
-                canEdit: widget.canEditSelf)),
+                canEdit: (r) =>
+                    widget.canEditSelf(r) &&
+                    _open(i, row, ReviewStage.selfRating))),
         _cell(_wMon, _reviewCell(i, row)),
         _cell(
             _wMon,
             _scoreCell(i, rowId, maxScore, name, ReviewStage.managementReview,
                 canEdit: (r) =>
-                    widget.canEditManagement(r) && !r.isManagementLocked)),
+                    widget.canEditManagement(r) &&
+                    !r.isManagementLocked &&
+                    _open(i, row, ReviewStage.managementReview))),
       ],
       _cell(
           _wQtr,
           Text(
-              _fmt(
-                  qAvgRow((r) => widget.pct(r, rowId, ReviewStage.selfRating))),
+              _fmt(qAvgRow((i) => widget.pct(widget.reviews[i],
+                  _monthRowId(i, rowId), ReviewStage.selfRating))),
               style:
                   const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
       _cell(
           _wQtr,
-          Text(_fmt(qAvgRow((r) => _reviewPct(r, rowId))),
+          Text(_fmt(qAvgRow((i) => _reviewPct(widget.reviews[i], rowId))),
               style:
                   const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
       _cell(
           _wQtr,
-          Text(_fmt(qAvgRow((r) => _rowFinalPct(r, rowId))),
+          Text(_fmt(qAvgRow((i) => _rowFinalPct(widget.reviews[i], rowId))),
               style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
@@ -2037,10 +2097,11 @@ class _GridState extends State<_Grid> {
             TextStyle(fontSize: 11, height: 1.3, color: AppColors.textMuted));
   }
 
-  Widget _scoreCell(int monthIdx, String rowId, double maxScore, String name,
-      ReviewStage stage,
+  Widget _scoreCell(int monthIdx, String canonicalRowId, double maxScore,
+      String name, ReviewStage stage,
       {required bool Function(MonthlyReview) canEdit}) {
     final review = widget.reviews[monthIdx];
+    final rowId = _monthRowId(monthIdx, canonicalRowId);
     final p = widget.pct(review, rowId, stage);
     final editable = review != null && canEdit(review);
 
@@ -2130,6 +2191,23 @@ class _GridState extends State<_Grid> {
     );
   }
 
+  /// Whether the (row, month, stage) cell is open for entry — see
+  /// [isCellOpenForEntry]. Combined with the viewer gates, never instead of
+  /// them.
+  bool _open(int monthIdx, dynamic row, ReviewStage stage) {
+    // The MONTH's own row — the canonical one carries the first month's self
+    // score, which would open August off the back of July's rating.
+    final monthRow =
+        _rowIn(widget.reviews[monthIdx], (row as MonthlyKraRow).id);
+    if (monthRow == null) return false;
+    return isCellOpenForEntry(
+      stage: stage,
+      row: monthRow,
+      month: widget.months[monthIdx],
+      now: widget.now,
+    );
+  }
+
   // True when the current viewer owns [stage] for this review: RM by
   // relationship, HR / Accounts by role.
   bool _canEditReviewerStage(MonthlyReview review, ReviewStage stage) {
@@ -2151,7 +2229,7 @@ class _GridState extends State<_Grid> {
   // Until they've rated, it shows an explicit "<reviewer> pending" status.
   Widget _reviewCell(int monthIdx, dynamic row) {
     final review = widget.reviews[monthIdx];
-    final rowId = row.id as String;
+    final rowId = _monthRowId(monthIdx, row.id as String);
     // Every row resolves to a single reviewer (see _applyReviewerMap); a bare
     // row passed straight through (tests) defaults to the reporting manager.
     final KraReviewer reviewer =
@@ -2168,7 +2246,8 @@ class _GridState extends State<_Grid> {
     final maxScore = (row.maxScore as num).toDouble();
     final name = row.name as String;
     final p = widget.pct(review, rowId, stage);
-    final editable = _canEditReviewerStage(review, stage);
+    final open = _open(monthIdx, row, stage);
+    final editable = _canEditReviewerStage(review, stage) && open;
     final color = _reviewerColor(reviewer);
 
     void openEditor() => widget.onEdit(
@@ -2225,6 +2304,20 @@ class _GridState extends State<_Grid> {
       );
     }
 
+    // Not open yet — so the reviewer owes nothing and must not be shown as
+    // holding it up. A future month shows nothing at all; a started month
+    // still waiting on the employee says so.
+    if (!open) {
+      if (isFutureMonth(widget.months[monthIdx], widget.now)) {
+        return Text(_fmt(null),
+            style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: AppColors.textSecondary));
+      }
+      return _pendingTag(AppStrings.quarterlyAwaitingSelfTag);
+    }
+
     // Not rated yet, view-only → the pending status, naming WHO must rate it.
     return _pendingChip(reviewer);
   }
@@ -2251,7 +2344,9 @@ class _GridState extends State<_Grid> {
 
   // "<reviewer> review pending" — a compact amber chip (clock + short tag) that
   // tells the viewer exactly which reviewer this KRA is still waiting on.
-  Widget _pendingChip(KraReviewer reviewer) {
+  Widget _pendingChip(KraReviewer reviewer) => _pendingTag(reviewer.cellTag);
+
+  Widget _pendingTag(String tag) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
@@ -2263,7 +2358,7 @@ class _GridState extends State<_Grid> {
         const Icon(Icons.schedule_rounded, size: 10, color: AppColors.warning),
         const SizedBox(width: 3),
         Flexible(
-          child: Text(reviewer.cellTag,
+          child: Text(tag,
               maxLines: 1,
               softWrap: false,
               overflow: TextOverflow.clip,
@@ -3674,6 +3769,38 @@ bool canRateReviewStage(
 ) {
   if (scope == null || review.isComplete) return false;
   return stage.isActionableByAny(scope.effectiveRoles);
+}
+
+/// Whether a month has not begun yet.
+bool isFutureMonth(ReviewPeriod m, DateTime now) =>
+    m.year > now.year || (m.year == now.year && m.month > now.month);
+
+/// Whether one cell is OPEN for entry yet — independently of WHO is looking.
+///
+/// The edit gates answer "are you the right person?". This answers "is there
+/// anything to do yet?", and both must hold. Two rules:
+///
+///   * A month that has not started has nothing to rate. The sheet always shows
+///     a whole quarter, so on 29 August it renders September — and September
+///     was offering reviewers a Rate button for work nobody had done.
+///   * Everything downstream of the self-rating needs that self-rating to
+///     exist, PER KRA. A reviewer rating first inverts the pipeline: their
+///     score is meant to moderate the employee's, and the reporting manager is
+///     explicitly capped by it, so rating first would set the ceiling for a
+///     number the employee has not chosen yet.
+///
+/// Deliberately per KRA rather than per month: each KRA is rated on its own
+/// row, so one unrated KRA should not close the ones the employee has done.
+@visibleForTesting
+bool isCellOpenForEntry({
+  required ReviewStage stage,
+  required MonthlyKraRow row,
+  required ReviewPeriod month,
+  required DateTime now,
+}) {
+  if (isFutureMonth(month, now)) return false;
+  if (stage == ReviewStage.selfRating) return true;
+  return row.scoreFor(ReviewStage.selfRating)?.value != null;
 }
 
 /// The month in this quarter that is the CURRENT calendar month and still has

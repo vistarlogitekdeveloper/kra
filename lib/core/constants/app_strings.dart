@@ -69,6 +69,11 @@ class AppStrings {
       'counts below exclude them. Retry to try again.';
 
   // ───── Quarterly KRA sheet ─────
+
+  /// Cell tag for a Review/Management cell whose month has started but whose
+  /// self-rating has not landed. The reviewer owes nothing yet, so showing
+  /// their name as pending would send them after work that cannot be done.
+  static const String quarterlyAwaitingSelfTag = 'Self';
   static const String quarterlySheetTitle = 'Quarterly KRA Sheet';
   static const String quarterlyPayoutTitle = 'Quarter payout';
   static const String quarterlyPayoutAmount = 'Payout this quarter';

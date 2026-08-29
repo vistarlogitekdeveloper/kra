@@ -12,6 +12,11 @@
 //     any that survive point at a review the self-heal did not cover.
 //   * WEIGHTAGE — KRA weightages that do not sum to 100%. Every score on the
 //     sheet is weighted, so this silently distorts the final percentage.
+//   * REVIEWED BEFORE SELF — a reviewer, or management, scored a KRA the
+//     employee never self-rated. The sheet used to offer a Rate button on
+//     months nobody had self-rated, and the reporting manager's score is meant
+//     to be capped by the self score, so these rows were entered with no
+//     ceiling and should be re-checked.
 //   * CURSOR AHEAD OF WORK — the stored currentStage has run past stages whose
 //     scores do not exist. This is what made the compliance report read
 //     "Submitted" and "Approved" for people who had rated almost nothing.
@@ -337,7 +342,28 @@ async function auditEmployee(summary) {
       : 'MANAGER';
     const stage = reviewStageFor(owner);
     perReviewer[owner][1]++;
-    if (stage && scoreOf(row, stage) !== null) perReviewer[owner][0]++;
+    const reviewerScored = stage && scoreOf(row, stage) !== null;
+    if (reviewerScored) perReviewer[owner][0]++;
+
+    // Rated out of order: a reviewer (or management) scored a KRA the employee
+    // never self-rated. The sheet used to allow this — it offered a Rate button
+    // on months nobody had self-rated — and the reporting manager's score is
+    // meant to be CAPPED by the self score, so these rows had no ceiling.
+    const selfScored = scoreOf(row, 'SELF_RATING') !== null;
+    if (!selfScored && reviewerScored) {
+      findings.push({
+        kind: 'REVIEWED_BEFORE_SELF',
+        kra: row.name,
+        detail: `${owner} scored this KRA but the employee never self-rated it`,
+      });
+    }
+    if (!selfScored && scoreOf(row, 'MANAGEMENT_REVIEW') !== null) {
+      findings.push({
+        kind: 'MANAGEMENT_BEFORE_SELF',
+        kra: row.name,
+        detail: 'management scored a KRA the employee never self-rated',
+      });
+    }
   }
 
   if (rows.length > 0 && Math.abs(weightTotal - 100) > 0.5) {
@@ -400,6 +426,8 @@ const SEVERITY = {
   UNKNOWN_REVIEWER: 'BLOCKER',
   WEIGHTAGE: 'BLOCKER',
   CURSOR_PAST_UNDONE_MANAGEMENT: 'BLOCKER',
+  REVIEWED_BEFORE_SELF: 'BLOCKER',
+  MANAGEMENT_BEFORE_SELF: 'BLOCKER',
   CURSOR_AHEAD_OF_WORK: 'WARN',
   NO_REVIEWER: 'WARN',
   NO_ASSIGNMENT: 'WARN',
