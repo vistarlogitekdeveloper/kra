@@ -12,8 +12,15 @@ import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_s
 /// column: each KRA is owned by exactly ONE reviewer (never an average of
 /// three), and an unrated KRA shows an explicit "<reviewer> pending" status.
 void main() {
+  /// Rows carry a SELF score by default.
+  ///
+  /// A Review cell only opens once the employee has rated that KRA — rating
+  /// first inverts the pipeline and would let the reporting manager set the
+  /// ceiling for a number the employee has not chosen. These tests are about
+  /// WHICH reviewer owns a KRA, so they start from a self-rated sheet; pass
+  /// `selfScore: null` for the un-self-rated case.
   MonthlyKraRow rowFor(String id, String name, KraReviewer reviewer,
-      {double? reviewerScore}) {
+      {double? reviewerScore, double? selfScore = 7}) {
     var row = MonthlyKraRow(
       id: id,
       name: name,
@@ -22,8 +29,13 @@ void main() {
       reviewerGroup: reviewer,
       displayOrder: id.hashCode & 0x7,
     );
+    if (selfScore != null) {
+      row = row.withStageScore(
+          ReviewStage.selfRating, RowScore(value: selfScore));
+    }
     if (reviewerScore != null) {
-      row = row.withStageScore(row.reviewStage!, RowScore(value: reviewerScore));
+      row =
+          row.withStageScore(row.reviewStage!, RowScore(value: reviewerScore));
     }
     return row;
   }

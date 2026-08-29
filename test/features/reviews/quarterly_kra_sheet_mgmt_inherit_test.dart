@@ -13,6 +13,8 @@ import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_s
 /// score for the management reviewer — so they start from it and only change it
 /// if needed, rather than re-keying from a blank cell.
 void main() {
+  /// Carries a self score, because the Management cell only opens once the
+  /// employee has rated the KRA — management cannot sign off on an unrated one.
   MonthlyKraRow rmRow({double? reviewerScore, double? mgmtScore}) {
     var row = const MonthlyKraRow(
       id: 'k1',
@@ -21,7 +23,7 @@ void main() {
       maxScore: 10,
       reviewerGroup: KraReviewer.reportingManager,
       displayOrder: 0,
-    );
+    ).withStageScore(ReviewStage.selfRating, const RowScore(value: 8));
     if (reviewerScore != null) {
       row = row.withStageScore(
           ReviewStage.reportingManagerRating, RowScore(value: reviewerScore));
@@ -83,7 +85,8 @@ void main() {
     expect(inheritedMgmtCell('90%'), findsOneWidget);
   });
 
-  testWidgets('without management rights the Mgmt cell stays blank until acted '
+  testWidgets(
+      'without management rights the Mgmt cell stays blank until acted '
       'on (no inherited pre-fill)', (tester) async {
     final review = reviewWith(rmRow(reviewerScore: 9));
     await tester.pumpWidget(host(
@@ -155,7 +158,8 @@ void main() {
     expect(find.text('Save & Lock'), findsNothing);
   });
 
-  testWidgets('once locked, the bar reads locked with a Reopen action and the '
+  testWidgets(
+      'once locked, the bar reads locked with a Reopen action and the '
       'Mgmt cell is read-only', (tester) async {
     var reopened = false;
     // Locked review: management already committed a 90% management score.
