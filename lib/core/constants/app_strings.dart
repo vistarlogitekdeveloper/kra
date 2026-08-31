@@ -105,6 +105,33 @@ class AppStrings {
       'This month has already moved on to your reporting manager, so it can no '
       'longer be submitted.';
 
+  // Submitting the reporting manager's own review. Mirrors the employee's
+  // submit: the per-KRA scores are already saved, this is the explicit
+  // "I'm done" that advances the manager's stage. It covers ONLY the KRAs
+  // assigned to the reporting manager — HR and Accounts submit their own.
+  static const String mgrSubmitAction = 'Submit my review';
+  static const String mgrSubmitHint =
+      'Rated the KRAs assigned to you? Submit to finalise your review.';
+  static const String mgrSubmitConfirmTitle = 'Submit your review?';
+  static const String mgrSubmitConfirmMessage =
+      'This finalises the ratings for the KRAs assigned to you as reporting '
+      'manager. HR and Accounts rate their own KRAs separately. You will not '
+      'be able to change your scores afterwards.';
+  static const String mgrSubmitConfirmAction = 'Submit';
+  static const String mgrSubmitDoneTitle = 'Review submitted successfully';
+  static const String mgrSubmitDoneMessage =
+      'Your ratings for the KRAs assigned to you have been submitted.';
+  static const String mgrSubmitFailed = 'Could not submit:';
+  static const String mgrSubmitAlreadyMoved =
+      'This month has already moved past your review, so it can no longer be '
+      'submitted.';
+
+  /// Shown in the confirm dialog so a partial submit is a conscious act:
+  /// "You have rated 3 of 5 KRAs assigned to you."
+  static String mgrSubmitCoverage(int rated, int total) =>
+      'You have rated $rated of $total ${total == 1 ? 'KRA' : 'KRAs'} '
+      'assigned to you.';
+
   // Returning a self-rating for rework.
   static const String sheetReworkAction = 'Send back for rework';
   static const String sheetReworkTitle = 'Send self-rating back for rework?';

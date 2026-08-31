@@ -5,12 +5,16 @@ import '../storage/secure_storage_service.dart';
 
 /// App-wide theme mode (light / dark / system), persisted to secure storage.
 ///
-/// Starts on [ThemeMode.dark] (the app's historical look) and overrides it once
-/// the stored preference loads, so there's no flash of the wrong theme for a
-/// returning user beyond the first frame.
+/// Starts on [ThemeMode.light] and overrides it once the stored preference
+/// loads, so there's no flash of the wrong theme for a returning user beyond
+/// the first frame.
+///
+/// This seed applies only when nothing is stored yet — a fresh install, or a
+/// user who has never touched the toggle. Anyone who has already chosen a mode
+/// keeps their choice, because [_load] overwrites this value.
 class ThemeModeController extends StateNotifier<ThemeMode> {
   final SecureStorageService _storage;
-  ThemeModeController(this._storage) : super(ThemeMode.dark) {
+  ThemeModeController(this._storage) : super(ThemeMode.light) {
     _load();
   }
 

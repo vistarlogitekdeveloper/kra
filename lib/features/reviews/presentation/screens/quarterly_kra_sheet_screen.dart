@@ -368,6 +368,133 @@ class _QuarterlyKraSheetScreenState
   bool _hasSelfScore(MonthlyReview r) =>
       r.rows.any((row) => row.scoreFor(ReviewStage.selfRating)?.value != null);
 
+  // ── The reporting manager's own submit ────────────────────────────────────
+  //
+  // The manager's counterpart to the employee's "Submit self-rating". Their
+  // per-KRA scores already persist the moment the rating sheet closes, so this
+  // adds the missing "I'm done" step rather than any new score writing.
+  //
+  // Scoped to the manager's OWN ratings. Each KRA is assigned to exactly one
+  // Review-cycle reviewer ([MonthlyKraRow.reviewStage]), and the three raters
+  // work in parallel on separate stages, so submitting
+  // `REPORTING_MANAGER_RATING` finalises this manager's KRAs and leaves HR's
+  // and Accounts' rows untouched for them to submit themselves.
+
+  /// Months whose manager review this viewer may submit. The per-review rule
+  /// itself lives in [managerCanSubmitReview] so it can be tested directly.
+  List<MonthlyReview> _managerSubmittableReviews(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) =>
+      scope == null
+          ? const []
+          : [
+              for (final r in reviews.whereType<MonthlyReview>())
+                if (managerCanSubmitReview(r, scope.userId)) r,
+            ];
+
+  /// The manager-submit action, or null when there is nothing to submit — which
+  /// keeps the bar off employees' own sheets, off other managers' reports, and
+  /// off months already submitted or not yet rated.
+  Future<void> Function()? _managerSubmitAction(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) {
+    if (scope == null) return null;
+    final targets = _managerSubmittableReviews(reviews, scope);
+    if (targets.isEmpty) return null;
+    return () => _submitManagerReview(targets, scope);
+  }
+
+  /// Submits the reporting manager's review for [targets] and confirms it.
+  Future<void> _submitManagerReview(
+    List<MonthlyReview> targets,
+    ReviewScope scope,
+  ) async {
+    final months = targets.map((r) => r.period.label).join(', ');
+    // Coverage across the quarter, so "3 of 5" reads correctly for a
+    // multi-month submit rather than quoting only the first month.
+    final rated =
+        targets.fold<int>(0, (sum, r) => sum + managerRatedKraCount(r));
+    final total =
+        targets.fold<int>(0, (sum, r) => sum + managerAssignedKras(r).length);
+
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.mgrSubmitConfirmTitle,
+      message: '${AppStrings.mgrSubmitConfirmMessage}\n\n'
+          '${AppStrings.mgrSubmitCoverage(rated, total)}\n\n$months',
+      confirmLabel: AppStrings.mgrSubmitConfirmAction,
+      cancelLabel: AppStrings.commonCancel,
+      icon: Icons.task_alt_rounded,
+      accentColor: AppColors.primaryPurple,
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(monthlyReviewRepositoryProvider);
+      for (final review in targets) {
+        // approved: true is what separates this from the rework send-back,
+        // which posts the same stage with approved: false.
+        await repo.submitStage(
+          review.id,
+          ReviewStage.reportingManagerRating,
+          approved: true,
+          actorId: scope.userId,
+          actorName: scope.userName,
+        );
+      }
+      ref.invalidate(quarterlySheetProvider);
+      // The manager's team list badges review state from the summary.
+      ref.invalidate(monthlyReviewListProvider);
+      if (mounted) await _showManagerSubmittedDialog();
+    } catch (e) {
+      if (mounted) {
+        final conflict = e is ApiError && e.statusCode == 409;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(conflict
+                ? AppStrings.mgrSubmitAlreadyMoved
+                : '${AppStrings.mgrSubmitFailed} '
+                    '${e is ApiError ? e.message : e}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showManagerSubmittedDialog() => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surfaceElevated,
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.success, size: 44),
+          title: const Text(
+            AppStrings.mgrSubmitDoneTitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            AppStrings.mgrSubmitDoneMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          actions: [
+            Center(
+              child: FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple),
+                child: const Text(AppStrings.commonClose),
+              ),
+            ),
+          ],
+        ),
+      );
+
   /// The submit action, or null when there is nothing to submit — which keeps the
   /// bar off other people's sheets, off months already submitted, and off months
   /// with nothing rated yet.
@@ -915,6 +1042,9 @@ class _QuarterlyKraSheetScreenState
             onSendBackForRework: _reworkAction(mappedReviews, scope),
             // The employee finalises their own rating; null for everyone else.
             onSubmitSelfRating: _submitAction(mappedReviews, scope),
+            // The reporting manager's counterpart, scoped to their own KRAs.
+            onSubmitManagerReview:
+                _managerSubmitAction(mappedReviews, scope),
           );
         },
       ),
@@ -940,6 +1070,60 @@ extension _Let<T> on T {
   R let<R>(R Function(T) f) => f(this);
 }
 
+// ── The reporting manager's submit rule ──────────────────────────────────────
+//
+// Top-level and visible for testing because "submit only MY ratings" is the
+// whole point of the manager's submit, and that scoping deserves a direct test
+// rather than being reachable only through a rendered widget.
+
+/// The KRAs on [r] assigned to the reporting manager.
+///
+/// A row with no assigned reviewer (legacy data) falls back to the reporting
+/// manager, matching how the Review column itself resolves a row's stage.
+@visibleForTesting
+List<MonthlyKraRow> managerAssignedKras(MonthlyReview r) => [
+      for (final row in r.rows)
+        if ((row.reviewStage ?? ReviewStage.reportingManagerRating) ==
+            ReviewStage.reportingManagerRating)
+          row,
+    ];
+
+/// How many of the manager's own KRAs carry a manager score. Surfaced in the
+/// confirm dialog so submitting a partly-rated month is a deliberate choice.
+@visibleForTesting
+int managerRatedKraCount(MonthlyReview r) => managerAssignedKras(r)
+    .where((row) =>
+        row.scoreFor(ReviewStage.reportingManagerRating)?.value != null)
+    .length;
+
+/// Whether [managerUserId] may submit their reporting-manager review of [r].
+///
+/// Mirrors the employee's rule, scoped to the manager's own KRAs:
+///   * they are this review's reporting manager (a RELATIONSHIP, not a role)
+///     and the month is not already completed;
+///   * at least one KRA assigned to THEM carries their score — submitting an
+///     untouched month would finalise an empty review. HR's and Accounts' rows
+///     are ignored here, so rating an HR-assigned KRA never unlocks the
+///     manager's submit;
+///   * they have not already submitted, which a stage record for
+///     `REPORTING_MANAGER_RATING` proves, so the button goes away once used.
+///
+/// Deliberately NOT gated on the cursor still sitting at the manager's stage,
+/// for the same reason the employee's rule isn't: a backend that auto-advances
+/// on save moves the cursor before submit is ever pressed, and the window would
+/// never open. A server that disagrees is handled on the response (409).
+@visibleForTesting
+/// The identity test requires a NON-EMPTY id on both sides. A review with a
+/// blank `managerId` would otherwise match a viewer with a blank `userId` and
+/// hand them the submit — unlikely, but it fails open, so it is ruled out here.
+bool managerCanSubmitReview(MonthlyReview r, String managerUserId) =>
+    !r.isComplete &&
+    managerUserId.isNotEmpty &&
+    (r.managerId ?? '').isNotEmpty &&
+    r.managerId == managerUserId &&
+    managerRatedKraCount(r) > 0 &&
+    r.recordFor(ReviewStage.reportingManagerRating) == null;
+
 /// Builds the quarterly-sheet body from plain data (no providers/auth) so
 /// widget tests can exercise its layout in isolation — e.g. assert the grid
 /// renders a full "100%" editable cell without a RenderFlex overflow.
@@ -956,6 +1140,7 @@ Widget quarterlyKraSheetBodyForTest({
   Future<void> Function()? onReopenManagement,
   Future<void> Function()? onSendBackForRework,
   Future<void> Function()? onSubmitSelfRating,
+  Future<void> Function()? onSubmitManagerReview,
 
   /// Pins "today" so a test can assert the current-month copy deterministically.
   DateTime? now,
@@ -1021,6 +1206,7 @@ Widget quarterlyKraSheetBodyForTest({
     onReopenManagement: onReopenManagement,
     onSendBackForRework: onSendBackForRework,
     onSubmitSelfRating: onSubmitSelfRating,
+    onSubmitManagerReview: onSubmitManagerReview,
   );
 }
 
@@ -1088,6 +1274,10 @@ class _Sheet extends StatelessWidget {
   /// still at Self-Rating and has something rated to submit.
   final Future<void> Function()? onSubmitSelfRating;
 
+  /// The reporting manager's explicit "I'm done" for the KRAs assigned to
+  /// them. Null unless they actually have a month of their own to submit.
+  final Future<void> Function()? onSubmitManagerReview;
+
   const _Sheet({
     this.clock,
     required this.months,
@@ -1108,6 +1298,7 @@ class _Sheet extends StatelessWidget {
     this.onReopenManagement,
     this.onSendBackForRework,
     this.onSubmitSelfRating,
+    this.onSubmitManagerReview,
   });
 
   MonthlyReview? get _any =>
@@ -1315,6 +1506,12 @@ class _Sheet extends StatelessWidget {
             if (onSubmitSelfRating != null) ...[
               const SizedBox(height: 14),
               _SubmitSelfRatingBar(onSubmit: onSubmitSelfRating!),
+            ],
+            // The manager's submit sits above the rework bar: approving is the
+            // common path, handing it back the exception.
+            if (onSubmitManagerReview != null) ...[
+              const SizedBox(height: 14),
+              _ManagerSubmitBar(onSubmit: onSubmitManagerReview!),
             ],
             if (onSendBackForRework != null) ...[
               const SizedBox(height: 14),
@@ -3080,6 +3277,86 @@ class _ReworkNotice extends StatelessWidget {
 /// Separate from the rating cells on purpose: returning the work is a decision
 /// about the whole month, not one KRA, and it is destructive enough to the
 /// employee's flow that it should not sit inside a tap-to-rate cell.
+/// The reporting manager's "I'm done" bar — their counterpart to
+/// [_SubmitSelfRatingBar].
+///
+/// Same shape and placement as the employee's on purpose: the manager already
+/// recognises this bar from rating their own KRAs, and the action it performs is
+/// the same kind of finalisation. It only ever covers the KRAs assigned to this
+/// manager; HR and Accounts submit their own stages.
+class _ManagerSubmitBar extends StatefulWidget {
+  final Future<void> Function() onSubmit;
+  const _ManagerSubmitBar({required this.onSubmit});
+
+  @override
+  State<_ManagerSubmitBar> createState() => _ManagerSubmitBarState();
+}
+
+class _ManagerSubmitBarState extends State<_ManagerSubmitBar> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onSubmit();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border:
+            Border.all(color: AppColors.primaryPurple.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.task_alt_rounded,
+                  size: 18, color: AppColors.primaryPurple),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  AppStrings.mgrSubmitHint,
+                  style:
+                      TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _busy ? null : _run,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: _busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send_rounded, size: 18),
+            label: const Text(
+              AppStrings.mgrSubmitAction,
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReworkBar extends StatefulWidget {
   final Future<void> Function() onSendBack;
   const _ReworkBar({required this.onSendBack});
