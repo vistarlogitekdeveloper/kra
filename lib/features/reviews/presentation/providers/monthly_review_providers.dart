@@ -221,20 +221,22 @@ final currentReviewScopeProvider = Provider<ReviewScope?>((ref) {
   );
 });
 
-/// Recent calendar months (current + previous 5, newest first) — feeds
-/// the month picker. Reviews exist monthly, so the picker is a fixed
-/// rolling window rather than a query.
+/// The six most recent RATABLE months, newest first — feeds the month picker.
+/// Reviews exist monthly, so the picker is a fixed rolling window rather than
+/// a query.
+///
+/// Starts at [ReviewPeriod.openForRating], not at today's month. The current
+/// calendar month has not ended, so there is nothing to review in it yet;
+/// listing it put an always-empty period at the top of every picker and made
+/// it look as though that month's reviews had gone missing.
 final availablePeriodsProvider = Provider<List<ReviewPeriod>>((ref) {
-  final now = DateTime.now();
-  return List.generate(6, (i) {
-    var m = now.month - i;
-    var y = now.year;
-    while (m <= 0) {
-      m += 12;
-      y -= 1;
-    }
-    return ReviewPeriod(y, m);
-  });
+  var period = ReviewPeriod.openForRating(DateTime.now());
+  final periods = <ReviewPeriod>[];
+  for (var i = 0; i < 6; i++) {
+    periods.add(period);
+    period = period.previous;
+  }
+  return periods;
 });
 
 /// The month the dashboards are showing. Null → callers fall back to the

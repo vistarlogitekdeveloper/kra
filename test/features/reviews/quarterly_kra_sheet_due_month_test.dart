@@ -18,11 +18,21 @@ import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_s
 ///
 /// So the sheet must name the outstanding month, and must stop saying it once
 /// there is nothing outstanding. The clock is injected: the copy turns on which
-/// month is current, so a test reading the real clock would assert something
+/// month is due, so a test reading the real clock would assert something
 /// different every month.
+///
+/// The month that is DUE is the previous calendar month, never the current one
+/// — a month is rated after it has finished. These fixtures therefore put the
+/// clock one month AHEAD of the month they expect to be named; an earlier
+/// version sat inside August and expected August, which assumed a month could
+/// be rated while twenty days of it were still to come. See
+/// [ReviewPeriod.openForRating].
 void main() {
   const august = ReviewPeriod(2026, 8);
-  final inAugust = DateTime(2026, 8, 25);
+  // A date in SEPTEMBER, because August is the month under review then. The
+  // clock used to sit inside August and expect August to be due, which assumed
+  // a month could be rated while it was still running.
+  final whileAugustIsDue = DateTime(2026, 9, 5);
 
   const months = [
     ReviewPeriod(2026, 7),
@@ -63,14 +73,14 @@ void main() {
       );
 
   const genericHint = 'You can edit the Self ratings on this sheet.';
-  const augustHint = "Rate your Aug '26 Self column — that is the current "
-      'month, and it is still empty.';
+  const augustHint = "Rate your Aug '26 Self column — that month has closed "
+      'and it is still empty.';
 
   testWidgets(
       'an earlier month rated but the current one empty → the hint '
       'names the current month', (tester) async {
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
-      now: inAugust,
+      now: whileAugustIsDue,
       months: months,
       reviews: [
         reviewFor(months[0], selfScore: 9), // July done — the reported case
@@ -92,7 +102,7 @@ void main() {
     // HR generates months lazily, so "not generated" and "generated but empty"
     // are both outstanding to the employee and must read the same.
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
-      now: inAugust,
+      now: whileAugustIsDue,
       months: months,
       reviews: [reviewFor(months[0], selfScore: 9), null, null],
       editableSelf: true,
@@ -106,7 +116,7 @@ void main() {
   testWidgets('the current month is rated → no nagging, generic hint returns',
       (tester) async {
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
-      now: inAugust,
+      now: whileAugustIsDue,
       months: months,
       reviews: [null, reviewFor(august, selfScore: 8), null],
       editableSelf: true,
@@ -123,7 +133,9 @@ void main() {
     // A quarter the employee is only visiting: nagging about a past month they
     // can no longer be marked overdue for would bury the one that matters.
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
-      now: DateTime(2026, 11, 3), // after the whole quarter
+      // After the quarter: the open review month is October, which is not one
+      // of the three on this sheet, so no month here is due.
+      now: DateTime(2026, 11, 3),
       months: months,
       reviews: [reviewFor(months[0]), null, null],
       editableSelf: true,
@@ -138,7 +150,7 @@ void main() {
   testWidgets('a viewer who cannot self-rate never sees the due-month hint',
       (tester) async {
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
-      now: inAugust,
+      now: whileAugustIsDue,
       months: months,
       reviews: [null, reviewFor(august), null],
       editableSelf: false,

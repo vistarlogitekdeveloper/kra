@@ -1454,8 +1454,8 @@ class _Sheet extends StatelessWidget {
         months, reviews, clock ?? DateTime.now());
     final scopeLabel = canSelf
         ? (dueMonth != null
-            ? 'Rate your ${dueMonth.shortLabel} Self column — that is the '
-                'current month, and it is still empty.'
+            ? 'Rate your ${dueMonth.shortLabel} Self column — that month has '
+                'closed and it is still empty.'
             : 'You can edit the Self ratings on this sheet.')
         : canMgr
             // The same seat reads differently in each pipeline. Under
@@ -2320,17 +2320,17 @@ class _GridState extends State<_Grid> {
           _cell(
               _wMon,
               Text('${m.shortLabel}\nSelf',
-                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
                   textAlign: TextAlign.right)),
           _cell(
               _wMon,
               Text('${m.shortLabel}\nReview',
-                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
                   textAlign: TextAlign.right)),
           _cell(
               _wMon,
               Text('${m.shortLabel}\nMgmt',
-                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
                   textAlign: TextAlign.right)),
         ],
         _cell(_wQtr, Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
@@ -4427,7 +4427,7 @@ ReviewPeriod? _currentMonthNeedingSelfRating(
     List<ReviewPeriod> months, List<MonthlyReview?> reviews, DateTime now) {
   for (var i = 0; i < months.length && i < reviews.length; i++) {
     final month = months[i];
-    if (!_isCurrentMonth(month, now)) continue;
+    if (!_isOpenReviewMonth(month, now)) continue;
     final review = reviews[i];
     if (review == null) return month; // not generated yet — still outstanding
     final rated = review.rows
@@ -4437,5 +4437,11 @@ ReviewPeriod? _currentMonthNeedingSelfRating(
   return null;
 }
 
-bool _isCurrentMonth(ReviewPeriod m, DateTime now) =>
-    m.year == now.year && m.month == now.month;
+/// Whether [m] is the month whose rating window is open as of [now].
+///
+/// NOT "is this today's calendar month". Today's month has not ended, so
+/// nothing in it can be rated yet; the month that matters to a rater is the
+/// previous one. Used both to highlight the live column in the header and to
+/// find the month still owing a self-rating.
+bool _isOpenReviewMonth(ReviewPeriod m, DateTime now) =>
+    m.key == ReviewPeriod.openForRating(now).key;

@@ -366,9 +366,21 @@ class _CurrentMonthSection extends ConsumerWidget {
   }
 
   /// The month this dashboard is showing, as a [ReviewPeriod].
+  ///
+  /// The server's `currentMonth` wins when it is present — it is anchored to
+  /// the review cycle's own months, which is more authoritative than the
+  /// device clock (a cycle can start mid-year, and the device may be in a
+  /// different timezone).
+  ///
+  /// The fallback is the month whose rating window is OPEN, not today's month.
+  /// Today's month has not finished, so nobody can rate it yet; defaulting to
+  /// it made the card announce "Sep-26 Self-rating pending" on 9 September
+  /// when the outstanding work was August's.
   static ReviewPeriod _periodFor(EmployeeDashboard dashboard) {
-    final d = dashboard.currentMonth?.monthDate ?? DateTime.now();
-    return ReviewPeriod(d.year, d.month);
+    final d = dashboard.currentMonth?.monthDate;
+    return d == null
+        ? ReviewPeriod.openForRating(DateTime.now())
+        : ReviewPeriod(d.year, d.month);
   }
 
   /// Routes the current-month CTA to whichever screen makes sense for
