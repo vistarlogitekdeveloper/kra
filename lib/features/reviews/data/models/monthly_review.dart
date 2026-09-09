@@ -55,6 +55,19 @@ class ReviewPeriod {
   /// calendar month and anything ahead of it.
   bool isRatableOn(DateTime now) => this <= ReviewPeriod.openForRating(now);
 
+  /// This month, pulled back to [ReviewPeriod.openForRating] if it has not
+  /// ended yet.
+  ///
+  /// For taking a month from a source that might name one too recent — the
+  /// server's `currentMonth` picks the cycle month matching TODAY, which is a
+  /// month nobody can rate. Clamping is one-directional on purpose: an OLDER
+  /// month is left alone, because a cycle running behind or a backfilled month
+  /// genuinely is the one owing work, and overriding that would hide it.
+  ReviewPeriod clampToRatable(DateTime now) {
+    final open = ReviewPeriod.openForRating(now);
+    return this > open ? open : this;
+  }
+
   /// Stable key, e.g. "2026-06". Used for equality + map keys.
   String get key => '$year-${month.toString().padLeft(2, '0')}';
 
@@ -77,6 +90,13 @@ class ReviewPeriod {
   /// e.g. "June 2026".
   String get label => '${(month >= 1 && month <= 12) ? _names[month] : ''} '
       '$year';
+
+  /// "Jul-26" — the same shape the backend uses for `monthLabel`, so a label
+  /// derived on the client is visually indistinguishable from one the server
+  /// sent. Used where the two can appear in the same place.
+  String get compactLabel =>
+      "${(month >= 1 && month <= 12) ? _names[month].substring(0, 3) : ''}"
+      "-${year.toString().substring(2)}";
 
   /// Compact "Jul '26" — a 3-letter month + 2-digit year for tight table
   /// headers and month chips.

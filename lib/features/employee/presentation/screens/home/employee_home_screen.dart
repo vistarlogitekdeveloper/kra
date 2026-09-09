@@ -358,6 +358,10 @@ class _CurrentMonthSection extends ConsumerWidget {
           cycle: dashboard.cycle,
           currentMonth: dashboard.currentMonth,
           scorecard: dashboard.scorecard,
+          // The clamped period, in the server's own label shape — so the card
+          // is visually unchanged apart from naming the right month, and it
+          // cannot disagree with the deadline banner above it.
+          monthLabel: period.compactLabel,
           stateOverride: promote ? ReviewState.employeeSubmittedAll : null,
           onPrimaryAction: () => _onCurrentMonthAction(context, dashboard),
         );
@@ -367,20 +371,28 @@ class _CurrentMonthSection extends ConsumerWidget {
 
   /// The month this dashboard is showing, as a [ReviewPeriod].
   ///
-  /// The server's `currentMonth` wins when it is present — it is anchored to
-  /// the review cycle's own months, which is more authoritative than the
-  /// device clock (a cycle can start mid-year, and the device may be in a
-  /// different timezone).
+  /// The server's `currentMonth` is preferred when it names a month that can
+  /// actually be under review — it is anchored to the review cycle's own
+  /// months, so it correctly handles a cycle that starts mid-year.
   ///
-  /// The fallback is the month whose rating window is OPEN, not today's month.
-  /// Today's month has not finished, so nobody can rate it yet; defaulting to
-  /// it made the card announce "Sep-26 Self-rating pending" on 9 September
-  /// when the outstanding work was August's.
+  /// But it is CLAMPED, never trusted blindly. The server picks the cycle month
+  /// matching today's date, which through September is September — a month with
+  /// twenty days still to run and therefore nothing to rate. That is what put
+  /// "Sep-26 Self-rating pending" on this screen on 9 September when the
+  /// outstanding work was August's. A month that has not ended cannot be the
+  /// month under review, and the client can tell that from the clock alone, so
+  /// it does not need the server to be fixed first.
+  ///
+  /// Clamping rather than overriding matters: an older `currentMonth` is
+  /// legitimate — a cycle can be behind, and a backfilled month is genuinely
+  /// the one owing work — so only the future direction is corrected.
   static ReviewPeriod _periodFor(EmployeeDashboard dashboard) {
+    // One clock read, so the two branches cannot straddle midnight.
+    final now = DateTime.now();
     final d = dashboard.currentMonth?.monthDate;
     return d == null
-        ? ReviewPeriod.openForRating(DateTime.now())
-        : ReviewPeriod(d.year, d.month);
+        ? ReviewPeriod.openForRating(now)
+        : ReviewPeriod(d.year, d.month).clampToRatable(now);
   }
 
   /// Routes the current-month CTA to whichever screen makes sense for

@@ -33,12 +33,26 @@ class CurrentMonthCard extends StatelessWidget {
   /// screen passes the state derived from the monthly review here instead.
   final ReviewState? stateOverride;
 
+  /// The month this card is about, already resolved by the caller.
+  ///
+  /// Required, and it wins over `currentMonth.monthLabel`, because the server's
+  /// label is the cycle month matching TODAY — which is a month that has not
+  /// ended and so cannot be the one under review. Rendering it verbatim is
+  /// what made this card read "Sep-26 Self-rating pending" on 9 September when
+  /// August was what was owed.
+  ///
+  /// Passing the label in rather than deriving it here also means the card and
+  /// the deadline banner above it cannot disagree: they now name the same
+  /// month because they are handed the same one.
+  final String monthLabel;
+
   const CurrentMonthCard({
     super.key,
     required this.cycle,
     required this.currentMonth,
     required this.scorecard,
     required this.onPrimaryAction,
+    required this.monthLabel,
     this.stateOverride,
   });
 
@@ -47,10 +61,6 @@ class CurrentMonthCard extends StatelessWidget {
     if (cycle == null) return const _NoActiveCycle();
 
     final state = stateOverride ?? scorecard?.state ?? ReviewState.draft;
-    final monthLabel = currentMonth?.monthLabel ??
-        EmployeeFormatters.monthYear(
-          currentMonth?.monthDate ?? DateTime.now(),
-        );
 
     switch (state) {
       case ReviewState.draft:

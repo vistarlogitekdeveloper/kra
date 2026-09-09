@@ -80,12 +80,15 @@ void main() {
   group('ordering', () {
     test('compares across years, not just month numbers', () {
       // A naive month-only comparison makes Dec 2025 look "later" than Jan 2026.
-      expect(const ReviewPeriod(2025, 12) <= const ReviewPeriod(2026, 1), isTrue);
-      expect(const ReviewPeriod(2026, 1) > const ReviewPeriod(2025, 12), isTrue);
+      expect(
+          const ReviewPeriod(2025, 12) <= const ReviewPeriod(2026, 1), isTrue);
+      expect(
+          const ReviewPeriod(2026, 1) > const ReviewPeriod(2025, 12), isTrue);
     });
 
     test('a month is not greater than itself', () {
-      expect(const ReviewPeriod(2026, 8) > const ReviewPeriod(2026, 8), isFalse);
+      expect(
+          const ReviewPeriod(2026, 8) > const ReviewPeriod(2026, 8), isFalse);
       expect(
           const ReviewPeriod(2026, 8) <= const ReviewPeriod(2026, 8), isTrue);
     });
@@ -110,6 +113,62 @@ void main() {
     test('future months are not ratable', () {
       expect(const ReviewPeriod(2026, 10).isRatableOn(now), isFalse);
       expect(const ReviewPeriod(2027, 1).isRatableOn(now), isFalse);
+    });
+  });
+
+  group('clampToRatable only ever pulls a month BACK', () {
+    final now = DateTime(2026, 9, 9);
+
+    test('the live calendar month is pulled back to the open one', () {
+      // The exact reported bug: the server sent September as `currentMonth`.
+      expect(
+        const ReviewPeriod(2026, 9).clampToRatable(now).key,
+        const ReviewPeriod(2026, 8).key,
+      );
+    });
+
+    test('a future month is pulled back too', () {
+      expect(
+        const ReviewPeriod(2026, 12).clampToRatable(now).key,
+        const ReviewPeriod(2026, 8).key,
+      );
+    });
+
+    test('the open month passes through untouched', () {
+      expect(
+        const ReviewPeriod(2026, 8).clampToRatable(now).key,
+        const ReviewPeriod(2026, 8).key,
+      );
+    });
+
+    test('an OLDER month is left alone — it is genuinely what is owed', () {
+      // A cycle running behind, or a backfilled month, really is the month
+      // owing work. Clamping in both directions would hide it.
+      expect(
+        const ReviewPeriod(2026, 5).clampToRatable(now).key,
+        const ReviewPeriod(2026, 5).key,
+      );
+    });
+
+    test('the result is always ratable, whatever went in', () {
+      for (var y = 2025; y <= 2027; y++) {
+        for (var m = 1; m <= 12; m++) {
+          expect(
+              ReviewPeriod(y, m).clampToRatable(now).isRatableOn(now), isTrue,
+              reason: 'clamping $y-$m produced an unratable month');
+        }
+      }
+    });
+  });
+
+  group('compactLabel matches the shape the server sends', () {
+    test('it is "Aug-26", not "Aug \'26"', () {
+      // The card can be handed either a server label or a derived one, so the
+      // derived one has to be visually identical or the fix would look like a
+      // formatting regression.
+      expect(const ReviewPeriod(2026, 8).compactLabel, 'Aug-26');
+      expect(const ReviewPeriod(2026, 12).compactLabel, 'Dec-26');
+      expect(const ReviewPeriod(2027, 1).compactLabel, 'Jan-27');
     });
   });
 
