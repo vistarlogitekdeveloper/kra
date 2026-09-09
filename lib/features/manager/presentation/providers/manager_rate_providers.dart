@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 
 import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
@@ -18,8 +18,14 @@ import '../../data/repositories/manager_rate_repository.dart';
 import 'manager_dashboard_providers.dart';
 import 'manager_review_providers.dart';
 import 'manager_team_providers.dart';
+import '../../../../core/observability/app_logger.dart';
 
 final managerRateRepositoryProvider = Provider<ManagerRateRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   return ApiManagerRateRepository(dio: ref.read(dioProvider));
 });
 
@@ -358,7 +364,7 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
       );
     } catch (e, st) {
       assert(() {
-        debugPrint('manager auto-save failed: $e\n$st');
+        AppLog.e('manager.rate', 'auto-save failed', error: e, stackTrace: st);
         return true;
       }());
       // Mark the cells dirty again so the next tick retries them.

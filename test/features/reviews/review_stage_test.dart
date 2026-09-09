@@ -10,8 +10,8 @@ void main() {
       // → payout → completed. The raters are entered in parallel in practice;
       // this linear `next` only drives the formal cursor.
       expect(ReviewStage.selfRating.next, ReviewStage.reportingManagerRating);
-      expect(ReviewStage.reportingManagerRating.next,
-          ReviewStage.accountHrRating);
+      expect(
+          ReviewStage.reportingManagerRating.next, ReviewStage.accountHrRating);
       expect(ReviewStage.accountHrRating.next, ReviewStage.financeRating);
       expect(ReviewStage.financeRating.next, ReviewStage.managementReview);
       expect(ReviewStage.managementReview.next, ReviewStage.incentivePayout);
@@ -111,8 +111,7 @@ void main() {
           ReviewStage.accountHrRating);
       expect(ReviewStage.fromApi('HR_RATING'), ReviewStage.accountHrRating);
       expect(ReviewStage.fromApi('FINANCE_RATING'), ReviewStage.financeRating);
-      expect(
-          ReviewStage.fromApi('ACCOUNTS_RATING'), ReviewStage.financeRating);
+      expect(ReviewStage.fromApi('ACCOUNTS_RATING'), ReviewStage.financeRating);
       expect(ReviewStage.fromApi('reportingManagerRating'),
           ReviewStage.reportingManagerRating);
       expect(

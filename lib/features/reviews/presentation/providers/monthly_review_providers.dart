@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 
 import '../../../../core/api/dio_client.dart';
+import '../../../../core/enums/review_flow.dart';
 import '../../../auth/data/models/user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../employee/presentation/providers/my_kra_providers.dart';
@@ -19,12 +21,16 @@ import '../../data/repositories/monthly_review_repository.dart';
 /// Whether to use the live monthly-review backend (`/reviews/monthly*`).
 ///
 /// Gated on a build-time flag so the switch is a deploy-day config change,
-/// not a code edit: pass `--dart-define=MONTHLY_BACKEND=true` once those
-/// endpoints are deployed. Defaults to `false` because they 404 on the
-/// current deployment — until then the app runs on the live-roster
-/// repository (real employees from `/employees` etc. + an in-memory
-/// pipeline). When `true`, [monthlyReviewRepositoryProvider] targets
-/// [ApiMonthlyReviewRepository] with no model/UI changes.
+/// not a code edit. **Defaults to `true`** — those endpoints are deployed, so
+/// [monthlyReviewRepositoryProvider] targets [ApiMonthlyReviewRepository] and
+/// every rating is a real API write. It defaulted to `false` while they still
+/// 404'd; the fallback ([LiveMonthlyReviewRepository] — real employees from
+/// `/employees` etc. plus an in-memory pipeline) is still there and is what
+/// `--dart-define=MONTHLY_BACKEND=false` selects.
+///
+/// Worth knowing when a rating "saves" in a test but does not persist: on the
+/// fallback it never left the process. Conversely, on the default the server's
+/// own role table has the last word — see docs/RATING_ROLE_DIVERGENCE.md.
 final monthlyBackendEnabledProvider = Provider<bool>(
   (ref) => const bool.fromEnvironment('MONTHLY_BACKEND', defaultValue: true),
 );
@@ -41,11 +47,20 @@ class ReviewScope {
   /// Every role held. Review AUTHORITY is checked against this, so someone
   /// holding both the HR and Accounts seats can act on either.
   final Set<UserRole> roles;
+
+  /// Which review pipeline this user's organisation runs.
+  ///
+  /// Carried on the scope so the rating gates can consult it without a second
+  /// lookup. Defaults to [ReviewFlow.standard] — the original pipeline — so a
+  /// scope built without it behaves exactly as it did before flows existed.
+  final ReviewFlow reviewFlow;
+
   const ReviewScope({
     required this.userId,
     required this.userName,
     required this.role,
     this.roles = const {},
+    this.reviewFlow = ReviewFlow.standard,
   });
 
   /// [roles], or `{role}` when only a scalar role is known.
@@ -61,6 +76,11 @@ class ReviewScope {
 /// API impl once one ships.
 final monthlyReviewRepositoryProvider =
     Provider<MonthlyReviewRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   if (ref.watch(monthlyBackendEnabledProvider)) {
     return ApiMonthlyReviewRepository(dio: ref.read(dioProvider));
   }
@@ -112,6 +132,7 @@ Future<List<RosterEntry>> _loadRoster(Ref ref) async {
     case UserRole.hr:
     case UserRole.finance:
     case UserRole.admin:
+    case UserRole.superAdmin:
     case UserRole.hrAdmin:
     // Management reviews the whole org, so it gets the full roster too — the
     // Management approval is the last gate before payout on every review.
@@ -193,6 +214,10 @@ final currentReviewScopeProvider = Provider<ReviewScope?>((ref) {
     userName: auth.user.fullName,
     role: auth.user.role,
     roles: auth.user.effectiveRoles,
+    // The ACTING organisation's flow, not the user's own. See
+    // core/providers/org_scope_provider.dart: they differ exactly when a super
+    // admin has switched tenant, which is the case that was broken.
+    reviewFlow: ref.watch(currentReviewFlowProvider),
   );
 });
 

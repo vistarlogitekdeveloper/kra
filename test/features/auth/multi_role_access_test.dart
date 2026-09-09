@@ -23,7 +23,8 @@ void main() {
       );
 
   group('User.effectiveRoles', () {
-    test('falls back to the scalar role when no roles array is sent — the '
+    test(
+        'falls back to the scalar role when no roles array is sent — the '
         'current API shape, so nothing changes for existing users', () {
       final u = user(role: UserRole.hrAdmin);
       expect(u.effectiveRoles, {UserRole.hrAdmin});
@@ -57,7 +58,8 @@ void main() {
       expect(u.effectiveRoles, {UserRole.hrAdmin, UserRole.finance});
     });
 
-    test('MANAGEMENT resolves instead of silently demoting to EMPLOYEE — the '
+    test(
+        'MANAGEMENT resolves instead of silently demoting to EMPLOYEE — the '
         'founder must not lose review access when the backend ships it', () {
       final u = User.fromJson({
         'id': 'u1',
@@ -110,7 +112,8 @@ void main() {
       expect(AppRoutes.canReviewAny(roles), isTrue);
     });
 
-    test('a role that grants nothing on its own still grants via the other', () {
+    test('a role that grants nothing on its own still grants via the other',
+        () {
       // Employee alone reaches no admin area; paired with FINANCE it reviews.
       expect(AppRoutes.canReviewAny({UserRole.employee}), isFalse);
       expect(AppRoutes.canReviewAny({UserRole.employee, UserRole.finance}),

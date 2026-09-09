@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/api/api_error.dart';
@@ -22,6 +23,11 @@ import 'my_review_providers.dart';
 // ────────────────────────────────────────────────────────────────────────
 
 final selfRateRepositoryProvider = Provider<SelfRateRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   return ApiSelfRateRepository(dio: ref.read(dioProvider));
 });
 

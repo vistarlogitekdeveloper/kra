@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 
 import '../../../../core/api/api_error.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -9,9 +10,15 @@ import '../../../../core/api/dio_client.dart';
 import '../../data/models/employee.dart';
 import '../../data/repositories/api_employee_repository.dart';
 import '../../data/repositories/employee_repository.dart';
+import '../../../../core/observability/app_logger.dart';
 
 /// Single SWAP point. Replace the body to drop in a mock implementation.
 final employeeRepositoryProvider = Provider<EmployeeRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   return ApiEmployeeRepository(dio: ref.read(dioProvider));
 });
 
@@ -195,7 +202,8 @@ class EmployeeListController extends StateNotifier<EmployeeListState> {
       state = state.copyWith(isInitialLoading: false, error: e.message);
     } catch (e, st) {
       assert(() {
-        debugPrint('employee list parse failed: $e\n$st');
+        AppLog.e('hr.employees', 'employee list parse failed',
+            error: e, stackTrace: st);
         return true;
       }());
       state = state.copyWith(

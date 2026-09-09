@@ -43,7 +43,8 @@ void main() {
     );
   }
 
-  test('furthest month drives the stage — July done, Aug/Sep empty → '
+  test(
+      'furthest month drives the stage — July done, Aug/Sep empty → '
       'Management Review even though the cursor is frozen at Self-Rating', () {
     final row = QuarterlyReviewSummary.build(
       employeeId: 'emp1',

@@ -42,7 +42,8 @@ void main() {
       expect(list, hasLength(2));
       expect(list.map((s) => s.employeeName),
           containsAll(['Real Employee One', 'Real Employee Two']));
-      expect(list.every((s) => s.currentStage == ReviewStage.selfRating), isTrue);
+      expect(
+          list.every((s) => s.currentStage == ReviewStage.selfRating), isTrue);
       // Real incentive ceiling carried onto the summary.
       final one = list.firstWhere((s) => s.employeeCode == 'VLPL0101');
       expect(one.incentiveEligibleAmount, 8000);

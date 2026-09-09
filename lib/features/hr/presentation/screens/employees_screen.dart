@@ -8,6 +8,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../providers/employee_providers.dart';
+import '../providers/organization_providers.dart';
 import '../widgets/confirm_action_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/employee_list_tile.dart';
@@ -95,7 +96,12 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(AppStrings.employeesTitle),
+        // A super admin can be scoped to any tenant, and this list looks
+        // identical whichever one it is — so name it in the title. Without
+        // this, the only difference between two organizations' employee lists
+        // is their contents, which is exactly how you edit the wrong person.
+        // Renders the plain title for everyone else, who only ever have one.
+        title: const _OrgScopedTitle(),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
@@ -399,6 +405,55 @@ class _LoadingList extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: 8,
       itemBuilder: (_, __) => const ListItemSkeleton(),
+    );
+  }
+}
+
+/// The employees title, with the organization name beneath it when the signed-in
+/// user can be scoped to more than one.
+///
+/// Only a super admin can switch tenants, so only they need to be told which
+/// one they are looking at — everyone else has exactly one organization and a
+/// subtitle would be noise. Falls back to the bare title while the tenant list
+/// is loading, or if it fails: a missing subtitle is better than a wrong one.
+class _OrgScopedTitle extends ConsumerWidget {
+  const _OrgScopedTitle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const plain = Text(AppStrings.employeesTitle);
+    if (!ref.watch(canManageOrganizationsProvider)) return plain;
+
+    final currentId = ref.watch(currentOrganizationIdProvider);
+    if (currentId == null) return plain;
+
+    final name = ref.watch(organizationsProvider).maybeWhen(
+          data: (list) {
+            for (final o in list) {
+              if (o.id == currentId) return o.name;
+            }
+            return null;
+          },
+          orElse: () => null,
+        );
+    if (name == null || name.isEmpty) return plain;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        plain,
+        Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primaryPurple,
+          ),
+        ),
+      ],
     );
   }
 }

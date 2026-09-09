@@ -7,6 +7,7 @@ import '../../../../core/storage/secure_storage_service.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/api_auth_repository.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../../../core/observability/app_logger.dart';
 
 // ────────────────────────────────────────────────────────────────────
 // Repository wiring
@@ -20,6 +21,13 @@ import '../../data/repositories/auth_repository.dart';
 ///     return MockAuthRepository();
 ///
 /// (and add the corresponding import). No other file needs to change.
+/// Deliberately NOT org-scoped, unlike every other repository provider.
+///
+/// `currentOrgIdProvider` watches [authStateProvider], which is built from this
+/// provider — so watching it here would close a cycle and Riverpod would throw
+/// on first read. Auth is what PRODUCES the organisation claim; it cannot also
+/// be scoped by it. Nothing is lost: this repository holds no org-scoped data,
+/// only tokens and the current user.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return ApiAuthRepository(
     dio: ref.read(dioProvider),
@@ -89,11 +97,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // snackbar — the user still sees a polite message, but the
       // developer console gets the real stack trace.
       if (kDebugMode) {
-        debugPrint('Unexpected login error: $e');
+        AppLog.e('auth', 'unexpected login error', error: e);
         debugPrintStack(stackTrace: st);
       }
       state = const AuthError('Something went wrong. Please try again.');
     }
+  }
+
+  /// Adopts a token pair the server issued outside the login flow and
+  /// republishes the resulting user, so every org-scoped provider watching auth
+  /// refetches against the new tenant.
+  ///
+  /// State is left untouched on failure: a half-applied switch — new tokens,
+  /// old user — would show one organisation's name over another's data.
+  Future<User?> adoptTokens(String accessToken, String refreshToken) async {
+    final user = await _repository.adoptTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
+    if (user != null) state = AuthAuthenticated(user);
+    return user;
   }
 
   Future<void> logout() async {

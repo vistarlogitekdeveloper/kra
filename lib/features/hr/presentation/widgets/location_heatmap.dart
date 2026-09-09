@@ -331,7 +331,12 @@ Future<void> _showLocationSheet(
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(sheetContext).pop();
-                      context.push(AppRoutes.hrEmployees);
+                      // go, not push: hrEmployees is a StatefulShellBranch, and
+                      // pushing a shell-branch route builds a second copy of
+                      // the HR shell — duplicating its
+                      // GlobalKey<NavigatorState> and throwing "A GlobalKey was
+                      // used multiple times inside one widget's child list".
+                      context.go(AppRoutes.hrEmployees);
                     },
                     icon: const Icon(Icons.groups_outlined, size: 18),
                     label: const Text(

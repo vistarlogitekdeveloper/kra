@@ -8,12 +8,11 @@ void main() {
           ManagerTeamFilter.pendingMyReview);
       expect(ManagerTeamFilter.fromApi('pending_my_review'),
           ManagerTeamFilter.pendingMyReview);
-      expect(ManagerTeamFilter.fromApi('COMPLETED'),
-          ManagerTeamFilter.completed);
+      expect(
+          ManagerTeamFilter.fromApi('COMPLETED'), ManagerTeamFilter.completed);
       expect(ManagerTeamFilter.fromApi('NOT_SUBMITTED'),
           ManagerTeamFilter.notSubmitted);
-      expect(ManagerTeamFilter.fromApi('OVERDUE'),
-          ManagerTeamFilter.overdue);
+      expect(ManagerTeamFilter.fromApi('OVERDUE'), ManagerTeamFilter.overdue);
     });
 
     test('falls back to all on null / unknown / empty', () {
@@ -29,11 +28,10 @@ void main() {
     });
 
     test('non-all filters return their wire value', () {
-      expect(ManagerTeamFilter.pendingMyReview.toApiString(),
-          'PENDING_MY_REVIEW');
+      expect(
+          ManagerTeamFilter.pendingMyReview.toApiString(), 'PENDING_MY_REVIEW');
       expect(ManagerTeamFilter.completed.toApiString(), 'COMPLETED');
-      expect(ManagerTeamFilter.notSubmitted.toApiString(),
-          'NOT_SUBMITTED');
+      expect(ManagerTeamFilter.notSubmitted.toApiString(), 'NOT_SUBMITTED');
       expect(ManagerTeamFilter.overdue.toApiString(), 'OVERDUE');
     });
   });

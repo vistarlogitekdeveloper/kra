@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 
 import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
@@ -9,8 +9,14 @@ import '../../data/models/enums.dart';
 import '../../data/models/my_review_detail.dart';
 import '../../data/repositories/api_my_review_repository.dart';
 import '../../data/repositories/my_review_repository.dart';
+import '../../../../core/observability/app_logger.dart';
 
 final myReviewRepositoryProvider = Provider<MyReviewRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   return ApiMyReviewRepository(dio: ref.read(dioProvider));
 });
 
@@ -96,7 +102,8 @@ class MyReviewListController extends StateNotifier<MyReviewListState> {
       state = state.copyWith(isInitialLoading: false, error: e.message);
     } catch (e, st) {
       assert(() {
-        debugPrint('my-reviews list parse failed: $e\n$st');
+        AppLog.e('employee.reviews', 'my-reviews list parse failed',
+            error: e, stackTrace: st);
         return true;
       }());
       state = state.copyWith(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/api/error_text.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
@@ -14,6 +15,7 @@ import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/models/hr_dashboard_models.dart';
 import '../providers/hr_dashboard_providers.dart';
+import '../providers/organization_providers.dart';
 import '../widgets/_formatters.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/overview_stat_card.dart';
@@ -113,7 +115,7 @@ class _OverviewSection extends ConsumerWidget {
     return overviewAsync.when(
       loading: () => const _OverviewLoading(),
       error: (e, _) => _ErrorPanel(
-        message: e.toString(),
+        message: userFacingError(e),
         onRetry: () => ref.invalidate(hrOverviewProvider),
       ),
       data: (overview) {
@@ -332,7 +334,7 @@ class _RecentActivitySection extends ConsumerWidget {
         ),
       ),
       error: (e, _) => _ErrorPanel(
-        message: e.toString(),
+        message: userFacingError(e),
         onRetry: () => ref.invalidate(hrRecentActivityProvider),
       ),
       data: (items) {
@@ -419,11 +421,11 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _QuickActionsGrid extends StatelessWidget {
+class _QuickActionsGrid extends ConsumerWidget {
   const _QuickActionsGrid();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -458,7 +460,9 @@ class _QuickActionsGrid extends StatelessWidget {
           label: AppStrings.hrHomeQuickReviews,
           iconBg: AppColors.success.withValues(alpha: 0.12),
           iconFg: AppColors.success,
-          onTap: () => context.push(AppRoutes.hrReviews),
+          // go, not push — hrReviews is a shell branch; pushing one duplicates
+          // the shell's navigator GlobalKey and crashes the frame.
+          onTap: () => context.go(AppRoutes.hrReviews),
         ),
         QuickActionButton(
           icon: Icons.location_on_rounded,
@@ -467,6 +471,16 @@ class _QuickActionsGrid extends StatelessWidget {
           iconFg: AppColors.info,
           onTap: () => context.push(AppRoutes.hrLocations),
         ),
+        // Tenant administration. Shown ONLY to the super admin — an HR admin
+        // tapping it would reach a screen whose every call answers 403.
+        if (ref.watch(canManageOrganizationsProvider))
+          QuickActionButton(
+            icon: Icons.domain_rounded,
+            label: AppStrings.orgTitle,
+            iconBg: AppColors.primaryPurple.withValues(alpha: 0.16),
+            iconFg: AppColors.primaryPurple,
+            onTap: () => context.push(AppRoutes.hrOrganizations),
+          ),
       ],
     );
   }

@@ -28,7 +28,8 @@ class WorkspaceSwitcher {
   /// KRA and gets no menu; a manager also has My Team, a reviewer (HR /
   /// Accounts / admin) also has Reviews, and an admin also has HR Admin.
   static bool hasExtras(User user) =>
-      AppRoutes.canAccessManagerAny(user.effectiveRoles, hasReports: user.hasReports) ||
+      AppRoutes.canAccessManagerAny(user.effectiveRoles,
+          hasReports: user.hasReports) ||
       AppRoutes.canReviewAny(user.effectiveRoles) ||
       AppRoutes.canAccessHrAny(user.effectiveRoles);
 
@@ -42,7 +43,8 @@ class WorkspaceSwitcher {
         route: AppRoutes.employeeHome,
         areaPrefix: AppRoutes.employeeDashboard, // '/employee'
       ),
-      if (AppRoutes.canAccessManagerAny(user.effectiveRoles, hasReports: user.hasReports))
+      if (AppRoutes.canAccessManagerAny(user.effectiveRoles,
+          hasReports: user.hasReports))
         const Workspace(
           label: AppStrings.workspaceMyTeam,
           subtitle: AppStrings.workspaceMyTeamSubtitle,

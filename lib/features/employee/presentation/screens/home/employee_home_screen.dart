@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../../core/api/error_text.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
@@ -12,7 +13,10 @@ import '../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../core/widgets/workspace_switcher.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../hr/presentation/widgets/confirm_action_dialog.dart';
+import '../../../../../core/providers/org_scope_provider.dart';
 import '../../../../reviews/data/models/monthly_review.dart';
+import '../../../../reviews/data/models/review_flow.dart';
+import '../../../../reviews/data/models/review_stage.dart';
 import '../../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../../data/models/employee_dashboard.dart';
 import '../../../data/models/enums.dart';
@@ -285,7 +289,18 @@ class _DeadlineBannerSection extends ConsumerWidget {
         final submittedAll =
             selfDone || (dashboard.scorecard?.state.hasSubmittedAll ?? false);
         final days = dashboard.selfRatingDaysRemaining;
-        final showBanner = !submittedAll &&
+        // Some organisations run a pipeline with NO self-rating at all. There
+        // the employee can never submit one, so `submittedAll` is false
+        // forever and this banner would sit on their home screen permanently
+        // telling them a task is overdue that does not exist and that they
+        // have no way to complete.
+        //
+        // Checked FIRST, and asked of the FLOW rather than of the deadline:
+        // the deadline is real either way, it is the work that is gone.
+        final selfRatingExists = stageIsInFlow(
+            ReviewStage.selfRating, ref.watch(currentReviewFlowProvider));
+        final showBanner = selfRatingExists &&
+            !submittedAll &&
             days != null &&
             (dashboard.isSelfRatingOverdue || days <= _bannerThresholdDays);
         if (!showBanner) return const SizedBox.shrink();
@@ -324,7 +339,7 @@ class _CurrentMonthSection extends ConsumerWidget {
     return dashboardAsync.when(
       loading: () => const _SectionLoading(),
       error: (e, _) => _SectionError(
-        message: e.toString(),
+        message: userFacingError(e),
         onRetry: () => ref.invalidate(employeeDashboardProvider),
       ),
       data: (dashboard) {

@@ -15,6 +15,7 @@ import '../../../auth/presentation/widgets/branded_primary_button.dart';
 import '../../../auth/presentation/widgets/branded_text_field.dart';
 import '../../data/models/employee.dart';
 import '../providers/employee_providers.dart';
+import '../providers/organization_providers.dart';
 import '../providers/project_location_providers.dart';
 import '../widgets/_formatters.dart';
 import '../widgets/confirm_action_dialog.dart';
@@ -79,12 +80,120 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   /// — including the assignments needed to bootstrap the tier itself. So while
   /// [FeatureFlags.roleTiers] is off, HR admins keep the ability they have
   /// today.
-  bool get _canGrantRoles {
-    final auth = ref.watch(authStateProvider);
+  bool get _canGrantRoles => _mayGrantRoles(ref.watch(authStateProvider));
+
+  /// Same rule, without subscribing — for use from [_submit], where a
+  /// `ref.watch` would register a dependency from inside a callback.
+  bool get _canGrantRolesNow => _mayGrantRoles(ref.read(authStateProvider));
+
+  /// Moves this employee to another organization.
+  ///
+  /// A deliberate action, not part of saving the form: it relocates their KRA
+  /// assignments and clears the manager and location, which reference rows in
+  /// the organization they are leaving. The server refuses (409) when the
+  /// employee has review history, because `kra.reviews` has no organization
+  /// column — a review belongs to whichever organization ran its review cycle,
+  /// so it cannot follow them.
+  Future<void> _moveToOrganization() async {
+    final id = widget.employeeId;
+    if (id == null) return;
+
+    final orgs = await ref.read(organizationsProvider.future);
+    if (!mounted) return;
+    final currentOrgId = ref.read(currentOrganizationIdProvider);
+    final choices = [
+      for (final o in orgs)
+        if (o.id != currentOrgId) o
+    ];
+    if (choices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.orgAlreadyCurrent)),
+      );
+      return;
+    }
+
+    final targetId = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 18, 18, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  AppStrings.employeeFormMovePick,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+            for (final o in choices)
+              ListTile(
+                leading: const Icon(Icons.domain_rounded, size: 20),
+                title: Text(o.name.isEmpty ? o.slug : o.name),
+                subtitle: Text(o.slug, style: const TextStyle(fontSize: 11.5)),
+                onTap: () => Navigator.of(ctx).pop(o.id),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (targetId == null || !mounted) return;
+
+    final target = choices.firstWhere((o) => o.id == targetId);
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.employeeFormMoveTitle,
+      message: '${AppStrings.employeeFormMoveMessage}\n\n${target.name}',
+      confirmLabel: AppStrings.employeeFormMoveConfirm,
+      cancelLabel: AppStrings.commonCancel,
+      icon: Icons.swap_horiz_rounded,
+      accentColor: AppColors.primaryPurple,
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(employeeRepositoryProvider).transfer(id, targetId);
+      if (!mounted) return;
+      // The employee has left this tenant, so every org-scoped list holding
+      // them is now wrong — including the one behind this screen.
+      ref.invalidate(employeeListProvider);
+      ref.invalidate(employeeDetailProvider(id));
+      ref.invalidate(organizationsProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.employeeFormMoveDone)),
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      // 409 is specifically "this employee has reviews". It is a rule, not a
+      // failure, so it gets its own explanation rather than a raw message.
+      final blocked = e is ApiError && e.statusCode == 409;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: Duration(seconds: blocked ? 8 : 4),
+          content: Text(blocked
+              ? AppStrings.employeeFormMoveBlocked
+              : '${AppStrings.employeeFormMoveFailed} '
+                  '${e is ApiError ? e.combinedMessage : e}'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  static bool _mayGrantRoles(AuthState auth) {
     if (auth is! AuthAuthenticated) return false;
     if (auth.user.isSuperAdmin) return true;
-    return !FeatureFlags.roleTiers &&
-        auth.user.hasAnyRole({UserRole.hrAdmin});
+    return !FeatureFlags.roleTiers && auth.user.hasAnyRole({UserRole.hrAdmin});
   }
 
   /// Access roles HR can grant explicitly.
@@ -106,6 +215,14 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     if (FeatureFlags.roleTiers) ...['MANAGEMENT', 'SUPER_ADMIN'],
   ];
   String? _department;
+
+  /// Target organisation for a CREATE, chosen by a super admin.
+  ///
+  /// Null means "the organisation I am signed in to", which is what the server
+  /// assumes when the field is absent. Never sent on edit — see
+  /// [EmployeeRepository.create] for why moving an employee between tenants is
+  /// not a form field.
+  String? _organizationId;
   String? _projectLocationId;
   String? _managerId;
   DateTime? _joinedDate;
@@ -164,27 +281,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   /// tier is the narrowest, highest-privilege seat, and an unmatched title
   /// silently falling through to EMPLOYEE is how a founder ended up with no
   /// management-review access at all.
-  static String _roleFromDesignation(String designation) {
-    final d = designation.toUpperCase();
-    // Management tier. Falls back to HR_ADMIN while the backend's employees
-    // endpoint rejects MANAGEMENT (VAL_001) — sending it would 400 every save
-    // for these titles. See [FeatureFlags.roleTiers].
-    if (d.contains('CEO') ||
-        d.contains('FOUNDER') ||
-        d.contains('DIRECTOR') ||
-        d.contains('CHAIRMAN')) {
-      return FeatureFlags.roleTiers ? 'MANAGEMENT' : 'HR_ADMIN';
-    }
-    if (d.contains('HR')) return 'HR';
-    if (d.contains('ACCOUNT') || d.contains('FINANCE')) return 'FINANCE';
-    if (d.contains('MANAGER') ||
-        d.contains('INCHARGE') ||
-        d.contains('IN-CHARGE') ||
-        d.contains('IN CHARGE')) {
-      return 'MANAGER';
-    }
-    return 'EMPLOYEE';
-  }
+  static String _roleFromDesignation(String designation) =>
+      roleFromDesignation(designation);
 
   /// Department options as they appear in the company Master Data sheet,
   /// with the sheet's "Transporation" typo corrected — the backend data is
@@ -328,10 +426,21 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       final position = designation.isEmpty ? null : designation;
       // An explicit Access role wins; otherwise fall back to the designation's
       // default (and, with no designation, to whatever the record already had).
-      final role = _roleOverride ??
-          (designation.isEmpty
-              ? (_original?.role ?? 'EMPLOYEE')
-              : _roleFromDesignation(designation));
+      //
+      // Access and job title are separate axes, and [_canGrantRoles] hides only
+      // the Access-roles FIELD — it never gated this computation. Since
+      // [_roleFromDesignation] maps "Director" / "Founder & CEO" / "Chairman" to
+      // HR_ADMIN (MANAGEMENT once FeatureFlags.roleTiers is on) and `role` is
+      // PATCHed whenever it differs from the original, the ungated Designation
+      // dropdown was a complete way around the grant gate: pick a title, get the
+      // top tier. So for anyone who may not grant roles, access is PINNED —
+      // they can retitle someone freely, but never move their access.
+      final role = resolveEmployeeRole(
+        mayGrantRoles: _canGrantRolesNow,
+        designation: designation,
+        explicitRole: _roleOverride,
+        originalRole: _original?.role,
+      );
       // Full grant set — only sent once the server accepts it. While it doesn't,
       // an unrecognised `roles` field would 400 EVERY save, single-role ones
       // included, so the scalar `role` above carries the primary alone.
@@ -401,6 +510,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           joinedDate: _joinedDate,
           password: passwordText.isEmpty ? null : passwordText,
           forcePasswordReset: passwordText.isEmpty ? null : _forcePasswordReset,
+          organizationId: _organizationId,
         );
         ref.read(employeeListProvider.notifier).prependCreated(created);
         if (!mounted) return;
@@ -644,6 +754,17 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           // records, but handing out roles — including their own — is a
           // privilege-escalation path, so the field is hidden (and never sent)
           // for anyone below that tier.
+          _OrganizationField(
+            selected: _organizationId,
+            onChanged: (v) => setState(() {
+              _organizationId = v;
+              _isDirty = true;
+            }),
+            isEdit: widget.isEdit,
+            // Only offered once the record has loaded — moving needs its id.
+            onMove:
+                widget.isEdit && _original != null ? _moveToOrganization : null,
+          ),
           if (_canGrantRoles) ...[
             const SizedBox(height: 14),
             _AccessRolesField(
@@ -991,6 +1112,136 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+/// Which organisation a NEW employee belongs to.
+///
+/// Renders NOTHING unless the signed-in user is a super admin and this is a
+/// create: it is the only role the server lets name a different tenant, and on
+/// edit the field does not exist at all.
+///
+/// Moving an existing employee is deliberately not offered. Their reviews, KRA
+/// assignments, manager and project location each carry their own
+/// `organizationId`, so changing only the employee's would strand every one of
+/// them — their review history would stay with the old tenant and vanish from
+/// their own view. The server's update path does not accept the field either,
+/// so this is not merely a UI omission. Edit mode shows the constraint instead
+/// of a disabled control that looks like it might work.
+class _OrganizationField extends ConsumerWidget {
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+  final bool isEdit;
+
+  /// Edit mode only. Null hides the action — which is what happens for anyone
+  /// who is not a super admin, and while the employee has not loaded yet.
+  final VoidCallback? onMove;
+
+  const _OrganizationField({
+    required this.selected,
+    required this.onChanged,
+    required this.isEdit,
+    this.onMove,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(canManageOrganizationsProvider)) {
+      return const SizedBox.shrink();
+    }
+
+    if (isEdit) {
+      // Moving is a MIGRATION, not an edit: it relocates KRA assignments and
+      // clears references that only exist in the old tenant, and the server
+      // refuses outright when the employee has reviews. So it is a deliberate
+      // action with its own confirmation rather than a field that saves with
+      // the rest of the form — a dropdown here would imply it is as reversible
+      // as changing a phone number.
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 15, color: AppColors.textMuted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    AppStrings.employeeFormOrgLockedOnEdit,
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.45,
+                        color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+            if (onMove != null) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onMove,
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                  label: const Text(AppStrings.employeeFormMoveAction),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final orgs = ref.watch(organizationsProvider);
+    return orgs.when(
+      // A spinner would suggest the field is required. It is not — omitting it
+      // means "my own organisation" — so failures and loading both fall back to
+      // rendering nothing rather than blocking the form.
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (list) {
+        if (list.length < 2) {
+          // One tenant means there is no choice to make.
+          return const SizedBox.shrink();
+        }
+        final currentOrgId = ref.watch(currentOrganizationIdProvider);
+        return Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: DropdownButtonFormField<String?>(
+            initialValue: selected,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: AppStrings.employeeFormOrgLabel,
+              helperText: AppStrings.employeeFormOrgHelp,
+              helperMaxLines: 3,
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text(
+                  AppStrings.employeeFormOrgDefault,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              for (final o in list)
+                DropdownMenuItem<String?>(
+                  value: o.id,
+                  child: Text(
+                    o.id == currentOrgId
+                        ? '${o.name} (${AppStrings.orgCurrentBadge.toLowerCase()})'
+                        : o.name,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: onChanged,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _RoleDropdown extends StatelessWidget {
   final String value;
   final List<String> roles;
@@ -1060,7 +1311,6 @@ class _RoleDropdown extends StatelessWidget {
     );
   }
 }
-
 
 /// Access-role picker — which permissions/review seats this person holds.
 ///
@@ -1504,4 +1754,60 @@ class _ErrorBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Access-role resolution ───────────────────────────────────────────────────
+//
+// Top-level and visible for testing because this is a SECURITY rule: it decides
+// whose access can move, and it needs assertions of its own rather than being
+// reachable only by driving the form.
+
+/// The access role a job title implies.
+///
+/// Titles and access are separate axes; this is only the DEFAULT applied when
+/// nobody picks an explicit Access role.
+@visibleForTesting
+String roleFromDesignation(String designation) {
+  final d = designation.toUpperCase();
+  // Management tier. Falls back to HR_ADMIN while the backend's employees
+  // endpoint rejects MANAGEMENT (VAL_001) — sending it would 400 every save
+  // for these titles. See [FeatureFlags.roleTiers].
+  if (d.contains('CEO') ||
+      d.contains('FOUNDER') ||
+      d.contains('DIRECTOR') ||
+      d.contains('CHAIRMAN')) {
+    return FeatureFlags.roleTiers ? 'MANAGEMENT' : 'HR_ADMIN';
+  }
+  if (d.contains('HR')) return 'HR';
+  if (d.contains('ACCOUNT') || d.contains('FINANCE')) return 'FINANCE';
+  if (d.contains('MANAGER') ||
+      d.contains('INCHARGE') ||
+      d.contains('IN-CHARGE') ||
+      d.contains('IN CHARGE')) {
+    return 'MANAGER';
+  }
+  return 'EMPLOYEE';
+}
+
+/// The access role to SEND for this save.
+///
+/// [mayGrantRoles] false PINS access to [originalRole] (or `EMPLOYEE` on
+/// create). That is the whole point: the Access-roles field is hidden from
+/// those users, but the Designation dropdown never was, and
+/// [roleFromDesignation] turns "Director" into HR_ADMIN — or MANAGEMENT once
+/// FeatureFlags.roleTiers is on. Because `role` is PATCHed whenever it differs
+/// from the original, picking a title was a complete way around the grant gate.
+/// Retitling stays allowed; moving access does not.
+@visibleForTesting
+String resolveEmployeeRole({
+  required bool mayGrantRoles,
+  required String designation,
+  String? explicitRole,
+  String? originalRole,
+}) {
+  if (!mayGrantRoles) return originalRole ?? 'EMPLOYEE';
+  if (explicitRole != null) return explicitRole;
+  final d = designation.trim();
+  if (d.isEmpty) return originalRole ?? 'EMPLOYEE';
+  return roleFromDesignation(d);
 }

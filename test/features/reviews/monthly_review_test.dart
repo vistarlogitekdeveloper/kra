@@ -80,7 +80,8 @@ void main() {
       expect(rec?.actorName, 'Amol Laxman Veer');
     });
 
-    test('not flagged once the pipeline has moved on again — the return is then '
+    test(
+        'not flagged once the pipeline has moved on again — the return is then '
         'history, not a pending action', () {
       final r = reviewAt(
         ReviewStage.reportingManagerRating,
@@ -137,8 +138,7 @@ void main() {
 
     test('the current stage reads as in-progress', () {
       final r = reviewAt(ReviewStage.reportingManagerRating);
-      expect(
-          r.statusOf(ReviewStage.reportingManagerRating),
+      expect(r.statusOf(ReviewStage.reportingManagerRating),
           StageStatus.inProgress);
     });
 
@@ -152,7 +152,8 @@ void main() {
       expect(r.statusOf(ReviewStage.completed), StageStatus.submitted);
     });
 
-    test('a non-current stage without a record reads as pending, even '
+    test(
+        'a non-current stage without a record reads as pending, even '
         'when the review has moved past it (should never happen but is '
         'defensive)', () {
       final r = reviewAt(ReviewStage.incentivePayout);
@@ -205,13 +206,14 @@ void main() {
 
     test('nobody else can self-rate on your behalf', () {
       final r = reviewAt(ReviewStage.selfRating);
-      expect(r.isActionableBy(UserRole.hrAdmin, userId: 'someone-else'),
-          isFalse);
+      expect(
+          r.isActionableBy(UserRole.hrAdmin, userId: 'someone-else'), isFalse);
     });
   });
 
   group('MonthlyReview.isActionableBy — org-level stages stay role-gated', () {
-    test('management review is role-gated to the management tier, never a '
+    test(
+        'management review is role-gated to the management tier, never a '
         'relationship', () {
       final r = reviewAt(ReviewStage.managementReview, managerId: 'mgr1');
       expect(r.isActionableBy(UserRole.management, userId: 'anyone'), isTrue);
@@ -240,28 +242,27 @@ void main() {
 
   group('MonthlyReview.weightedScorePct', () {
     const rows = [
-      MonthlyKraRow(
-          id: 'a', name: 'A', weightagePercent: 60, maxScore: 10),
-      MonthlyKraRow(
-          id: 'b', name: 'B', weightagePercent: 40, maxScore: 10),
+      MonthlyKraRow(id: 'a', name: 'A', weightagePercent: 60, maxScore: 10),
+      MonthlyKraRow(id: 'b', name: 'B', weightagePercent: 40, maxScore: 10),
     ];
 
     test('sums (value/max) × weight over rows with scores at the stage', () {
       final r = reviewAt(ReviewStage.selfRating, rows: [
-        rows[0].withStageScore(
-            ReviewStage.selfRating, const RowScore(value: 9)),
-        rows[1].withStageScore(
-            ReviewStage.selfRating, const RowScore(value: 5)),
+        rows[0]
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 9)),
+        rows[1]
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 5)),
       ]);
       // 60% × (9/10 × 100) + 40% × (5/10 × 100) = 54 + 20 = 74
       expect(r.weightedScorePct(ReviewStage.selfRating), closeTo(74, 1e-9));
     });
 
-    test('drops rows without a score (or N/A) from both numerator and '
+    test(
+        'drops rows without a score (or N/A) from both numerator and '
         'denominator so a partial rating doesn\'t under-count', () {
       final r = reviewAt(ReviewStage.selfRating, rows: [
-        rows[0].withStageScore(
-            ReviewStage.selfRating, const RowScore(value: 9)),
+        rows[0]
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 9)),
         // rows[1] has no score for selfRating.
       ]);
       // Only row A counts; 100% × (9/10 × 100) = 90
@@ -270,8 +271,8 @@ void main() {
 
     test('a N/A (value: null) row also drops out', () {
       final r = reviewAt(ReviewStage.selfRating, rows: [
-        rows[0].withStageScore(
-            ReviewStage.selfRating, const RowScore(value: 9)),
+        rows[0]
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 9)),
         rows[1].withStageScore(
             ReviewStage.selfRating, const RowScore(value: null)),
       ]);
@@ -285,8 +286,8 @@ void main() {
 
     test('clamps to 100 even if scores exceed max (defensive)', () {
       final r = reviewAt(ReviewStage.selfRating, rows: [
-        rows[0].withStageScore(
-            ReviewStage.selfRating, const RowScore(value: 20)),
+        rows[0]
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 20)),
       ]);
       expect(r.weightedScorePct(ReviewStage.selfRating), 100);
     });
@@ -302,7 +303,8 @@ void main() {
       expect(r.furthestScoredStage, isNull);
     });
 
-    test('Yash case: every KRA reviewed but the cursor is frozen at selfRating '
+    test(
+        'Yash case: every KRA reviewed but the cursor is frozen at selfRating '
         '(save-scores never advances it) — the display advances to Management '
         'Review as the pending next step', () {
       // Mirrors the live payload: currentStage SELF_RATING, but the (single)
@@ -314,8 +316,7 @@ void main() {
           rows[0]
               .withStageScore(
                   ReviewStage.selfRating, const RowScore(value: 100))
-              .withStageScore(
-                  ReviewStage.reportingManagerRating,
+              .withStageScore(ReviewStage.reportingManagerRating,
                   const RowScore(value: 95)),
         ],
       );
@@ -344,8 +345,7 @@ void main() {
                   weightagePercent: 50,
                   maxScore: 100,
                   reviewerGroup: KraReviewer.reportingManager)
-              .withStageScore(
-                  ReviewStage.reportingManagerRating,
+              .withStageScore(ReviewStage.reportingManagerRating,
                   const RowScore(value: 90)),
           const MonthlyKraRow(
               id: 'a',
@@ -387,7 +387,8 @@ void main() {
       expect(r.displayStatus, StageStatus.inProgress);
     });
 
-    test('once management scores, the stage reads Management Review (done)', () {
+    test('once management scores, the stage reads Management Review (done)',
+        () {
       final r = reviewAt(
         ReviewStage.selfRating,
         rows: [
@@ -397,8 +398,8 @@ void main() {
                   weightagePercent: 100,
                   maxScore: 100,
                   reviewerGroup: KraReviewer.reportingManager)
-              .withStageScore(ReviewStage.reportingManagerRating,
-                  const RowScore(value: 90))
+              .withStageScore(
+                  ReviewStage.reportingManagerRating, const RowScore(value: 90))
               .withStageScore(
                   ReviewStage.managementReview, const RowScore(value: 80)),
         ],
@@ -429,8 +430,7 @@ void main() {
 
   group('MonthlyReview.finalScorePct', () {
     const rows = [
-      MonthlyKraRow(
-          id: 'a', name: 'A', weightagePercent: 100, maxScore: 10),
+      MonthlyKraRow(id: 'a', name: 'A', weightagePercent: 100, maxScore: 10),
     ];
 
     test('prefers the reporting manager stage when it has any score', () {
@@ -438,11 +438,9 @@ void main() {
         ReviewStage.reportingManagerRating,
         rows: [
           rows[0]
+              .withStageScore(ReviewStage.selfRating, const RowScore(value: 5))
               .withStageScore(
-                  ReviewStage.selfRating, const RowScore(value: 5))
-              .withStageScore(
-                  ReviewStage.reportingManagerRating,
-                  const RowScore(value: 9)),
+                  ReviewStage.reportingManagerRating, const RowScore(value: 9)),
         ],
       );
       expect(r.finalScorePct, closeTo(90, 1e-9));
@@ -453,8 +451,7 @@ void main() {
         ReviewStage.reportingManagerRating,
         rows: [
           rows[0]
-              .withStageScore(
-                  ReviewStage.selfRating, const RowScore(value: 5))
+              .withStageScore(ReviewStage.selfRating, const RowScore(value: 5))
               .withStageScore(
                   ReviewStage.accountHrRating, const RowScore(value: 8)),
         ],
@@ -466,8 +463,8 @@ void main() {
       final r = reviewAt(
         ReviewStage.reportingManagerRating,
         rows: [
-          rows[0].withStageScore(
-              ReviewStage.selfRating, const RowScore(value: 5)),
+          rows[0]
+              .withStageScore(ReviewStage.selfRating, const RowScore(value: 5)),
         ],
       );
       expect(r.finalScorePct, closeTo(50, 1e-9));
@@ -637,10 +634,9 @@ void main() {
         ReviewStage.reportingManagerRating,
         rows: [
           const MonthlyKraRow(
-              id: 'a', name: 'A', weightagePercent: 100, maxScore: 10)
+                  id: 'a', name: 'A', weightagePercent: 100, maxScore: 10)
               .withStageScore(
-                  ReviewStage.reportingManagerRating,
-                  const RowScore(value: 7)),
+                  ReviewStage.reportingManagerRating, const RowScore(value: 7)),
         ],
         incentive: const IncentiveSnapshot(eligibleAmount: 10000),
       );
@@ -674,8 +670,8 @@ void main() {
     });
 
     test('is amount × pct / 100 once the score lands', () {
-      const snap = IncentiveSnapshot(
-          eligibleAmount: 5000, computedScorePct: 82);
+      const snap =
+          IncentiveSnapshot(eligibleAmount: 5000, computedScorePct: 82);
       expect(snap.computedPayable, closeTo(4100, 1e-9));
     });
   });

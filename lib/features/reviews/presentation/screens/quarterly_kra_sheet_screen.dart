@@ -14,10 +14,11 @@ import '../../../../core/utils/proof_file_saver.dart';
 import '../../../../core/widgets/adaptive_leading.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/workspace_drawer.dart';
-import '../../../auth/data/models/user.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
+import '../../../../core/enums/review_flow.dart';
+import '../../data/models/review_flow.dart';
 import '../../data/models/review_stage.dart';
 import '../../data/models/row_score.dart';
 import '../../../hr/presentation/widgets/confirm_action_dialog.dart';
@@ -149,7 +150,7 @@ class _QuarterlyKraSheetScreenState
   ///   4. default to the Reporting Manager — the relationship every employee
   ///      has — so a KRA is never left unassigned.
   MonthlyReview? _applyReviewerMap(
-      MonthlyReview? r, KraReviewerAssignment map) {
+      MonthlyReview? r, KraReviewerAssignment map, ReviewFlow flow) {
     if (r == null) return r;
     // Match the template's ordering so position-based fallback lines up.
     final ordered = [...r.rows]
@@ -158,10 +159,39 @@ class _QuarterlyKraSheetScreenState
       for (var i = 0; i < ordered.length; i++)
         () {
           final row = ordered[i];
-          final reviewer = row.reviewerGroup ??
+          // What the SERVER has for this row, as distinct from what the local
+          // assignment template guesses. The difference decides whether a
+          // re-point is safe — see below.
+          final stored = row.reviewerGroup;
+          var reviewer = stored ??
               map.byName[kraNameKey(row.name)] ??
               (i < map.byOrder.length ? map.byOrder[i] : null) ??
-              KraReviewer.reportingManager;
+              defaultReviewerFor(flow);
+          // A row assigned to a reviewer this flow does not use has NO eligible
+          // rater — nobody can score it, and the cell offers no tap target to
+          // anyone. Re-point it at a seat the flow actually has, but ONLY when
+          // the server holds no assignment for the row.
+          //
+          // That condition is not caution, it is the server's rule. writeRowScores
+          // carries a per-KRA reviewer guard in raw SQL: a Review-cycle rater may
+          // only score a row assigned to them, and it passes any stage when
+          // `reviewer_group IS NULL`. So re-pointing a row the server has STORED
+          // as the reporting manager produces an ACCOUNT_HR_RATING write that
+          // matches nothing, inserts zero rows, and — in its own words —
+          // "Mismatches are silently skipped". HTTP 200, no error, no score.
+          //
+          // Faking a rateable cell there is worse than showing none: the rater
+          // enters a value, sees it accepted, and finds it gone on the next
+          // refresh. So leave it visibly on the seat the flow does not use, and
+          // let the sheet say so — the fix is to reassign the KRA, which is what
+          // an administrators-only organisation should have done anyway.
+          //
+          // Only ever redirects AWAY from a removed stage, so on the standard
+          // flow (where every stage is present) this whole branch is a no-op.
+          if (stored == null &&
+              !stageIsInFlow(stageForReviewer(reviewer), flow)) {
+            reviewer = defaultReviewerFor(flow);
+          }
           return row.reviewerGroup == reviewer
               ? row
               : row.copyWith(reviewerGroup: reviewer);
@@ -174,9 +204,12 @@ class _QuarterlyKraSheetScreenState
     if (r == null) return null;
     for (final row in r.rows) {
       if (row.id != rowId) continue;
-      final s = row.scoreFor(stage);
-      if (s?.value != null && row.maxScore > 0) {
-        return (s!.value! / row.maxScore) * 100;
+      // Bound to a local so the null check promotes it; `s?.value` cannot be
+      // promoted through the null-aware access, which is why this previously
+      // needed two bang operators to say something already proven.
+      final value = row.scoreFor(stage)?.value;
+      if (value != null && row.maxScore > 0) {
+        return (value / row.maxScore) * 100;
       }
       return null;
     }
@@ -195,6 +228,10 @@ class _QuarterlyKraSheetScreenState
   // per-review — never per-sheet.
   bool _canEditSelf(MonthlyReview r, ReviewScope? scope) {
     if (scope == null || r.isComplete) return false;
+    // Some organisations run a pipeline with no self-rating at all. Checked
+    // before identity: under that flow it is not that someone ELSE rates the
+    // employee, it is that the stage does not exist.
+    if (!stageIsInFlow(ReviewStage.selfRating, scope.reviewFlow)) return false;
     return scope.userId == r.employeeId;
   }
 
@@ -208,6 +245,17 @@ class _QuarterlyKraSheetScreenState
   // Still excludes the employee themselves and anyone else's manager.
   bool _canEditManager(MonthlyReview r, ReviewScope? scope) {
     if (scope == null || r.isComplete) return false;
+    final flow = scope.reviewFlow;
+    if (!stageIsInFlow(ReviewStage.reportingManagerRating, flow)) return false;
+    // Under a flow that has taken rating out of the reporting line, this seat
+    // is MANAGEMENT's — the KRAs left over once HR and Accounts have taken
+    // theirs — and the question becomes "what role do you hold?", not "are you
+    // this employee's manager?". Asking the relationship there would lock out
+    // the only people the flow grants it to.
+    if (!stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow)) {
+      return canActOnStage(
+          ReviewStage.reportingManagerRating, flow, scope.effectiveRoles);
+    }
     return r.managerId != null && r.managerId == scope.userId;
   }
 
@@ -228,7 +276,14 @@ class _QuarterlyKraSheetScreenState
   // review. [_canEditManagement] adds the lock and gates per-KRA score entry.
   bool _hasManagementRole(ReviewScope? scope) =>
       scope != null &&
-      (scope.role == UserRole.hrAdmin || scope.role == UserRole.admin);
+      // Reads the MODEL's answer rather than restating a role list, which is
+      // how `management` — the stage's primary actor — came to be missing here
+      // while `managementReview.actorRoles` named it all along: the founder /
+      // CEO tier could not open the sign-off UI it exclusively owns. Deriving
+      // the gate means the two can no longer drift apart, and the
+      // FeatureFlags.roleTiers narrowing is honoured for free.
+      canActOnStage(
+          ReviewStage.managementReview, scope.reviewFlow, scope.effectiveRoles);
 
   bool _canEditManagement(MonthlyReview r, ReviewScope? scope) =>
       _hasManagementRole(scope) && !r.isComplete;
@@ -386,7 +441,12 @@ class _QuarterlyKraSheetScreenState
     List<MonthlyReview?> reviews,
     ReviewScope? scope,
   ) =>
-      scope == null
+      // No manager rating in this flow means nothing for a manager to submit.
+      // Checked here rather than inside managerCanSubmitReview so that rule
+      // stays a pure function of the review and the viewer.
+      scope == null ||
+              !stageIsInFlow(
+                  ReviewStage.reportingManagerRating, scope.reviewFlow)
           ? const []
           : [
               for (final r in reviews.whereType<MonthlyReview>())
@@ -608,10 +668,17 @@ class _QuarterlyKraSheetScreenState
     ReviewScope? scope,
   ) =>
       [
-        for (final r in reviews.whereType<MonthlyReview>())
-          if (r.currentStage == ReviewStage.reportingManagerRating &&
-              _canEditManager(r, scope))
-            r,
+        // Handing the sheet back asks the EMPLOYEE to revise their own
+        // self-rating. A flow with no self-rating has nothing to hand back and
+        // nobody to hand it to, so the action must not be offered there — it
+        // would move the review backwards into a stage that admits no actor and
+        // strand it.
+        if (stageIsInFlow(
+            ReviewStage.selfRating, scope?.reviewFlow ?? ReviewFlow.standard))
+          for (final r in reviews.whereType<MonthlyReview>())
+            if (r.currentStage == ReviewStage.reportingManagerRating &&
+                _canEditManager(r, scope))
+              r,
       ];
 
   /// The rework action, or null when this viewer has nothing to hand back —
@@ -1000,7 +1067,9 @@ class _QuarterlyKraSheetScreenState
         ),
         data: (data) {
           final mappedReviews = [
-            for (final r in data.reviews) _applyReviewerMap(r, reviewerMap),
+            for (final r in data.reviews)
+              _applyReviewerMap(
+                  r, reviewerMap, scope?.reviewFlow ?? ReviewFlow.standard),
           ];
           final canManage = _hasManagementRole(scope);
           return _Sheet(
@@ -1043,8 +1112,7 @@ class _QuarterlyKraSheetScreenState
             // The employee finalises their own rating; null for everyone else.
             onSubmitSelfRating: _submitAction(mappedReviews, scope),
             // The reporting manager's counterpart, scoped to their own KRAs.
-            onSubmitManagerReview:
-                _managerSubmitAction(mappedReviews, scope),
+            onSubmitManagerReview: _managerSubmitAction(mappedReviews, scope),
           );
         },
       ),
@@ -1113,6 +1181,7 @@ int managerRatedKraCount(MonthlyReview r) => managerAssignedKras(r)
 /// on save moves the cursor before submit is ever pressed, and the window would
 /// never open. A server that disagrees is handled on the response (409).
 @visibleForTesting
+
 /// The identity test requires a NON-EMPTY id on both sides. A review with a
 /// blank `managerId` would otherwise match a viewer with a blank `userId` and
 /// hand them the submit — unlikely, but it fails open, so it is ruled out here.
@@ -1158,9 +1227,12 @@ Widget quarterlyKraSheetBodyForTest({
     if (r == null) return null;
     for (final row in r.rows) {
       if (row.id != rowId) continue;
-      final s = row.scoreFor(stage);
-      if (s?.value != null && row.maxScore > 0) {
-        return (s!.value! / row.maxScore) * 100;
+      // Bound to a local so the null check promotes it; `s?.value` cannot be
+      // promoted through the null-aware access, which is why this previously
+      // needed two bang operators to say something already proven.
+      final value = row.scoreFor(stage)?.value;
+      if (value != null && row.maxScore > 0) {
+        return (value / row.maxScore) * 100;
       }
       return null;
     }
@@ -1386,8 +1458,16 @@ class _Sheet extends StatelessWidget {
                 'current month, and it is still empty.'
             : 'You can edit the Self ratings on this sheet.')
         : canMgr
-            ? 'You can rate the KRAs assigned to you as Reporting Manager — '
-                'tap a Review cell.'
+            // The same seat reads differently in each pipeline. Under
+            // administrators-only it is management picking up whatever HR and
+            // Accounts were not assigned, so naming the reporting manager here
+            // would describe a relationship the flow no longer uses.
+            ? (stageIsRelationshipGated(ReviewStage.reportingManagerRating,
+                    scope?.reviewFlow ?? ReviewFlow.standard)
+                ? 'You can rate the KRAs assigned to you as Reporting Manager — '
+                    'tap a Review cell.'
+                : 'You can rate the KRAs left to Management — the ones not '
+                    'assigned to HR or Accounts. Tap a Review cell.')
             : canHr
                 ? 'You can rate the KRAs assigned to HR — tap a Review cell.'
                 : canFin
@@ -1449,6 +1529,18 @@ class _Sheet extends StatelessWidget {
                             color: AppColors.textMuted,
                             fontWeight: FontWeight.w600)),
                   ),
+                  // Which pipeline the sheet BELIEVES it is running.
+                  //
+                  // Shown unconditionally, including for the standard flow.
+                  // Its absence cost a long debugging session: an organisation
+                  // had been switched to administrators-only, the server was
+                  // dropping the field from /auth/me, and the sheet was quietly
+                  // running the standard pipeline — refusing every rating while
+                  // it waited for a self-rating that flow does not have. The
+                  // screen looked correct and said nothing. Naming the flow
+                  // makes "the setting didn't reach me" and "you aren't allowed"
+                  // two visibly different failures.
+                  _FlowBadge(flow: scope?.reviewFlow ?? ReviewFlow.standard),
                 ],
               ),
             ),
@@ -1462,10 +1554,21 @@ class _Sheet extends StatelessWidget {
                   record:
                       r.returnedRecordFor(ReviewStage.reportingManagerRating)!,
                 ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: _ReviewerLegend(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: _ReviewerLegend(
+                  flow: scope?.reviewFlow ?? ReviewFlow.standard),
             ),
+            // KRAs assigned to a reviewer this flow does not use. Nobody can
+            // score them and the server would drop a score aimed anywhere else,
+            // so say so plainly instead of leaving three rows that quietly
+            // refuse every attempt.
+            () {
+              final stranded = kraNamesWithoutRaterInFlow(
+                  reviews, scope?.reviewFlow ?? ReviewFlow.standard);
+              if (stranded.isEmpty) return const SizedBox.shrink();
+              return _StrandedKraNotice(names: stranded);
+            }(),
             // Frame the table so its edge columns don't merge with the screen
             // edge — a bordered, rounded card (matching the header/payout cards)
             // with a little internal padding, and a horizontal margin that keeps
@@ -1484,6 +1587,9 @@ class _Sheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: _Grid(
                   now: clock ?? DateTime.now(),
+                  // The sheet holds the scope; the grid decides cell openness, so
+                  // the flow has to reach it or no column can honour it.
+                  reviewFlow: scope?.reviewFlow ?? ReviewFlow.standard,
                   rows: rows,
                   months: months,
                   reviews: reviews,
@@ -1812,13 +1918,138 @@ class _HeaderCard extends StatelessWidget {
       );
 }
 
-/// A compact key explaining the per-KRA reviewer colours and the pending
-/// status, so the single-reviewer model reads clearly at the top of the sheet.
-class _ReviewerLegend extends StatelessWidget {
-  const _ReviewerLegend();
+/// "These KRAs have nobody to rate them."
+///
+/// Raised when a KRA is assigned to a reviewer the active flow does not use —
+/// in practice, a KRA still pointing at the Reporting Manager on an
+/// administrators-only organisation. The row cannot be scored by anyone, and
+/// the server's per-KRA reviewer guard would silently discard a score entered
+/// against a different seat, so an unexplained dead row is the worst possible
+/// presentation: it looks like a permissions problem and is actually a
+/// configuration one.
+///
+/// Names the KRAs and says who can fix it, because the fix is a reassignment in
+/// the KRA assignment screen, not anything the rater can do from here.
+class _StrandedKraNotice extends StatelessWidget {
+  final List<String> names;
+  const _StrandedKraNotice({required this.names});
 
   @override
   Widget build(BuildContext context) {
+    final plural = names.length > 1;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.person_off_rounded,
+              size: 15, color: AppColors.warning),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  plural
+                      ? '${names.length} KRAs have no reviewer in this flow'
+                      : 'This KRA has no reviewer in this flow',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${names.join(', ')} — assigned to the Reporting Manager, '
+                  'which this flow does not use. ${plural ? 'They' : 'It'} '
+                  'cannot be rated by anyone until HR reassigns '
+                  '${plural ? 'them' : 'it'} to HR or Accounts in the KRA '
+                  'assignment.',
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.4,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Names the review pipeline this sheet is running.
+///
+/// Deliberately always visible. Which flow is in effect is decided three
+/// layers away — an organisation column, the login payload, the review scope —
+/// and when that plumbing broke there was no way to tell from the screen. The
+/// sheet sat there refusing ratings and looking perfectly normal. A viewer who
+/// can read "Standard flow" on an organisation they switched to
+/// administrators-only knows immediately that the setting never arrived, which
+/// is a completely different problem from not having permission.
+class _FlowBadge extends StatelessWidget {
+  final ReviewFlow flow;
+  const _FlowBadge({required this.flow});
+
+  @override
+  Widget build(BuildContext context) {
+    final isStandard = flow == ReviewFlow.standard;
+    // The standard flow is the overwhelmingly common case, so it is stated
+    // quietly; a non-default pipeline is worth actually noticing.
+    final color = isStandard ? AppColors.textMuted : AppColors.primaryPurple;
+    return Tooltip(
+      message: flow.description,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: isStandard ? 0.06 : 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(isStandard ? Icons.route_rounded : Icons.admin_panel_settings,
+              size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            flow.displayName,
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: color,
+                letterSpacing: 0.2),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A compact key explaining the per-KRA reviewer colours and the pending
+/// status, so the single-reviewer model reads clearly at the top of the sheet.
+class _ReviewerLegend extends StatelessWidget {
+  /// Which pipeline is running, so the key does not advertise a reviewer the
+  /// flow has removed. Under administrators-only there is no reporting-manager
+  /// rating, and listing "Manager" there sent people looking for a column that
+  /// cannot be filled by anyone.
+  final ReviewFlow flow;
+  const _ReviewerLegend({this.flow = ReviewFlow.standard});
+
+  @override
+  Widget build(BuildContext context) {
+    // Derived from the flow rather than a hand-written list per flow — the same
+    // reason actorRolesFor defers to the stage instead of restating its roles.
+    final reviewers = [
+      for (final r in KraReviewer.values)
+        if (stageIsInFlow(stageForReviewer(r), flow)) r,
+    ];
     return Wrap(
       spacing: 12,
       runSpacing: 6,
@@ -1829,7 +2060,7 @@ class _ReviewerLegend extends StatelessWidget {
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textMuted)),
-        for (final r in KraReviewer.values) _dot(r),
+        for (final r in reviewers) _dot(r),
         const Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.schedule_rounded, size: 11, color: AppColors.warning),
           SizedBox(width: 3),
@@ -1852,7 +2083,7 @@ class _ReviewerLegend extends StatelessWidget {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       const SizedBox(width: 4),
-      Text(r.shortLabel,
+      Text(reviewerShortLabelFor(r, flow),
           style: TextStyle(
               fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
     ]);
@@ -1860,6 +2091,10 @@ class _ReviewerLegend extends StatelessWidget {
 }
 
 class _Grid extends StatefulWidget {
+  /// The organisation's review pipeline. Needed here because cell openness
+  /// depends on it: a flow without a self-rating must not wait for one.
+  final ReviewFlow reviewFlow;
+
   /// See [_Sheet.clock] — the sheet resolves it once and passes it down.
   final DateTime now;
   final List<dynamic> rows; // MonthlyKraRow
@@ -1895,6 +2130,7 @@ class _Grid extends StatefulWidget {
   final double Function(ReviewStage) qAvg;
 
   const _Grid({
+    required this.reviewFlow,
     required this.now,
     required this.rows,
     required this.months,
@@ -2376,7 +2612,8 @@ class _GridState extends State<_Grid> {
           Icon(_reviewerIcon(reviewer), size: 11, color: color),
           const SizedBox(width: 3),
           Flexible(
-            child: Text('Reviewed by ${reviewer.shortLabel}',
+            child: Text(
+                'Reviewed by ${reviewerShortLabelFor(reviewer, widget.reviewFlow)}',
                 maxLines: 1,
                 softWrap: false,
                 overflow: TextOverflow.ellipsis,
@@ -2402,6 +2639,7 @@ class _GridState extends State<_Grid> {
       row: monthRow,
       month: widget.months[monthIdx],
       now: widget.now,
+      flow: widget.reviewFlow,
     );
   }
 
@@ -2541,7 +2779,8 @@ class _GridState extends State<_Grid> {
 
   // "<reviewer> review pending" — a compact amber chip (clock + short tag) that
   // tells the viewer exactly which reviewer this KRA is still waiting on.
-  Widget _pendingChip(KraReviewer reviewer) => _pendingTag(reviewer.cellTag);
+  Widget _pendingChip(KraReviewer reviewer) =>
+      _pendingTag(reviewerCellTagFor(reviewer, widget.reviewFlow));
 
   Widget _pendingTag(String tag) {
     return Container(
@@ -3667,25 +3906,23 @@ class _JustificationDialogState extends State<_JustificationDialog> {
     // Every failure path below used to be a silent `return`, which is
     // indistinguishable from "the button is dead". Say something instead.
     try {
-      // `withData: true` is what makes this work on the WEB build. A browser
-      // never exposes a filesystem path, so `PlatformFile.path` is ALWAYS null
-      // there — the old `if (path == null) return;` meant picking a file
-      // silently did nothing at all on web. Bytes are the portable
-      // representation (and are what the upload needs anyway).
+      // Bytes, not a path: a browser never exposes a filesystem path, so
+      // `PlatformFile.path` is ALWAYS null on web — an earlier
+      // `if (path == null) return;` meant picking a file silently did nothing
+      // there. Bytes are the portable representation and are what the upload
+      // needs anyway.
+      //
+      // Read via `readAsBytes()` rather than the old `withData: true` +
+      // `f.bytes`: that flag is deprecated in file_picker 12, and reading on
+      // demand means a file the user then cancels out of is never loaded into
+      // memory at all.
+      //
       // Any file type — Excel, Word, PowerPoint, images, PDF, whatever the
       // employee's evidence happens to be. Restricting extensions just blocked
       // legitimate proof; the size cap below is the real guard.
-      final res = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        withData: true,
-      );
-      if (res == null || res.files.isEmpty) return; // user cancelled — normal
-      final f = res.files.single;
-      final bytes = f.bytes;
-      if (bytes == null) {
-        _say('Could not read "${f.name}". Try another file.');
-        return;
-      }
+      final f = await FilePicker.pickFile(type: FileType.any);
+      if (f == null) return; // user cancelled — normal
+      final bytes = await f.readAsBytes();
       if (bytes.length > _maxProofBytes) {
         final kb = (bytes.length / 1024).round();
         _say('"${f.name}" is $kb KB — attachments are capped at ~700 KB for '
@@ -4045,7 +4282,97 @@ bool canRateReviewStage(
   MonthlyReview review,
 ) {
   if (scope == null || review.isComplete) return false;
-  return stage.isActionableByAny(scope.effectiveRoles);
+  // Flow-aware. For ReviewFlow.standard this is a pass-through to
+  // stage.actorRoles, so the original pipeline is unchanged; for admin-only it
+  // returns an empty set for the stages that flow removes, which reads as
+  // "nobody can act here".
+  return canActOnStage(stage, scope.reviewFlow, scope.effectiveRoles);
+}
+
+/// The [ReviewStage] a KRA's assigned reviewer group rates at.
+///
+/// Mirrors [MonthlyKraRow.reviewStage] but takes the group directly, so the
+/// reviewer map can be checked against a flow before it is written onto a row.
+@visibleForTesting
+ReviewStage stageForReviewer(KraReviewer reviewer) {
+  switch (reviewer) {
+    case KraReviewer.reportingManager:
+      return ReviewStage.reportingManagerRating;
+    case KraReviewer.hr:
+      return ReviewStage.accountHrRating;
+    case KraReviewer.accounts:
+      return ReviewStage.financeRating;
+  }
+}
+
+/// The reviewer an unassigned KRA falls back to under [flow].
+///
+/// The reporting manager on the standard pipeline, which is the historical
+/// default and stays exactly that. Any flow that removes the manager rating
+/// falls back to HR instead — leaving it on the manager would produce rows no
+/// role in the flow can rate.
+@visibleForTesting
+KraReviewer defaultReviewerFor(ReviewFlow flow) =>
+    stageIsInFlow(ReviewStage.reportingManagerRating, flow)
+        ? KraReviewer.reportingManager
+        : KraReviewer.hr;
+
+/// The reviewer's on-screen name under [flow].
+///
+/// [KraReviewer.reportingManager] is the seat that MOVES between pipelines: the
+/// employee's own reporting manager on the standard flow, MANAGEMENT under
+/// administrators-only. Printing "Manager" in the second case names the wrong
+/// person entirely and sends the reader looking for a rating their line manager
+/// is not being asked for.
+///
+/// Keyed off [stageIsRelationshipGated] rather than off the flow by name, so
+/// the label follows whoever actually holds the seat.
+@visibleForTesting
+String reviewerShortLabelFor(KraReviewer reviewer, ReviewFlow flow) =>
+    _seatIsManagements(reviewer, flow) ? 'Management' : reviewer.shortLabel;
+
+/// The same seat, in the ultra-compact form the per-month cell has room for.
+@visibleForTesting
+String reviewerCellTagFor(KraReviewer reviewer, ReviewFlow flow) =>
+    _seatIsManagements(reviewer, flow) ? 'Mgmt' : reviewer.cellTag;
+
+bool _seatIsManagements(KraReviewer reviewer, ReviewFlow flow) =>
+    reviewer == KraReviewer.reportingManager &&
+    !stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow);
+
+/// KRA names whose ASSIGNED reviewer is a seat [flow] does not use.
+///
+/// These are stranded: no role in the flow may score them, and the server would
+/// silently discard a score entered against any other seat (see the per-KRA
+/// reviewer guard quoted in `_applyReviewerMap`). The only real fix is to
+/// reassign the KRA, so the sheet names them rather than pretending.
+///
+/// Always empty on [ReviewFlow.standard] — that pipeline uses every seat — so
+/// nothing about the original flow changes.
+///
+/// Returns names, not rows: the same KRA recurs in all three months of the
+/// quarter and the reader only needs to be told once.
+@visibleForTesting
+List<String> kraNamesWithoutRaterInFlow(
+  List<MonthlyReview?> reviews,
+  ReviewFlow flow,
+) {
+  final names = <String>[];
+  final seen = <String>{};
+  for (final review in reviews) {
+    if (review == null) continue;
+    for (final row in review.rows) {
+      final reviewer = row.reviewerGroup;
+      // Unassigned: the server's per-KRA guard passes any stage for a row whose
+      // reviewer_group is NULL, so there is nothing stranded to report.
+      if (reviewer == null) {
+        continue;
+      }
+      if (stageIsInFlow(stageForReviewer(reviewer), flow)) continue;
+      if (seen.add(kraNameKey(row.name))) names.add(row.name);
+    }
+  }
+  return names;
 }
 
 /// Whether a month has not begun yet.
@@ -4074,9 +4401,20 @@ bool isCellOpenForEntry({
   required MonthlyKraRow row,
   required ReviewPeriod month,
   required DateTime now,
+  ReviewFlow flow = ReviewFlow.standard,
 }) {
   if (isFutureMonth(month, now)) return false;
   if (stage == ReviewStage.selfRating) return true;
+
+  // The self-first ordering only means anything in a flow that HAS a
+  // self-rating. Under a flow without one there is no score to wait for and
+  // none will ever arrive, so keeping the prerequisite closed every cell in
+  // the sheet for every rater — HR, Accounts and management included. That
+  // was not a narrow bug: the entire pipeline was unusable.
+  //
+  // Defaults to standard, so every existing caller and test is unaffected.
+  if (!stageIsInFlow(ReviewStage.selfRating, flow)) return true;
+
   return row.scoreFor(ReviewStage.selfRating)?.value != null;
 }
 

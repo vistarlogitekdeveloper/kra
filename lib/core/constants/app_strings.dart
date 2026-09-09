@@ -593,6 +593,130 @@ class AppStrings {
   static const String hrDrawerProfile = 'Profile';
 
   // ───── Locations ─────
+  /// A 404 on an employee, which after an organization switch is isolation
+  /// working rather than a failure: the app keeps each tab's navigation stack
+  /// alive, so a detail screen opened before the switch survives it and then
+  /// refetches against the new tenant, where that person does not exist.
+  static const String employeeNotInThisOrg =
+      'This employee is not in the organization you are currently viewing. '
+      'They may belong to another organization, or have been removed.';
+
+  // Choosing a new employee's organization. Super admin only, create only.
+  static const String employeeFormOrgLabel = 'Organization';
+  static const String employeeFormOrgDefault =
+      'The organization I am signed in to';
+  static const String employeeFormOrgHelp =
+      'Which organization this employee belongs to. They will only see that '
+      'organization\'s KRAs, reviews and colleagues.';
+
+  // Moving an existing employee. A named migration, not an edit — see
+  // EmployeeRepository.transfer.
+  static const String employeeFormMoveAction = 'Move to another organization';
+  static const String employeeFormMoveTitle = 'Move this employee?';
+  static const String employeeFormMoveMessage =
+      'They will belong to the organization you pick, and their KRA '
+      'assignments move with them. Their reporting manager and location are '
+      'cleared, because both belong to the organization they are leaving — '
+      'set them again afterwards.';
+  static const String employeeFormMoveConfirm = 'Move';
+  static const String employeeFormMoveDone = 'Employee moved.';
+  static const String employeeFormMoveFailed = 'Could not move:';
+  static const String employeeFormMovePick = 'Move to';
+
+  /// The 409. Review history is owned by the organization that ran the review
+  /// cycle — kra.reviews has no organization column — so it cannot follow the
+  /// employee, and the server refuses rather than detaching it silently.
+  static const String employeeFormMoveBlocked =
+      'This employee has review history, which belongs to the organization '
+      'that ran those reviews and cannot move with them. Nothing was changed. '
+      'Create a new account in the other organization instead.';
+
+  /// Edit mode. Says WHY rather than showing a disabled control that looks as
+  /// though it might work — the server does not accept the field on update.
+  static const String employeeFormOrgLockedOnEdit =
+      'An employee\'s organization is set when the account is created and '
+      'cannot be changed here. Their reviews, KRA assignments, manager and '
+      'location all belong to that organization, so moving them would leave '
+      'that history behind.';
+
+  // ── Organizations (tenants) — super admin only ────────────────────────────
+  static const String orgTitle = 'Organizations';
+  static const String orgSubtitle =
+      'Each organization is a separate workspace. Its employees, KRA '
+      'templates, locations and reviews are visible only inside it.';
+  static const String orgAdd = 'New organization';
+  static const String orgEdit = 'Edit organization';
+  static const String orgSearchHint = 'Search by name or slug';
+  static const String orgNameLabel = 'Name';
+  static const String orgNameHint = 'e.g. Vistar Logitek North';
+  static const String orgSlugLabel = 'Slug';
+  static const String orgSlugHint = 'e.g. vistar-logitek-north';
+  static const String orgSlugHelp =
+      'Lowercase letters, digits and single hyphens. Must be unique and '
+      'cannot be reused by another organization.';
+  static const String orgSlugInvalid =
+      'Use lowercase letters, digits and single hyphens only.';
+  static const String orgLogoLabel = 'Logo URL (optional)';
+  static const String orgNameRequired = 'Please enter a name.';
+  static const String orgSlugRequired = 'Please enter a slug.';
+  static const String orgSlugTaken =
+      'That slug is already used by another organization.';
+  static const String orgCreated = 'Organization created.';
+  static const String orgUpdated = 'Organization updated.';
+  static const String orgEmpty = 'No organizations yet';
+  static const String orgEmptyBody =
+      'Create one to separate a set of employees, templates and reviews '
+      'from the rest.';
+  static const String orgCurrentBadge = 'Current';
+
+  // Per-organization review pipeline. Existing organizations stay on the
+  // standard flow; this only lets a super admin opt one out.
+  static const String orgFlowLabel = 'Review flow';
+  static const String orgFlowHelp =
+      'Who enters ratings for this organization. Existing organizations use '
+      'the standard flow; changing this does not alter reviews already in '
+      'progress.';
+
+  /// Employee count on a tenant card. Reads "1 employee" / "12 employees",
+  /// and "Not counted" when the payload omitted the figure — an uncounted
+  /// organization must not render identically to an empty one.
+  static String orgEmployeeCount(int? n) {
+    if (n == null) return 'Not counted';
+    if (n == 0) return 'No employees';
+    return n == 1 ? '1 employee' : '$n employees';
+  }
+
+  // Switching tenant. The organization lives in the JWT, so this re-issues
+  // the caller's tokens rather than filtering the current view.
+  static const String orgSwitchAction = 'Switch to this organization';
+  static const String orgViewPeople = 'View employees';
+
+  /// Tapping a tenant card. Says what will happen to the whole session,
+  /// because switching is not a filter — it re-issues the caller's token, so
+  /// every screen follows.
+  static const String orgOpenTitle = 'Open this organization?';
+  static const String orgOpenMessage =
+      'You will be switched into this organization and taken to its employee '
+      'list. Everything in the app — employees, KRA templates, reviews — will '
+      'be its data until you switch again.';
+  static const String orgOpenConfirm = 'Open';
+  static const String orgSwitchTitle = 'Switch organization?';
+  static const String orgSwitchMessage =
+      'You will be signed in against this organization instead. Everything '
+      'you see — employees, templates, reviews — will be its data, and '
+      'anything you create will belong to it.';
+  static const String orgSwitchConfirm = 'Switch';
+  static const String orgSwitchDone = 'Switched organization.';
+  static const String orgSwitchFailed = 'Could not switch organization:';
+  static const String orgAlreadyCurrent =
+      'You are already working in this organization.';
+
+  /// Shown when the endpoints are missing — the client ships ahead of the
+  /// server here, so a 404 is a deployment state, not a bug worth a raw error.
+  static const String orgApiMissing =
+      'Organization management is not available on this server yet. The API '
+      'needs the /organizations endpoints deployed.';
+
   static const String locationsTitle = 'Locations';
   static const String locationsEmptyTitle = 'No locations yet';
   static const String locationsEmptyMessage =

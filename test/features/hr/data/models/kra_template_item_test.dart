@@ -93,7 +93,8 @@ void main() {
         'weightagePercent does NOT inflate sub-1 values — a user-typed 1 (1%) '
         'stays 1, not 100 (regression: the old <=1.0 heuristic mangled it)',
         () {
-      const onePercent = KraTemplateItem(name: 'Tiny', weightage: 1, sortOrder: 0);
+      const onePercent =
+          KraTemplateItem(name: 'Tiny', weightage: 1, sortOrder: 0);
       expect(onePercent.weightagePercent, 1);
       expect(onePercent.toJson()['weightage'], closeTo(0.01, 1e-9));
 
@@ -103,7 +104,8 @@ void main() {
       expect(halfPercent.toJson()['weightage'], closeTo(0.005, 1e-9));
     });
 
-    test('fromJson normalises a sub-1% wire fraction without double-scaling', () {
+    test('fromJson normalises a sub-1% wire fraction without double-scaling',
+        () {
       // "0.005" on the wire is 0.5%, which must read back as 0.5 — not 50.
       final item = KraTemplateItem.fromJson({
         'name': 'Half percent',
@@ -129,16 +131,17 @@ void main() {
     });
 
     test('each reviewer maps to its ScoreSourceEnum value', () {
-      String src(KraReviewer r) =>
-          KraTemplateItem(name: 'x', weightage: 1, sortOrder: 0, reviewerGroup: r)
-              .toJson()['scoreSource'] as String;
+      String src(KraReviewer r) => KraTemplateItem(
+              name: 'x', weightage: 1, sortOrder: 0, reviewerGroup: r)
+          .toJson()['scoreSource'] as String;
       expect(src(KraReviewer.reportingManager), 'MANAGER');
       expect(src(KraReviewer.hr), 'HR_FEED');
       expect(src(KraReviewer.accounts), 'ACCOUNTS_FEED');
     });
 
     test('toJson omits the reviewer keys when unassigned', () {
-      const item = KraTemplateItem(name: 'Unassigned', weightage: 10, sortOrder: 0);
+      const item =
+          KraTemplateItem(name: 'Unassigned', weightage: 10, sortOrder: 0);
       final json = item.toJson();
       expect(json.containsKey('reviewerGroup'), isFalse);
       expect(json.containsKey('scoreSource'), isFalse);

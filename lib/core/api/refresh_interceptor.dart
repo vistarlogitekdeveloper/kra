@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../storage/secure_storage_service.dart';
 import 'api_constants.dart';
+import '../observability/app_logger.dart';
 
 /// Global, app-level signal for "session is gone, force the user back to login".
 ///
@@ -199,12 +200,12 @@ class RefreshInterceptor extends Interceptor {
     } on DioException catch (e) {
       // Refresh itself returned 401 / network failure → can't recover.
       if (kDebugMode) {
-        debugPrint('RefreshInterceptor: refresh failed (${e.type})');
+        AppLog.w('auth.refresh', 'refresh failed (${e.type})');
       }
       return false;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('RefreshInterceptor: refresh threw $e');
+        AppLog.e('auth.refresh', 'refresh threw', error: e);
       }
       return false;
     }

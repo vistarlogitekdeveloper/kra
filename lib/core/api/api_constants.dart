@@ -41,6 +41,19 @@ class ApiConstants {
   // HR module endpoints
   static const String employees = '/employees';
   static const String locations = '/locations';
+
+  // Tenant administration — super admin only. NOT part of the original API:
+  // the Organization table always existed and organizationId threads through
+  // the whole backend, but no route exposed it, so organisations could only be
+  // created directly in SQL. Added by docs/backend_patch_organizations.js;
+  // until that is deployed these answer 404 RES_001.
+  static const String organizations = '/organizations';
+
+  /// Re-issues the caller's tokens against another organisation. The only way
+  /// a super admin can act inside a tenant it is not currently "inside" —
+  /// every backend query scopes by the JWT's organizationId claim, never by a
+  /// request parameter.
+  static const String organizationsSwitch = '/organizations/switch';
   static const String kraTemplates = '/kra-templates';
   static const String kraAssignments = '/kra-assignments';
   static const String kraAssignmentsBulk = '/kra-assignments/bulk';

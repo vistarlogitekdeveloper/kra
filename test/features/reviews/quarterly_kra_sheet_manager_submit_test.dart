@@ -85,8 +85,7 @@ void main() {
 
     test('ignores a self score sitting on the manager\'s own row', () {
       final r = review([
-        row('a', KraReviewer.reportingManager,
-            ratedBy: ReviewStage.selfRating),
+        row('a', KraReviewer.reportingManager, ratedBy: ReviewStage.selfRating),
       ]);
       expect(managerRatedKraCount(r), 0);
     });
@@ -121,8 +120,8 @@ void main() {
 
     test('no when both ids are blank — a blank must not match a blank', () {
       // Fails open otherwise: '' == '' would authorise an unidentified viewer.
-      expect(managerCanSubmitReview(review([rated], managerId: ''), ''),
-          isFalse);
+      expect(
+          managerCanSubmitReview(review([rated], managerId: ''), ''), isFalse);
     });
 
     test('no when nothing of theirs is rated', () {
@@ -140,7 +139,9 @@ void main() {
     });
 
     test('no once already submitted — the stage record proves it', () {
-      final r = review([rated], stageRecords: {
+      final r = review([
+        rated
+      ], stageRecords: {
         ReviewStage.reportingManagerRating: StageRecord(
           actorId: 'mgr1',
           actorName: 'Manager',

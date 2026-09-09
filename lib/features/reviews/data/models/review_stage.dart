@@ -204,26 +204,45 @@ enum ReviewStage {
         };
       case ReviewStage.accountHrRating:
         // The HR rater in the Review cycle.
-        return const {UserRole.hr, UserRole.hrAdmin};
+        return const {UserRole.hr, UserRole.hrAdmin, UserRole.superAdmin};
       case ReviewStage.financeRating:
         // The Finance / Accounts rater in the Review cycle. HR_ADMIN holds this
         // seat too: the commercial/HR-admin post covers Accounts rating as well,
         // and a single [UserRole] can't express "HR Admin AND Accounts".
-        return const {UserRole.finance, UserRole.hrAdmin};
+        return const {
+          UserRole.finance,
+          UserRole.hrAdmin,
+          UserRole.superAdmin,
+        };
       case ReviewStage.managementReview:
         // The management tier signs off (approve, or override per KRA on
-        // rework) — the last gate before the incentive is paid, so it is
-        // deliberately NOT the same seat as the HR rater: HR would otherwise
-        // approve its own input.
+        // rework) — the last gate before the incentive is paid, so it aims NOT
+        // to be the same seat as the HR rater: HR would otherwise approve its
+        // own input.
         //
-        // Until the backend's employees enum accepts `MANAGEMENT`, nobody can
-        // be assigned it and gating on it alone would leave this stage with no
-        // eligible actor, so HR_ADMIN shares it. See [FeatureFlags.roleTiers].
+        // Two documented exceptions to that separation, both deliberate:
+        //  * HR_ADMIN, until the backend's employees enum accepts
+        //    `MANAGEMENT` — nobody can be assigned it today, and gating on it
+        //    alone would leave this stage with no eligible actor at all. Turning
+        //    on [FeatureFlags.roleTiers] withdraws this one.
+        //  * SUPER_ADMIN, which holds every seat in the app on purpose and so
+        //    CAN approve its own HR rating. It is the cross-organisation
+        //    operator account, not a seat in anyone's review, and it is not
+        //    withdrawn by [FeatureFlags.roleTiers].
         return FeatureFlags.roleTiers
-            ? const {UserRole.management}
-            : const {UserRole.management, UserRole.hrAdmin};
+            ? const {UserRole.management, UserRole.superAdmin}
+            : const {
+                UserRole.management,
+                UserRole.hrAdmin,
+                UserRole.superAdmin,
+              };
       case ReviewStage.incentivePayout:
-        return const {UserRole.finance, UserRole.hr, UserRole.hrAdmin};
+        return const {
+          UserRole.finance,
+          UserRole.hr,
+          UserRole.hrAdmin,
+          UserRole.superAdmin,
+        };
       case ReviewStage.completed:
         return const {};
     }
@@ -294,8 +313,7 @@ enum ReviewStage {
 
   /// True when ANY of [roles] may act on this stage — the multi-role form.
   /// Someone holding both the HR and Accounts seats can act on either.
-  bool isActionableByAny(Set<UserRole> roles) =>
-      roles.any(actorRoles.contains);
+  bool isActionableByAny(Set<UserRole> roles) => roles.any(actorRoles.contains);
 
   /// Stages decided by WHO the caller is to a review rather than by role:
   ///   * [selfRating] — the review's owner, whatever their role.

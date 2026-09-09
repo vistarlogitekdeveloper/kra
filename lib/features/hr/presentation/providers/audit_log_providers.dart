@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 
 import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
@@ -7,8 +7,14 @@ import '../../../../core/constants/app_strings.dart';
 import '../../data/models/hr_dashboard_models.dart';
 import '../../data/repositories/api_audit_log_repository.dart';
 import '../../data/repositories/audit_log_repository.dart';
+import '../../../../core/observability/app_logger.dart';
 
 final auditLogRepositoryProvider = Provider<AuditLogRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   return ApiAuditLogRepository(dio: ref.read(dioProvider));
 });
 
@@ -82,7 +88,8 @@ class AuditLogListController extends StateNotifier<AuditLogListState> {
       state = state.copyWith(isInitialLoading: false, error: e.message);
     } catch (e, st) {
       assert(() {
-        debugPrint('audit log parse failed: $e\n$st');
+        AppLog.e('hr.audit', 'audit log parse failed',
+            error: e, stackTrace: st);
         return true;
       }());
       state = state.copyWith(

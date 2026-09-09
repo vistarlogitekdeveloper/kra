@@ -24,7 +24,9 @@ void main() {
       await r.submitStage(
         id,
         stage,
-        rowScores: {for (final row in rev.rows) row.id: const RowScore(value: 7)},
+        rowScores: {
+          for (final row in rev.rows) row.id: const RowScore(value: 7)
+        },
         actorId: 'x',
         actorName: 'X',
       );

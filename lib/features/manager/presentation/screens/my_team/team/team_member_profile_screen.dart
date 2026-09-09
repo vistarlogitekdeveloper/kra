@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../../../core/api/error_text.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/utils/name_format.dart';
 import '../../../../../../core/constants/app_strings.dart';
@@ -97,7 +98,7 @@ class _TeamMemberProfileScreenState
       body: async.when(
         loading: () => const _ProfileLoading(),
         error: (e, _) => _ProfileError(
-          message: e.toString(),
+          message: userFacingError(e),
           onRetry: () => ref
               .invalidate(managerTeamMemberProfileProvider(widget.employeeId)),
         ),

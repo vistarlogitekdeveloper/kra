@@ -205,10 +205,10 @@ class MonthlyReview {
     double weighted = 0;
     double totalWeight = 0;
     for (final row in rows) {
-      final s = row.scoreFor(stage);
-      if (s == null || s.value == null || row.maxScore <= 0) continue;
+      final value = row.scoreFor(stage)?.value;
+      if (value == null || row.maxScore <= 0) continue;
       totalWeight += row.weightagePercent;
-      weighted += (s.value! / row.maxScore) * row.weightagePercent;
+      weighted += (value / row.maxScore) * row.weightagePercent;
     }
     if (totalWeight <= 0) return 0;
     return (weighted * 100 / totalWeight).clamp(0, 100).toDouble();
@@ -225,15 +225,18 @@ class MonthlyReview {
     if (row.maxScore <= 0) return null;
     final assigned = row.reviewStage;
     if (assigned != null) {
-      final s = row.scoreFor(assigned);
-      if (s?.value == null) return null;
-      return (s!.value! / row.maxScore) * 100;
+      // Bound to a local so the null check promotes it — `s?.value` cannot
+      // be promoted through the null-aware access, which is the only reason
+      // the previous form needed two bang operators.
+      final value = row.scoreFor(assigned)?.value;
+      if (value == null) return null;
+      return (value / row.maxScore) * 100;
     }
     // Legacy fallback: average whichever of the three raters scored the row.
     final present = <double>[];
     for (final stage in ReviewStage.reviewRaters) {
-      final s = row.scoreFor(stage);
-      if (s?.value != null) present.add((s!.value! / row.maxScore) * 100);
+      final value = row.scoreFor(stage)?.value;
+      if (value != null) present.add((value / row.maxScore) * 100);
     }
     if (present.isEmpty) return null;
     return present.reduce((a, b) => a + b) / present.length;

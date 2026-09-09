@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../../core/api/error_text.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/router/app_router.dart';
@@ -42,7 +43,7 @@ class MyReportingTreeScreen extends ConsumerWidget {
       body: async.when(
         loading: () => const _Loading(),
         error: (e, _) => _Error(
-          message: e.toString(),
+          message: userFacingError(e),
           onRetry: () => ref.invalidate(myProfileProvider),
         ),
         data: (profile) => _TreeBody(profile: profile),

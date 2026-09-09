@@ -26,7 +26,8 @@ void main() {
       expect(result.skippedCount, 0);
       expect(result.reviewGeneration, isNotNull);
       expect(result.reviewGeneration!.updated, 1);
-      expect(result.reviewGeneration!.message, '1 review updated to the new KRA.');
+      expect(
+          result.reviewGeneration!.message, '1 review updated to the new KRA.');
       expect(result.reviewGeneration!.hasMessage, isTrue);
     });
 
@@ -37,14 +38,20 @@ void main() {
         'skippedCount': 0,
         'skippedEmployeeIds': <String>[],
         'created': <Map<String, dynamic>>[],
-        'reviewGeneration': {'created': 1, 'updated': 0, 'skipped': [], 'message': '1 review created.'},
+        'reviewGeneration': {
+          'created': 1,
+          'updated': 0,
+          'skipped': [],
+          'message': '1 review created.'
+        },
       });
       expect(result.createdCount, 1);
       expect(result.updatedCount, 0);
       expect(result.reviewGeneration!.created, 1);
     });
 
-    test('surfaces a skipped-review reason (e.g. review already in progress)', () {
+    test('surfaces a skipped-review reason (e.g. review already in progress)',
+        () {
       final result = BulkAssignResult.fromJson({
         'createdCount': 0,
         'updatedCount': 1,
@@ -55,7 +62,10 @@ void main() {
           'created': 0,
           'updated': 0,
           'skipped': [
-            {'employeeId': 'e1', 'reason': 'A review is already in progress for this cycle.'}
+            {
+              'employeeId': 'e1',
+              'reason': 'A review is already in progress for this cycle.'
+            }
           ],
           'message': 'A review is already in progress for this cycle.',
         },
@@ -77,7 +87,9 @@ void main() {
       expect(result.reviewGeneration, isNull);
     });
 
-    test('tolerates a partial reviewGeneration (missing message) without throwing', () {
+    test(
+        'tolerates a partial reviewGeneration (missing message) without throwing',
+        () {
       final result = BulkAssignResult.fromJson({
         'createdCount': 1,
         'updatedCount': 0,
