@@ -131,8 +131,33 @@ ORDER  BY e.name;
 --          employee's own manager can
 --     needs: docs/install_admin_only_remainder.mjs
 --
--- Until both are applied, on an ADMIN_ONLY organisation:
---   HR KRA        -> works today (HR / HR_ADMIN)
---   Accounts KRA  -> works today (FINANCE only; HR_ADMIN gets a 403)
---   remaining KRA -> only the reporting manager, NOT management
---   sign-off      -> only HR_ADMIN
+-- STATUS as of 2026-09-10: BOTH are applied and verified, along with
+-- install_review_designation.mjs. So on an ADMIN_ONLY organisation:
+--   HR KRA        -> HR, HR_ADMIN
+--   Accounts KRA  -> FINANCE only
+--   remaining KRA -> MANAGEMENT, HR_ADMIN, ADMIN
+--   sign-off      -> MANAGEMENT, HR_ADMIN, ADMIN
+-- Still NOT applied: install_review_month_shift.mjs (the API still reports
+-- today's month as current; the client clamps it, so screens are correct).
+--
+-- Each needs an API RESTART to take effect — the files are patched on disk,
+-- but a running process still holds the old code.
+
+
+-- ── 5. Which employees will actually SHOW a designation? ───────────────────
+-- The card renders the line only when `position` is non-empty, and the
+-- designation field is OPTIONAL on the employee form — the payload omits
+-- `position` entirely when it was left blank. So a null here is a data gap,
+-- not a bug: fix it by editing the employee and picking a Designation.
+WITH subject AS (
+  SELECT organization_id FROM kra.employees WHERE employee_code = 'VLPL8844'
+)
+SELECT e.employee_code,
+       e.name,
+       e.role,
+       COALESCE(NULLIF(TRIM(e.position), ''), '(none - card shows no line)')
+         AS designation
+FROM   kra.employees e, subject s
+WHERE  e.organization_id = s.organization_id
+  AND  e.is_active = true
+ORDER  BY (NULLIF(TRIM(e.position), '') IS NULL) DESC, e.name;

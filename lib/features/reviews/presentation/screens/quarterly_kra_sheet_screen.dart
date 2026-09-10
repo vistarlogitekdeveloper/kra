@@ -2446,6 +2446,11 @@ class _GridState extends State<_Grid> {
             _scoreCell(i, rowId, maxScore, name, ReviewStage.managementReview,
                 canEdit: (r) =>
                     widget.canEditManagement(r) &&
+                    // Per-ROW, unlike the three gates around it. Under
+                    // administrators-only, management rates the leftover KRAs
+                    // and must not overwrite HR's or Accounts' own scores.
+                    managementMayScoreRow(
+                        row as MonthlyKraRow, widget.reviewFlow) &&
                     !r.isManagementLocked &&
                     _open(i, row, ReviewStage.managementReview))),
       ],
@@ -4380,6 +4385,38 @@ String reviewerCellTagFor(KraReviewer reviewer, ReviewFlow flow) =>
 bool _seatIsManagements(KraReviewer reviewer, ReviewFlow flow) =>
     reviewer == KraReviewer.reportingManager &&
     !stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow);
+
+/// Whether MANAGEMENT may enter a per-KRA score in the Mgmt column for [row].
+///
+/// The two flows mean different things by that column:
+///
+///  * [ReviewFlow.standard] — management holds no Review seat of its own. The
+///    Mgmt column is the sign-off's OVERRIDE: on rework it may correct any
+///    KRA's score, whoever rated it. So every row is open, exactly as before.
+///
+///  * [ReviewFlow.adminOnly] — management is a RATER, of the KRAs left over
+///    once HR and Accounts have taken theirs. Its column is therefore its own
+///    seat, not authority over everyone else's: only HR scores the HR KRA, only
+///    Accounts scores the Accounts KRA. Without this, management got an
+///    editable Mgmt cell on every row and could overwrite both.
+///
+/// A row with no assigned reviewer counts as management's, matching
+/// [defaultReviewerFor] — the remainder includes the never-assigned.
+///
+/// This is a CLIENT restriction and cannot be enforced server-side as it
+/// stands: "Save & Lock" legitimately writes a MANAGEMENT_REVIEW score for
+/// every KRA (copying each Review score in so the incentive has something to
+/// settle to), and the API cannot tell that bulk settle apart from a manual
+/// per-cell override — both are the same `save-scores` call. Refusing the
+/// stage per row would break the sign-off itself.
+@visibleForTesting
+bool managementMayScoreRow(MonthlyKraRow row, ReviewFlow flow) {
+  if (stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow)) {
+    return true;
+  }
+  final assigned = row.reviewStage ?? ReviewStage.reportingManagerRating;
+  return assigned == ReviewStage.reportingManagerRating;
+}
 
 /// KRA names whose ASSIGNED reviewer is a seat [flow] does not use.
 ///
