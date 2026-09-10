@@ -1103,7 +1103,7 @@ class _QuarterlyKraSheetScreenState
           return _Sheet(
             months: data.months,
             reviews: mappedReviews,
-            scope: scope,
+            flow: scope?.reviewFlow ?? ReviewFlow.standard,
             onPrevQuarter: () => setState(() => _anchor =
                 quarterMonthsFor(_anchor!)
                     .first
@@ -1241,6 +1241,11 @@ bool managerCanSubmitReview(
 Widget quarterlyKraSheetBodyForTest({
   required List<ReviewPeriod> months,
   required List<MonthlyReview?> reviews,
+
+  /// Which pipeline the organisation runs. The sheet reads nothing else
+  /// off the review scope, so this is the whole of it — and it decides
+  /// whether the Self columns are drawn at all.
+  ReviewFlow flow = ReviewFlow.standard,
   bool editableSelf = true,
   bool editableManager = false,
   bool editableHr = false,
@@ -1284,7 +1289,7 @@ Widget quarterlyKraSheetBodyForTest({
     clock: now,
     months: months,
     reviews: reviews,
-    scope: null,
+    flow: flow,
     onPrevQuarter: () {},
     onNextQuarter: () {},
     pct: pct,
@@ -1333,7 +1338,15 @@ class _Sheet extends StatelessWidget {
   final DateTime? clock;
   final List<ReviewPeriod> months;
   final List<MonthlyReview?> reviews;
-  final ReviewScope? scope;
+
+  /// The pipeline this organisation runs — the only thing the sheet ever
+  /// needed off the review scope.
+  ///
+  /// Resolved ONCE by the screen and passed down, rather than each of the
+  /// seven consumers below writing `scope?.reviewFlow ?? standard` for
+  /// itself. That restating is what left the flow badge, the legend and
+  /// the grid able to disagree about which pipeline was running.
+  final ReviewFlow flow;
   final VoidCallback onPrevQuarter;
   final VoidCallback onNextQuarter;
   final double? Function(MonthlyReview?, String, ReviewStage) pct;
@@ -1395,7 +1408,7 @@ class _Sheet extends StatelessWidget {
     this.clock,
     required this.months,
     required this.reviews,
-    required this.scope,
+    required this.flow,
     required this.onPrevQuarter,
     required this.onNextQuarter,
     required this.pct,
@@ -1503,8 +1516,8 @@ class _Sheet extends StatelessWidget {
             // administrators-only it is management picking up whatever HR and
             // Accounts were not assigned, so naming the reporting manager here
             // would describe a relationship the flow no longer uses.
-            ? (stageIsRelationshipGated(ReviewStage.reportingManagerRating,
-                    scope?.reviewFlow ?? ReviewFlow.standard)
+            ? (stageIsRelationshipGated(
+                    ReviewStage.reportingManagerRating, flow)
                 ? 'You can rate the KRAs assigned to you as Reporting Manager — '
                     'tap a Review cell.'
                 : 'You can rate the KRAs left to Management — the ones not '
@@ -1581,7 +1594,7 @@ class _Sheet extends StatelessWidget {
                   // screen looked correct and said nothing. Naming the flow
                   // makes "the setting didn't reach me" and "you aren't allowed"
                   // two visibly different failures.
-                  _FlowBadge(flow: scope?.reviewFlow ?? ReviewFlow.standard),
+                  _FlowBadge(flow: flow),
                 ],
               ),
             ),
@@ -1597,16 +1610,14 @@ class _Sheet extends StatelessWidget {
                 ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: _ReviewerLegend(
-                  flow: scope?.reviewFlow ?? ReviewFlow.standard),
+              child: _ReviewerLegend(flow: flow),
             ),
             // KRAs assigned to a reviewer this flow does not use. Nobody can
             // score them and the server would drop a score aimed anywhere else,
             // so say so plainly instead of leaving three rows that quietly
             // refuse every attempt.
             () {
-              final stranded = kraNamesWithoutRaterInFlow(
-                  reviews, scope?.reviewFlow ?? ReviewFlow.standard);
+              final stranded = kraNamesWithoutRaterInFlow(reviews, flow);
               if (stranded.isEmpty) return const SizedBox.shrink();
               return _StrandedKraNotice(names: stranded);
             }(),
@@ -1628,9 +1639,10 @@ class _Sheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: _Grid(
                   now: clock ?? DateTime.now(),
-                  // The sheet holds the scope; the grid decides cell openness, so
-                  // the flow has to reach it or no column can honour it.
-                  reviewFlow: scope?.reviewFlow ?? ReviewFlow.standard,
+                  // The grid decides both cell openness and WHICH COLUMNS
+                  // EXIST, so the flow has to reach it or it draws three
+                  // Self columns nobody can ever fill.
+                  reviewFlow: flow,
                   rows: rows,
                   months: months,
                   reviews: reviews,
@@ -1679,6 +1691,7 @@ class _Sheet extends StatelessWidget {
             const SizedBox(height: 16),
             _PayoutCard(
               qSelf: qSelf,
+              showSelfAverage: stageIsInFlow(ReviewStage.selfRating, flow),
               qFinal: qFinal,
               eligibleMonthly: eligibleMonthly,
               quarterEligible: quarterEligible,
@@ -2206,9 +2219,33 @@ class _GridState extends State<_Grid> {
       _wTrk = 158,
       _wMon = 70,
       _wQtr = 56;
-  // Per month: Self | Review | Mgmt (3 cols). Quarter: Self | Review | Final.
+
+  /// Whether the sheet draws its Self columns at all.
+  ///
+  /// Derived from the flow rather than named per flow: a pipeline with no
+  /// self-rating stage never collects a self score, so those three month
+  /// columns and the Qtr Self column are a dash in every row and a 0% in
+  /// the totals. Under administrators-only that is exactly the state — the
+  /// employee does not rate — and three dead columns pushed the two live
+  /// ones off the right edge of the screen.
+  bool get _showSelf =>
+      stageIsInFlow(ReviewStage.selfRating, widget.reviewFlow);
+
+  // Per month: Self | Review | Mgmt. Quarter: Self | Review | Final. Each
+  // loses its Self column where the flow has no self-rating.
+  int get _colsPerMonth => _showSelf ? 3 : 2;
+  int get _qtrCols => _showSelf ? 3 : 2;
+
+  // Must agree with the header, main-row and totals builders. Hide a
+  // column in one of them and keep counting its width here and the sheet
+  // scrolls past its own content; the reverse clips the last column.
   double get _totalWidth =>
-      _wWt + _wKra + _wTgt + _wTrk + _wMon * 9 + _wQtr * 3;
+      _wWt +
+      _wKra +
+      _wTgt +
+      _wTrk +
+      _wMon * 3 * _colsPerMonth +
+      _wQtr * _qtrCols;
 
   String _fmt(double? p) => p == null ? '—' : '${p.round()}%';
 
@@ -2280,10 +2317,14 @@ class _GridState extends State<_Grid> {
   }
 
   // The stages that carry a Reason & Proof entry for a KRA row: the employee's
-  // SELF evidence, plus the assigned reviewer's (RM/HR/Accounts) if the KRA is
-  // assigned. Legacy unassigned rows keep just the employee slot.
+  // SELF evidence where the flow HAS a self-rating, plus the assigned
+  // reviewer's (RM/HR/Accounts). On the standard flow a legacy unassigned row
+  // keeps just the employee slot.
   List<ReviewStage> _evidenceStages(MonthlyKraRow? row) {
-    final stages = <ReviewStage>[ReviewStage.selfRating];
+    // Only the stages this flow actually has. A self remark left behind by
+    // an organisation that later moved to administrators-only would
+    // otherwise light the "justified" dot with evidence no longer shown.
+    final stages = <ReviewStage>[if (_showSelf) ReviewStage.selfRating];
     final rs = row?.reviewStage;
     if (rs != null) stages.add(rs);
     return stages;
@@ -2358,11 +2399,12 @@ class _GridState extends State<_Grid> {
         // someone opening this to "do my self-rating" can easily fill in the
         // wrong month, believe they are done, and still be shown as overdue.
         for (final m in widget.months) ...[
-          _cell(
-              _wMon,
-              Text('${m.shortLabel}\nSelf',
-                  style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
-                  textAlign: TextAlign.right)),
+          if (_showSelf)
+            _cell(
+                _wMon,
+                Text('${m.shortLabel}\nSelf',
+                    style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
+                    textAlign: TextAlign.right)),
           _cell(
               _wMon,
               Text('${m.shortLabel}\nReview',
@@ -2374,7 +2416,8 @@ class _GridState extends State<_Grid> {
                   style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
                   textAlign: TextAlign.right)),
         ],
-        _cell(_wQtr, Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
+        if (_showSelf)
+          _cell(_wQtr, Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
         _cell(_wQtr, Text('Qtr\nReview', style: h, textAlign: TextAlign.right)),
         _cell(_wQtr, Text('Qtr\nFinal', style: h, textAlign: TextAlign.right)),
       ]),
@@ -2434,12 +2477,13 @@ class _GridState extends State<_Grid> {
       _cell(_wTgt, _targetCell(row), align: Alignment.centerLeft),
       _cell(_wTrk, _trackingCell(row), align: Alignment.centerLeft),
       for (var i = 0; i < 3; i++) ...[
-        _cell(
-            _wMon,
-            _scoreCell(i, rowId, maxScore, name, ReviewStage.selfRating,
-                canEdit: (r) =>
-                    widget.canEditSelf(r) &&
-                    _open(i, row, ReviewStage.selfRating))),
+        if (_showSelf)
+          _cell(
+              _wMon,
+              _scoreCell(i, rowId, maxScore, name, ReviewStage.selfRating,
+                  canEdit: (r) =>
+                      widget.canEditSelf(r) &&
+                      _open(i, row, ReviewStage.selfRating))),
         _cell(_wMon, _reviewCell(i, row)),
         _cell(
             _wMon,
@@ -2454,13 +2498,14 @@ class _GridState extends State<_Grid> {
                     !r.isManagementLocked &&
                     _open(i, row, ReviewStage.managementReview))),
       ],
-      _cell(
-          _wQtr,
-          Text(
-              _fmt(qAvgRow((i) => widget.pct(widget.reviews[i],
-                  _monthRowId(i, rowId), ReviewStage.selfRating))),
-              style:
-                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+      if (_showSelf)
+        _cell(
+            _wQtr,
+            Text(
+                _fmt(qAvgRow((i) => widget.pct(widget.reviews[i],
+                    _monthRowId(i, rowId), ReviewStage.selfRating))),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 12))),
       _cell(
           _wQtr,
           Text(_fmt(qAvgRow((i) => _reviewPct(widget.reviews[i], rowId))),
@@ -2885,7 +2930,8 @@ class _GridState extends State<_Grid> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                    'employee + reviewer evidence · one per month · reason ≤ 300 chars',
+                    '${_showSelf ? 'employee + reviewer' : 'reviewer'} '
+                    'evidence · one per month · reason ≤ 300 chars',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -2958,13 +3004,17 @@ class _GridState extends State<_Grid> {
                     color: AppColors.textMuted,
                     fontStyle: FontStyle.italic))
           else ...[
-            _evidenceTile(review, rowId, name, label, ReviewStage.selfRating,
-                'Employee', Icons.person_rounded, widget.canEditSelf(review)),
+            // No employee slot on a flow without a self-rating: nobody can
+            // ever fill it, so it read "No entry" in all three months for
+            // the life of the quarter.
+            if (_showSelf)
+              _evidenceTile(review, rowId, name, label, ReviewStage.selfRating,
+                  'Employee', Icons.person_rounded, widget.canEditSelf(review)),
             if (rs != null) ...[
               // Min gap + a Spacer pins the reviewer tile to the card's bottom;
               // since the row's cards share a height, the reviewer tiles line
               // up across all three months regardless of the employee entry.
-              const SizedBox(height: 8),
+              if (_showSelf) const SizedBox(height: 8),
               const Spacer(),
               _evidenceTile(
                   review,
@@ -3093,11 +3143,12 @@ class _GridState extends State<_Grid> {
         _cell(_wTgt, const SizedBox.shrink(), align: Alignment.centerLeft),
         _cell(_wTrk, const SizedBox.shrink(), align: Alignment.centerLeft),
         for (var i = 0; i < 3; i++) ...[
-          _cell(
-              _wMon,
-              Text('${widget.monthTotal(i, ReviewStage.selfRating).round()}%',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 12))),
+          if (_showSelf)
+            _cell(
+                _wMon,
+                Text('${widget.monthTotal(i, ReviewStage.selfRating).round()}%',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 12))),
           _cell(
               _wMon,
               Text('${monthReview(i).round()}%',
@@ -3112,8 +3163,11 @@ class _GridState extends State<_Grid> {
                   style: const TextStyle(
                       fontWeight: FontWeight.w700, fontSize: 12))),
         ],
-        _cell(_wQtr,
-            Text('${widget.qAvg(ReviewStage.selfRating).round()}%', style: t)),
+        if (_showSelf)
+          _cell(
+              _wQtr,
+              Text('${widget.qAvg(ReviewStage.selfRating).round()}%',
+                  style: t)),
         _cell(
             _wQtr,
             Text('${qReview().round()}%',
@@ -3135,12 +3189,19 @@ class _GridState extends State<_Grid> {
 
 class _PayoutCard extends StatelessWidget {
   final double qSelf;
+
+  /// Whether to print the self average at all. A flow without a
+  /// self-rating never collects one, so the line reads a flat 0% beside a
+  /// real final average — which looks like the employee scored zero rather
+  /// than like the row does not apply to them.
+  final bool showSelfAverage;
   final double qFinal;
   final double eligibleMonthly;
   final double quarterEligible;
   final double payout;
   const _PayoutCard({
     required this.qSelf,
+    required this.showSelfAverage,
     required this.qFinal,
     required this.eligibleMonthly,
     required this.quarterEligible,
@@ -3163,7 +3224,8 @@ class _PayoutCard extends StatelessWidget {
           const Text(AppStrings.quarterlyPayoutTitle,
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
           const SizedBox(height: 12),
-          _row('Quarter self average', '${qSelf.round()}%'),
+          if (showSelfAverage)
+            _row('Quarter self average', '${qSelf.round()}%'),
           _row('Quarter final average', '${qFinal.round()}%'),
           _row('Monthly incentive',
               EmployeeFormatters.currencyInr(eligibleMonthly)),

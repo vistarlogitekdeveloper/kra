@@ -288,7 +288,7 @@ code to the standard; leave existing code alone unless the task is that migratio
 | 2 | `material_ui` / `cupertino_ui` packages | ❌ SDK `package:flutter/material.dart` in 136 files | codebase-wide |
 | 2 | `drift` / `sqflite` local cache | ❌ none; `shared_preferences` for drafts only | new capability |
 | 3 | `data` / `domain` / `presentation` | ❌ no `domain/`; 0 of 5 features have one | codebase-wide |
-| 3 | Files ≤ 300 lines | ❌ 52 files over; largest 4431 (`quarterly_kra_sheet_screen.dart`) | per-file |
+| 3 | Files ≤ 300 lines | ❌ 52 files over; largest 4596 (`quarterly_kra_sheet_screen.dart`) | per-file |
 | 4 | No legacy providers | ❌ 22 `StateNotifierProvider` / `StateProvider` sites | with the 2→3 migration |
 | 4 | No `.value!` on `AsyncValue` | ✅ 0 bang operators anywhere in `lib/` | — |
 | 4 | Exhaustive `AsyncValue` pattern matching | ❌ 53 `.when()` / `.maybeWhen()` (`main.dart` converted) | mechanical |
@@ -407,6 +407,35 @@ Server-side root cause: `findCurrentMonth` in
 Patch: [`docs/install_review_month_shift.mjs`](docs/install_review_month_shift.mjs),
 verified 2/6 → 6/6 including the January rollover. The client **clamps** whatever
 the server sends, so the screens are correct without it.
+
+## The KRA sheet's COLUMNS are flow-shaped, not just its gates
+
+The flow decides which stages exist, so it also decides which columns exist. On
+`ADMIN_ONLY` the employee never rates, and the three per-month Self columns plus
+the Qtr Self column were a dash in every row and a 0% in the totals — 266 px of
+dead grid that pushed the two live columns off the right edge, and a payout card
+reporting a self average of 0% next to a real final average, which reads as "the
+employee scored nothing" rather than "this does not apply". The same was true of
+the Reason & proof panel's Employee slot, which said "No entry" for the life of
+the quarter.
+
+One gate, `stageIsInFlow(ReviewStage.selfRating, flow)`, drives all of it —
+`_GridState._showSelf`. Not `flow == adminOnly`: **four** builders have to agree
+(header, KRA row, totals row, and `_totalWidth`), and
+
+> a column hidden in one builder while its width is still charged in another
+> misaligns every value in that row against its own header — silently, with no
+> overflow error on a wide screen.
+
+`quarterly_kra_sheet_self_columns_test.dart` measures the summed cell width of
+each rendered row and asserts they are equal and equal to `_totalWidth`.
+Validated by reintroducing both halves: a non-flow-aware `_totalWidth` and a
+single dropped guard, which showed up as `Set:[1016.0, 1226.0]`.
+
+`_Sheet` now takes the resolved `ReviewFlow`, not the `ReviewScope`. It read
+nothing else off the scope and re-derived `scope?.reviewFlow ?? standard` at
+seven call sites — B1's drift, and the reason the widget-test hook could only
+ever exercise the standard pipeline (it passed `scope: null`).
 
 **Open, deliberately unresolved** (product decisions, not code debt):
 
