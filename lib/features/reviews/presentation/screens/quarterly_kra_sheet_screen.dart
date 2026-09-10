@@ -1268,6 +1268,21 @@ Widget quarterlyKraSheetBodyForTest({
     required String rowId,
     required ReviewStage stage,
   })? onEdit,
+
+  /// Observes which (review, row, stage) a Reason & Proof edit was aimed
+  /// at. The ROW ID is the point: the backend mints one per row PER
+  /// REVIEW, so a save handed the canonical (month-1) id targets a row the
+  /// edited month does not contain — the server then matches nothing and
+  /// returns 200 having saved nothing.
+  void Function({
+    required MonthlyReview review,
+    required String rowId,
+    required ReviewStage stage,
+  })? onJustify,
+
+  /// Observes every row id the sheet looks an attachment up by, so a test
+  /// can assert it never asks a month for an id that month has no row for.
+  void Function(String reviewId, String rowId)? onFileNameFor,
 }) {
   double? pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
@@ -1318,8 +1333,13 @@ Widget quarterlyKraSheetBodyForTest({
       required kraName,
       required monthLabel,
       required canEdit,
-    }) async {},
-    fileNameFor: (_, __, ___) => null,
+    }) async {
+      onJustify?.call(review: review, rowId: rowId, stage: stage);
+    },
+    fileNameFor: (review, rowId, stage) {
+      onFileNameFor?.call(review.id, rowId);
+      return null;
+    },
     onLockManagement: onLockManagement,
     onReopenManagement: onReopenManagement,
     onSendBackForRework: onSendBackForRework,
@@ -2332,14 +2352,20 @@ class _GridState extends State<_Grid> {
 
   // A KRA is "justified" if ANY month has a reason or attachment on the employee
   // entry OR its assigned reviewer's entry.
-  bool _anyJustified(String rowId) {
+  bool _anyJustified(String canonicalRowId) {
     for (final r in widget.reviews) {
       if (r == null) continue;
-      final row = _rowIn(r, rowId);
+      final row = _rowIn(r, canonicalRowId);
+      // `fileNameFor` resolves by EXACT id on the screen's side, so it needs
+      // the id belonging to THIS month's review — the canonical one only ever
+      // matches the first month, which left the dot green off month 1's
+      // attachment alone and blind to the other two. `_rowIn` has already
+      // done the resolution, so reuse its answer rather than repeating it.
+      final id = row?.id ?? canonicalRowId;
       for (final stage in _evidenceStages(row)) {
         final s = row?.scoreFor(stage);
         if (s?.remark?.trim().isNotEmpty ?? false) return true;
-        if (widget.fileNameFor(r, rowId, stage) != null) return true;
+        if (widget.fileNameFor(r, id, stage) != null) return true;
       }
     }
     return false;
@@ -2969,10 +2995,29 @@ class _GridState extends State<_Grid> {
     );
   }
 
-  Widget _monthCard(
-      dynamic row, int i, String rowId, String name, KraReviewer? reviewer) {
+  Widget _monthCard(dynamic row, int i, String canonicalRowId, String name,
+      KraReviewer? reviewer) {
     final review = widget.reviews[i];
     final label = widget.months[i].shortLabel;
+    // THIS month's own row id — every id below travels to the SERVER on save.
+    //
+    // The backend mints a row id with randomUUID() per row PER REVIEW, so the
+    // canonical id (taken from the first month present) names a row the other
+    // two months do not contain. See [_rowIn]. [_scoreCell] already resolves
+    // this; the evidence path did not, and the write is
+    //   INSERT ... SELECT ... WHERE EXISTS (mrr.id = $2 AND mrr.review_id = $6)
+    // so a canonical id against month 2 or 3 matched nothing, inserted zero
+    // rows and returned 200 OK. The employee typed a reason, got no error, and
+    // the card still read "Add reason & proof".
+    //
+    // Resolving it HERE, once, is also the only SAFE shape. The same id feeds
+    // _currentScore in _openJustification, which is an exact-id lookup: fixing
+    // only the save key would leave `current` null, and the save would then
+    // write `value: null` over the stored score (the SQL does
+    // `value = EXCLUDED.value` unconditionally) and, with no stored file
+    // seeded, `clearProofFile: true` over the stored attachment. A one-line
+    // fix in the wrong place turns a silent no-op into silent destruction.
+    final rowId = _monthRowId(i, canonicalRowId);
     final ReviewStage? rs = row.reviewStage as ReviewStage?;
     return Container(
       padding: const EdgeInsets.all(10),
@@ -3997,13 +4042,24 @@ class _JustificationDialogState extends State<_JustificationDialog> {
 
   /// Max attachment size (raw bytes).
   ///
-  /// INTERIM VALUE — sized to fit under the LIVE server's 1 MB request-body
-  /// limit, so attachments work today without waiting on a deploy. A base64
-  /// upload is ~4/3 of the raw bytes plus a small JSON envelope, so ~700 KB raw
-  /// → ~0.95 MB body, safely under 1 MB. Once the server's `src/app.js` limit is
-  /// raised to 10 MB (already coded, not yet deployed) this should go back to
-  /// 5 MB (and the server's PROOF_FILE_MAX_BASE64 to ~7 MB) for Office files.
-  static const int _maxProofBytes = 700 * 1024;
+  /// 5 MB, which is exactly what the server is built for. base64 is 4/3 of
+  /// raw, so 5 MB → ceil(5242880 / 3) * 4 = 6,990,508 bytes, under the
+  /// server's `PROOF_FILE_MAX_BASE64` (7 MB) with ~350 KB of headroom, and
+  /// well under `express.json({ limit: '10mb' })` once the JSON envelope is
+  /// added. Both server constants are already in the repo — this is not
+  /// asking the backend for anything new.
+  ///
+  /// DEPLOY COUPLING: as of 2026-09-10 those two server changes were committed
+  /// but NOT pushed, and the live API still enforced the older ~1 MB body
+  /// limit — which is why this was pinned to 700 KB. Against an undeployed
+  /// backend a file over ~700 KB is now rejected by the SERVER rather than by
+  /// us, so [_pickFile] accepts it and the failure surfaces on save. That is
+  /// deliberate — the cap belongs where the limit actually is — but the two
+  /// rejections do NOT read alike: zod's carries a real message ("Proof file
+  /// is too large (max ~5 MB).") which [_saveErrorText] surfaces, while a raw
+  /// 413 from the body parser is not in the app's JSON envelope and falls back
+  /// to the generic "Could not save. Please try again."
+  static const int _maxProofBytes = 5 * 1024 * 1024;
 
   void _say(String msg) {
     if (!mounted) return;
@@ -4032,9 +4088,12 @@ class _JustificationDialogState extends State<_JustificationDialog> {
       if (f == null) return; // user cancelled — normal
       final bytes = await f.readAsBytes();
       if (bytes.length > _maxProofBytes) {
-        final kb = (bytes.length / 1024).round();
-        _say('"${f.name}" is $kb KB — attachments are capped at ~700 KB for '
-            'now (raised once the server upload limit is deployed).');
+        // Both numbers derived from the constant. The old copy hardcoded
+        // "~700 KB", so raising the cap would have left the app refusing a
+        // file while quoting a limit it no longer enforced.
+        final mb = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
+        const capMb = _maxProofBytes ~/ (1024 * 1024);
+        _say('"${f.name}" is $mb MB — attachments are capped at $capMb MB.');
         return;
       }
       setState(() => _file = (name: f.name, bytes: bytes));
@@ -4164,7 +4223,7 @@ class _FilePickRow extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          AppStrings.ratingProofFileLocalNote,
+          AppStrings.ratingProofFileKeptNote,
           style: TextStyle(
               fontSize: 10.5, color: AppColors.textMuted, height: 1.3),
         ),

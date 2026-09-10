@@ -160,8 +160,15 @@ class AppStrings {
   static const String ratingProofFileAdd = 'Attach proof file';
   static const String ratingProofFileReplace = 'Replace';
   static const String ratingProofFileRemove = 'Remove';
-  static const String ratingProofFileLocalNote =
-      'Kept on this device for now — file upload isn\'t wired to the server yet.';
+
+  /// Shown under a freshly PICKED file, before Save. The upload IS wired —
+  /// the bytes go up as base64 with the score and the server stores them in
+  /// `proof_file_data`, served back by `GET /reviews/monthly/:id/proof`. The
+  /// previous wording ("file upload isn't wired to the server yet") was
+  /// left over from before that shipped and told every employee their
+  /// evidence was going nowhere.
+  static const String ratingProofFileKeptNote =
+      'Not uploaded yet — it is sent when you tap Save.';
   static const String ratingViewTitle = 'Rating details';
   static const String ratingNoReason = 'No reason given.';
   static const String ratingNoProof = 'No proof provided.';

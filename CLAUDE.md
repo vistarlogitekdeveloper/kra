@@ -437,6 +437,60 @@ nothing else off the scope and re-derived `scope?.reviewFlow ?? standard` at
 seven call sites — B1's drift, and the reason the widget-test hook could only
 ever exercise the standard pipeline (it passed `scope: null`).
 
+## A KRA row has a DIFFERENT id in every month
+
+`monthly_review_rows.id` is `randomUUID()` per row **per review**, so one KRA
+carries three ids across a quarter — while the sheet takes its canonical row
+list from the first month present. Any per-month read or write handed the
+canonical id therefore addresses a row that month does not contain.
+
+The server does not complain. `writeRowScores` is
+
+```sql
+INSERT INTO kra.monthly_row_scores AS s (...) SELECT ...
+WHERE EXISTS (SELECT 1 FROM kra.monthly_review_rows mrr
+              WHERE mrr.id = $2 AND mrr.review_id = $6 AND <reviewer guard>)
+```
+
+so a foreign row id inserts **zero rows and returns 200 OK**. The user sees no
+error and no saved data.
+
+This has now bitten twice. First the score cells — fixed by resolving
+`_monthRowId` once in `_scoreCell`. Then the Reason & Proof panel, which was
+missed: an employee's August reason was discarded silently while July worked.
+Resolve the id **once per month card** (`_monthCard`) and pass it down; do not
+patch call sites individually.
+
+Doing it at the source is not just tidier, it is the only safe shape. The same
+id feeds `_currentScore`, which matches by **exact id with no fallback**. Fix
+only the save key and `current` stays null, so the save then writes
+`value: null` over the stored score — `DO UPDATE SET value = EXCLUDED.value` is
+unconditional — and, with no stored file seeded into the dialog,
+`clearProofFile: true` over the attachment. A one-line fix in the wrong place
+converts a silent no-op into silent destruction.
+
+Note the asymmetry that hides this: `_rowIn` is **tolerant** (id → displayOrder
+→ name key), so reads keep working and only writes fail. A test that asserts
+what renders will pass with the bug present — `quarterly_kra_sheet_evidence_
+rowid_test.dart` therefore asserts the invariant *no review is asked for a row
+id it does not contain*, and gives all three months different ids. Validated by
+reintroducing the bug: `Set:['r-aug asked for row-uuid-jul', 'r-sep asked for
+row-uuid-jul']`.
+
+## Proof attachments: the cap lives in three places
+
+Raw client cap `_maxProofBytes` (5 MB) → base64 is 4/3 of raw, so 5 MB becomes
+6,990,508 bytes → server `PROOF_FILE_MAX_BASE64` (7 MB) → `express.json({
+limit: '10mb' })`. Change one and check the other two. The client's error copy
+derives its number from the constant rather than restating it, because the old
+copy hardcoded "~700 KB" and would have quoted a limit it no longer enforced.
+
+The two server constants are in the repo but were **not deployed** as of
+2026-09-10, so against the live API a file over ~700 KB is rejected by the
+server. The two rejections do not read alike: zod's carries a real message,
+a raw 413 from the body parser is not in the app's JSON envelope and falls back
+to "Could not save. Please try again."
+
 **Open, deliberately unresolved** (product decisions, not code debt):
 
 - `HR_ADMIN` holds the Accounts seat on the client but not the server —
