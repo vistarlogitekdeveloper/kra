@@ -43,13 +43,14 @@ void main() {
     String? managerId = 'mgr1',
     ReviewStage currentStage = ReviewStage.reportingManagerRating,
     Map<ReviewStage, StageRecord> stageRecords = const {},
+    ReviewPeriod period = const ReviewPeriod(2026, 7),
   }) =>
       MonthlyReview(
         id: 'r1',
         employeeId: 'emp1',
         employeeName: 'Asha',
         managerId: managerId,
-        period: const ReviewPeriod(2026, 7),
+        period: period,
         currentStage: currentStage,
         stageRecords: stageRecords,
         rows: rows,
@@ -100,33 +101,43 @@ void main() {
   });
 
   group('managerCanSubmitReview', () {
+    // A month must have ENDED before it can be submitted, so the clock has to
+    // be later than the reviews under test (all July). September also makes
+    // August the live month, which the last test in this group relies on.
+    final now = DateTime(2026, 9, 5);
+
     final rated = row('a', KraReviewer.reportingManager,
         ratedBy: ReviewStage.reportingManagerRating);
 
     test('yes once the manager has rated one of their own KRAs', () {
-      expect(managerCanSubmitReview(review([rated]), 'mgr1'), isTrue);
+      expect(managerCanSubmitReview(review([rated]), 'mgr1', now: now), isTrue);
     });
 
     test('no for anyone who is not this review\'s reporting manager', () {
-      expect(managerCanSubmitReview(review([rated]), 'someone-else'), isFalse);
+      expect(managerCanSubmitReview(review([rated]), 'someone-else', now: now),
+          isFalse);
       // The employee themselves must not get the manager's submit.
-      expect(managerCanSubmitReview(review([rated]), 'emp1'), isFalse);
+      expect(
+          managerCanSubmitReview(review([rated]), 'emp1', now: now), isFalse);
     });
 
     test('no when the review has no manager mapped — fails closed', () {
-      expect(managerCanSubmitReview(review([rated], managerId: null), 'mgr1'),
+      expect(
+          managerCanSubmitReview(review([rated], managerId: null), 'mgr1',
+              now: now),
           isFalse);
     });
 
     test('no when both ids are blank — a blank must not match a blank', () {
       // Fails open otherwise: '' == '' would authorise an unidentified viewer.
       expect(
-          managerCanSubmitReview(review([rated], managerId: ''), ''), isFalse);
+          managerCanSubmitReview(review([rated], managerId: ''), '', now: now),
+          isFalse);
     });
 
     test('no when nothing of theirs is rated', () {
       final r = review([row('a', KraReviewer.reportingManager)]);
-      expect(managerCanSubmitReview(r, 'mgr1'), isFalse);
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isFalse);
     });
 
     test('no when ONLY an HR-assigned KRA is rated — this is the scope rule',
@@ -135,7 +146,7 @@ void main() {
         row('hrOnly', KraReviewer.hr, ratedBy: ReviewStage.accountHrRating),
         row('mine', KraReviewer.reportingManager), // theirs, still unrated
       ]);
-      expect(managerCanSubmitReview(r, 'mgr1'), isFalse);
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isFalse);
     });
 
     test('no once already submitted — the stage record proves it', () {
@@ -148,19 +159,41 @@ void main() {
           submittedAt: DateTime(2026, 8, 2),
         ),
       });
-      expect(managerCanSubmitReview(r, 'mgr1'), isFalse);
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isFalse);
     });
 
     test('no on a completed month — scores are locked server-side', () {
       final r = review([rated], currentStage: ReviewStage.completed);
-      expect(managerCanSubmitReview(r, 'mgr1'), isFalse);
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isFalse);
     });
 
     test('yes even when the cursor has moved past the manager stage', () {
       // A backend that auto-advances on save would otherwise make the button
       // unreachable; a server that really disagrees answers 409 instead.
       final r = review([rated], currentStage: ReviewStage.accountHrRating);
-      expect(managerCanSubmitReview(r, 'mgr1'), isTrue);
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isTrue);
+    });
+
+    test('NO on a month that has not ended yet', () {
+      // Submitting freezes a partial rating: it advances the review and
+      // snapshots the weighted manager percentage into the computed score for
+      // a month still in progress, and the bar then disappears because the
+      // stage record exists. On 5 September, August is the live month.
+      final live = review([rated], period: const ReviewPeriod(2026, 9));
+      expect(managerCanSubmitReview(live, 'mgr1', now: now), isFalse,
+          reason: 'September has not finished on 5 September');
+    });
+
+    test('and NO on a future month, however well rated', () {
+      final ahead = review([rated], period: const ReviewPeriod(2026, 12));
+      expect(managerCanSubmitReview(ahead, 'mgr1', now: now), isFalse);
+    });
+
+    test('yes on an older month — a late submission is still allowed', () {
+      // The rule closes the FUTURE direction only. A manager catching up on a
+      // month they missed must not be blocked.
+      final old = review([rated], period: const ReviewPeriod(2026, 5));
+      expect(managerCanSubmitReview(old, 'mgr1', now: now), isTrue);
     });
   });
 

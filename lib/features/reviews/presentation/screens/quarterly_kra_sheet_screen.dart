@@ -106,7 +106,17 @@ IconData _reviewerIcon(KraReviewer r) {
 /// signed-in user's own sheet.
 class QuarterlyKraSheetScreen extends ConsumerStatefulWidget {
   final String? employeeId;
-  const QuarterlyKraSheetScreen({super.key, this.employeeId});
+
+  /// Injectable clock, for the month-ratability gates.
+  ///
+  /// Whether a month may be rated depends on today's date, so the gates that
+  /// enforce it cannot be tested deterministically against the real clock —
+  /// they would assert something different every month. Null means
+  /// `DateTime.now()`, so production is unaffected.
+  @visibleForTesting
+  final DateTime? clock;
+
+  const QuarterlyKraSheetScreen({super.key, this.employeeId, this.clock});
 
   @override
   ConsumerState<QuarterlyKraSheetScreen> createState() =>
@@ -117,6 +127,12 @@ class _QuarterlyKraSheetScreenState
     extends ConsumerState<QuarterlyKraSheetScreen> {
   ReviewPeriod? _anchor;
   bool _saving = false;
+
+  /// Now, as the ratability gates see it. Read through a getter rather than
+  /// captured in `initState` so a sheet left open across midnight — or across
+  /// a month boundary, which is exactly when this rule changes — re-evaluates
+  /// instead of holding a stale answer.
+  DateTime get _now => widget.clock ?? DateTime.now();
 
   /// Locally-attached proof files, one per KRA, keyed by "reviewId|rowId".
   /// Kept only for this session — there's no upload endpoint yet, so the file
@@ -228,6 +244,18 @@ class _QuarterlyKraSheetScreenState
   // per-review — never per-sheet.
   bool _canEditSelf(MonthlyReview r, ReviewScope? scope) {
     if (scope == null || r.isComplete) return false;
+    // A month that has not ENDED cannot be rated by anyone, including its own
+    // employee. Enforced here as well as in isCellOpenForEntry because this
+    // gate feeds `_submittableReviews`, and that is a far worse failure than an
+    // open cell: with a score already present for the live month, the "Submit
+    // self-rating" bar appeared, its dialog named that month, and confirming
+    // advanced an unfinished month to the reporting-manager stage and notified
+    // the manager and HR. Irreversible from the employee's side.
+    //
+    // The gate is still needed after the cell fix, because scores written for
+    // the live month BEFORE that fix shipped are already in the database and
+    // the submit loop would go on offering them.
+    if (!r.period.isRatableOn(_now)) return false;
     // Some organisations run a pipeline with no self-rating at all. Checked
     // before identity: under that flow it is not that someone ELSE rates the
     // employee, it is that the stage does not exist.
@@ -450,7 +478,7 @@ class _QuarterlyKraSheetScreenState
           ? const []
           : [
               for (final r in reviews.whereType<MonthlyReview>())
-                if (managerCanSubmitReview(r, scope.userId)) r,
+                if (managerCanSubmitReview(r, scope.userId, now: _now)) r,
             ];
 
   /// The manager-submit action, or null when there is nothing to submit — which
@@ -1185,7 +1213,20 @@ int managerRatedKraCount(MonthlyReview r) => managerAssignedKras(r)
 /// The identity test requires a NON-EMPTY id on both sides. A review with a
 /// blank `managerId` would otherwise match a viewer with a blank `userId` and
 /// hand them the submit — unlikely, but it fails open, so it is ruled out here.
-bool managerCanSubmitReview(MonthlyReview r, String managerUserId) =>
+bool managerCanSubmitReview(
+  MonthlyReview r,
+  String managerUserId, {
+  required DateTime now,
+}) =>
+    // A month that has not ended must not be submitted. Submitting freezes a
+    // partial rating: it advances the review, snapshots the weighted manager
+    // percentage into the computed score, and makes the bar vanish (the
+    // stage-record test below goes false) before the month it covers is over.
+    //
+    // Note what was NOT wrong: the POST targets the right review id and the
+    // confirmation dialog names the right month. The defect is purely that it
+    // was offered too early.
+    r.period.isRatableOn(now) &&
     !r.isComplete &&
     managerUserId.isNotEmpty &&
     (r.managerId ?? '').isNotEmpty &&
@@ -2743,7 +2784,7 @@ class _GridState extends State<_Grid> {
     // holding it up. A future month shows nothing at all; a started month
     // still waiting on the employee says so.
     if (!open) {
-      if (isFutureMonth(widget.months[monthIdx], widget.now)) {
+      if (isNotYetRatableMonth(widget.months[monthIdx], widget.now)) {
         return Text(_fmt(null),
             style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -4375,18 +4416,28 @@ List<String> kraNamesWithoutRaterInFlow(
   return names;
 }
 
-/// Whether a month has not begun yet.
-bool isFutureMonth(ReviewPeriod m, DateTime now) =>
-    m.year > now.year || (m.year == now.year && m.month > now.month);
+/// Whether [m] cannot be rated yet as of [now] — because it has not ENDED.
+///
+/// This replaced `isFutureMonth`, whose name was the bug. It tested "has this
+/// month not STARTED", which lets the CURRENT calendar month through: on
+/// 9 September the September Self cell was open, editable, and
+/// `saveStageScores` persisted a rating for a month with twenty days still to
+/// run. The name read as already-satisfied to anyone scanning it, which is how
+/// it survived several passes over this same file.
+///
+/// Delegates to [ReviewPeriod.isRatableOn] so there is exactly one definition
+/// of "ratable" and this cannot drift from the banner, the card or the picker.
+bool isNotYetRatableMonth(ReviewPeriod m, DateTime now) => !m.isRatableOn(now);
 
 /// Whether one cell is OPEN for entry yet — independently of WHO is looking.
 ///
 /// The edit gates answer "are you the right person?". This answers "is there
 /// anything to do yet?", and both must hold. Two rules:
 ///
-///   * A month that has not started has nothing to rate. The sheet always shows
-///     a whole quarter, so on 29 August it renders September — and September
-///     was offering reviewers a Rate button for work nobody had done.
+///   * A month that has not ENDED has nothing to rate. The sheet always shows
+///     a whole quarter, so through August it renders September — and September
+///     was offering a live, writable Self cell for a month still in progress.
+///     "Not started" was the old test, and it let the current month through.
 ///   * Everything downstream of the self-rating needs that self-rating to
 ///     exist, PER KRA. A reviewer rating first inverts the pipeline: their
 ///     score is meant to moderate the employee's, and the reporting manager is
@@ -4403,7 +4454,7 @@ bool isCellOpenForEntry({
   required DateTime now,
   ReviewFlow flow = ReviewFlow.standard,
 }) {
-  if (isFutureMonth(month, now)) return false;
+  if (isNotYetRatableMonth(month, now)) return false;
   if (stage == ReviewStage.selfRating) return true;
 
   // The self-first ordering only means anything in a flow that HAS a

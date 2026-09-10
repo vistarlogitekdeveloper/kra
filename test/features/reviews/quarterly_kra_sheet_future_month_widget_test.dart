@@ -8,16 +8,23 @@ import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 import 'package:vistar_app/features/reviews/data/models/row_score.dart';
 import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_sheet_screen.dart';
 
-/// The reported sheet, rendered: Q2 on 29 August, July self-rated, August not,
-/// September not yet begun. Reviewers were offered a "Rate" button on both
-/// August and September.
+/// The reported sheet, rendered: Q2 with July self-rated, August not, and
+/// September still running. Reviewers were offered a "Rate" button on months
+/// nobody could rate yet.
+///
+/// The clock sits in SEPTEMBER, so August is the month under review and
+/// September is the live one. It used to sit on 29 August and treat August as
+/// ratable, which assumed a month could be scored before it ended — the defect
+/// that let a September self-rating be written on 9 September.
 void main() {
   const months = [
     ReviewPeriod(2026, 7),
     ReviewPeriod(2026, 8),
     ReviewPeriod(2026, 9),
   ];
-  final now = DateTime(2026, 8, 29);
+  // August is the month under review; September has not ended, so it stays
+  // closed to everyone; July is older and open for a late entry.
+  final now = DateTime(2026, 9, 5);
 
   MonthlyKraRow row({double? selfValue}) {
     var r = const MonthlyKraRow(
@@ -53,14 +60,14 @@ void main() {
 
   testWidgets(
       'the reporting manager gets no Rate button for an un-self-rated '
-      'August or an unstarted September', (tester) async {
+      'August or a still-running September', (tester) async {
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
       now: now,
       months: months,
       reviews: [
         review(months[0], selfValue: 100), // July done
         review(months[1]), // August: nobody has self-rated
-        review(months[2]), // September: not started
+        review(months[2]), // September: still running
       ],
       editableManager: true,
     )));
@@ -107,14 +114,14 @@ void main() {
       management: true,
     );
     // Self-rating August opens exactly one more Management cell. September is
-    // still closed because the month has not started.
+    // still closed because the month has not ENDED.
     expect(julyAndAugust, onlyJuly + 1);
   });
 
-  testWidgets('a future month never opens for the employee either',
+  testWidgets('the live month never opens for the employee either',
       (tester) async {
-    // September is self-rated in the data but has not begun, so it must add no
-    // Self affordance.
+    // September carries a self score in the data but has not ended, so it must
+    // add no Self affordance. This is the case that was writable in production.
     final withoutSeptember = await pencils(
       tester,
       [
@@ -134,6 +141,6 @@ void main() {
       self: true,
     );
     expect(withSeptember, withoutSeptember,
-        reason: 'a month that has not started must stay closed');
+        reason: 'a month that has not ENDED must stay closed');
   });
 }
