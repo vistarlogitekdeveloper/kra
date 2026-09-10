@@ -6,6 +6,7 @@ import '../../../../../../employee/presentation/widgets/_formatters.dart';
 import '../../../../../data/models/manager_review_detail.dart';
 import '../../../../../data/models/monthly_score.dart';
 import '../../../../../data/models/review_row.dart';
+import 'matrix_view_responsive.dart';
 import 'readonly_score_cell.dart';
 import 'score_cell.dart';
 
@@ -19,11 +20,15 @@ class MatrixAccordionView extends StatelessWidget {
   final void Function(String monthlyScoreId, double? rating) onScoreChanged;
   final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
+  /// Clock for the month-ratability rule.
+  final DateTime now;
+
   const MatrixAccordionView({
     super.key,
     required this.review,
     required this.onScoreChanged,
     required this.onRemarkChanged,
+    required this.now,
   });
 
   @override
@@ -39,6 +44,7 @@ class MatrixAccordionView extends StatelessWidget {
               months: review.cycle.months,
               onScoreChanged: onScoreChanged,
               onRemarkChanged: onRemarkChanged,
+              now: now,
             ),
             const SizedBox(height: 10),
           ],
@@ -54,11 +60,14 @@ class _RowCard extends StatelessWidget {
   final void Function(String monthlyScoreId, double? rating) onScoreChanged;
   final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
+  final DateTime now;
+
   const _RowCard({
     required this.row,
     required this.months,
     required this.onScoreChanged,
     required this.onRemarkChanged,
+    required this.now,
   });
 
   /// Headline summary number — the row's average of filled manager
@@ -66,10 +75,7 @@ class _RowCard extends StatelessWidget {
   /// expanding.
   double? _rowAverage() {
     final scored = row.monthlyScores
-        .where((c) =>
-            !c.isNotApplicable &&
-            c.monthStatus == ReviewMonthStatus.open &&
-            c.managerRating != null)
+        .where((c) => c.isRatableOn(now) && c.managerRating != null)
         .map((c) => c.managerRating!)
         .toList();
     if (scored.isEmpty) return null;
@@ -82,8 +88,10 @@ class _RowCard extends StatelessWidget {
     int filled = 0;
     int needed = 0;
     for (final c in row.monthlyScores) {
-      if (c.isNotApplicable) continue;
-      if (c.monthStatus != ReviewMonthStatus.open) continue;
+      // Same predicate as the screen footer and isComplete. When these
+      // disagreed the chip promised three cells while only two could be
+      // filled, so a row could never read as done.
+      if (!c.isRatableOn(now)) continue;
       needed++;
       if (c.managerRating != null) filled++;
     }
@@ -216,6 +224,7 @@ class _RowCard extends StatelessWidget {
                 month: months[i],
                 onScoreChanged: onScoreChanged,
                 onRemarkChanged: onRemarkChanged,
+                now: now,
               ),
               if (i != months.length - 1) const SizedBox(height: 16),
             ],
@@ -232,11 +241,14 @@ class _MonthBlock extends StatelessWidget {
   final void Function(String monthlyScoreId, double? rating) onScoreChanged;
   final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
+  final DateTime now;
+
   const _MonthBlock({
     required this.row,
     required this.month,
     required this.onScoreChanged,
     required this.onRemarkChanged,
+    required this.now,
   });
 
   @override
@@ -248,25 +260,31 @@ class _MonthBlock extends StatelessWidget {
         monthId: month.id,
         monthLabel: month.monthLabel,
         monthStatus: month.status,
+        monthDate: month.monthDate,
       ),
     );
     if (cell.monthlyScoreId.isEmpty) return const SizedBox.shrink();
     final isFeed = row.scoreSource == ScoreSource.feed;
     final monthClosed = month.status != ReviewMonthStatus.open;
-    final cellWidget = (isFeed || monthClosed || cell.isNotApplicable)
-        ? ReadonlyScoreCell(
-            key: ValueKey('ro_${cell.monthlyScoreId}'),
-            cell: cell,
-            maxScore: row.maxScore,
-            isFeedRow: isFeed,
-          )
-        : ScoreCell(
-            key: ValueKey(cell.monthlyScoreId),
-            cell: cell,
-            maxScore: row.maxScore,
-            onScoreChanged: (v) => onScoreChanged(cell.monthlyScoreId, v),
-            onRemarkChanged: (v) => onRemarkChanged(cell.monthlyScoreId, v),
-          );
+    // A month still running is read-only too, but for a different reason —
+    // see the table view.
+    final monthNotEnded = !monthEnded(month, now);
+    final cellWidget =
+        (isFeed || monthClosed || monthNotEnded || cell.isNotApplicable)
+            ? ReadonlyScoreCell(
+                key: ValueKey('ro_${cell.monthlyScoreId}'),
+                cell: cell,
+                maxScore: row.maxScore,
+                isFeedRow: isFeed,
+                monthNotEnded: monthNotEnded,
+              )
+            : ScoreCell(
+                key: ValueKey(cell.monthlyScoreId),
+                cell: cell,
+                maxScore: row.maxScore,
+                onScoreChanged: (v) => onScoreChanged(cell.monthlyScoreId, v),
+                onRemarkChanged: (v) => onRemarkChanged(cell.monthlyScoreId, v),
+              );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -284,7 +302,7 @@ class _MonthBlock extends StatelessWidget {
                   letterSpacing: 0.5,
                 ),
               ),
-              if (monthClosed) ...[
+              if (monthClosed || monthNotEnded) ...[
                 const SizedBox(width: 6),
                 Icon(
                   Icons.lock_rounded,

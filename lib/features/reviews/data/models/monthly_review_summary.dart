@@ -18,6 +18,17 @@ class MonthlyReviewSummary {
   final String employeeCode;
   final String? employeeGrade;
 
+  /// The employee's job designation — "Cluster Manager", "Sr. Accountant".
+  ///
+  /// Stored in the backend's `position` column and surfaced elsewhere as
+  /// `Employee.position`; named for what it IS on screen rather than for the
+  /// column, because "position" reads as an index in list code.
+  ///
+  /// Null when the API has not shipped it yet — the list query has to select
+  /// `e.position` explicitly. Callers must treat null as "unknown" and render
+  /// nothing, never a placeholder.
+  final String? employeeDesignation;
+
   /// The employee's reporting manager. [managerId] is what decides whether the
   /// caller may rate this review (a relationship, not a role) — see
   /// [needsActionBy]. Null when nobody is mapped as their manager.
@@ -64,6 +75,7 @@ class MonthlyReviewSummary {
     required this.employeeName,
     required this.employeeCode,
     this.employeeGrade,
+    this.employeeDesignation,
     this.managerId,
     this.managerName,
     required this.year,
@@ -95,6 +107,13 @@ class MonthlyReviewSummary {
         employeeName: JsonParse.parseString(json['employeeName']) ?? '',
         employeeCode: JsonParse.parseString(json['employeeCode']) ?? '',
         employeeGrade: JsonParse.parseString(json['employeeGrade']),
+        // Dual-read: the summary endpoint names it employeeDesignation, while
+        // anything serialising an employee row directly still calls it
+        // position. Same value either way.
+        employeeDesignation:
+            JsonParse.parseString(json['employeeDesignation']) ??
+                JsonParse.parseString(json['employeePosition']) ??
+                JsonParse.parseString(json['position']),
         managerId: JsonParse.parseString(json['managerId']),
         managerName: JsonParse.parseString(json['managerName']),
         year: JsonParse.parseInt(json['year']) ?? 0,

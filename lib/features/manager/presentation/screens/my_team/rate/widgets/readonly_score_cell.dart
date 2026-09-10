@@ -19,11 +19,16 @@ class ReadonlyScoreCell extends StatelessWidget {
   final double maxScore;
   final bool isFeedRow;
 
+  /// The month has not finished yet, so nobody can rate it — as opposed to
+  /// HR having locked it.
+  final bool monthNotEnded;
+
   const ReadonlyScoreCell({
     super.key,
     required this.cell,
     required this.maxScore,
     this.isFeedRow = false,
+    this.monthNotEnded = false,
   });
 
   @override
@@ -87,6 +92,11 @@ class ReadonlyScoreCell extends StatelessWidget {
     if (isFeedRow) return AppStrings.managerRateReadOnlyAuto.toUpperCase();
     if (cell.monthStatus != ReviewMonthStatus.open) {
       return AppStrings.managerRateReadOnlyLocked.toUpperCase();
+    }
+    // Checked AFTER the HR lock: a month can be both, and "Locked" is the
+    // more actionable of the two.
+    if (monthNotEnded) {
+      return AppStrings.managerRateReadOnlyMonthOpen.toUpperCase();
     }
     return '';
   }

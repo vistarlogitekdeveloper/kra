@@ -365,6 +365,49 @@ with `withData:` superseded by `PlatformFile.readAsBytes()`.
 - `userFacingError` at every catch site, so an `ApiError` dump never reaches a user.
 - Mutex-guarded single-flight token refresh with forced logout on failure (§10).
 
+## The review month is the PREVIOUS calendar month
+
+A month is rated once it has **ended**: through September you rate August. One
+definition — `ReviewPeriod.openForRating`, with `isRatableOn` and
+`clampToRatable` beside it in
+[`monthly_review.dart`](lib/features/reviews/data/models/monthly_review.dart).
+Never re-derive it.
+
+The deadline schedule is the proof this is the design rather than a preference:
+self-rating is due on the **10th**, which only makes sense as the 10th of the
+month *after* the one being rated.
+
+Six places used to answer this independently, and disagreed. Two were display —
+the home card rendered the API's `monthLabel` verbatim while the banner used a
+different path, so fixing one left the other showing September. Four were the
+**write** path: `isFutureMonth` asked "has this month *started*", so the live
+month's cells were editable, and a score for an unfinished month was persisted,
+submittable, and counted toward the incentive.
+
+The manager matrix was the worst of them. Every cycle month is seeded `OPEN`,
+and `isComplete` treated OPEN as *required*, so submit stayed disabled until the
+manager invented a rating for a month still in progress — and that number was
+POSTed. Cells now go through
+[`MonthlyScore.isRatableOn`](lib/features/manager/data/models/monthly_score.dart).
+Because the server's `MANAGER_RATED_ALL` transition is cycle-level and
+all-or-nothing, the submit CTA is withheld until the cycle's last month closes,
+with dated copy; ratings auto-save throughout, so only the transition waits.
+
+Two traps worth keeping in mind:
+
+- `copyWith` **must** carry `monthDate`. It runs on every keystroke, and
+  dropping it nulls the date on first edit, after which `isRatableOn` refuses
+  the cell and locks the manager out of the matrix.
+- "Every ratable cell is rated" is **vacuously true** when nothing is ratable
+  yet, which would enable submit on an empty review. `isComplete` therefore
+  also requires that at least one cell was ratable.
+
+Server-side root cause: `findCurrentMonth` in
+`dist/features/employee/employee.service.js` still matches *today's* month.
+Patch: [`docs/install_review_month_shift.mjs`](docs/install_review_month_shift.mjs),
+verified 2/6 → 6/6 including the January rollover. The client **clamps** whatever
+the server sends, so the screens are correct without it.
+
 **Open, deliberately unresolved** (product decisions, not code debt):
 
 - `HR_ADMIN` holds the Accounts seat on the client but not the server —

@@ -6,6 +6,7 @@ import '../../../../../../employee/presentation/widgets/_formatters.dart';
 import '../../../../../data/models/manager_review_detail.dart';
 import '../../../../../data/models/monthly_score.dart';
 import '../../../../../data/models/review_row.dart';
+import 'matrix_view_responsive.dart';
 import 'month_column_header.dart';
 import 'readonly_score_cell.dart';
 import 'score_cell.dart';
@@ -22,11 +23,15 @@ class MatrixTableView extends StatelessWidget {
   final void Function(String monthlyScoreId, double? rating) onScoreChanged;
   final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
+  /// Clock for the month-ratability rule.
+  final DateTime now;
+
   const MatrixTableView({
     super.key,
     required this.review,
     required this.onScoreChanged,
     required this.onRemarkChanged,
+    required this.now,
   });
 
   @override
@@ -91,6 +96,7 @@ class MatrixTableView extends StatelessWidget {
               monthFlex: monthFlex,
               onScoreChanged: onScoreChanged,
               onRemarkChanged: onRemarkChanged,
+              now: now,
             ),
             if (i != review.rows.length - 1)
               Divider(
@@ -114,6 +120,8 @@ class _DataRow extends StatelessWidget {
   final void Function(String monthlyScoreId, double? rating) onScoreChanged;
   final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
 
+  final DateTime now;
+
   const _DataRow({
     required this.row,
     required this.months,
@@ -121,6 +129,7 @@ class _DataRow extends StatelessWidget {
     required this.monthFlex,
     required this.onScoreChanged,
     required this.onRemarkChanged,
+    required this.now,
   });
 
   @override
@@ -141,6 +150,7 @@ class _DataRow extends StatelessWidget {
                   month: month,
                   onScoreChanged: onScoreChanged,
                   onRemarkChanged: onRemarkChanged,
+                  now: now,
                 ),
               ),
             ),
@@ -227,12 +237,14 @@ class _CellPicker extends StatelessWidget {
   final ManagerReviewMonth month;
   final void Function(String monthlyScoreId, double? rating) onScoreChanged;
   final void Function(String monthlyScoreId, String? remark) onRemarkChanged;
+  final DateTime now;
 
   const _CellPicker({
     required this.row,
     required this.month,
     required this.onScoreChanged,
     required this.onRemarkChanged,
+    required this.now,
   });
 
   @override
@@ -244,6 +256,7 @@ class _CellPicker extends StatelessWidget {
         monthId: month.id,
         monthLabel: month.monthLabel,
         monthStatus: month.status,
+        monthDate: month.monthDate,
       ),
     );
     if (cell.monthlyScoreId.isEmpty) {
@@ -251,12 +264,18 @@ class _CellPicker extends StatelessWidget {
     }
     final isFeed = row.scoreSource == ScoreSource.feed;
     final monthClosed = month.status != ReviewMonthStatus.open;
-    if (isFeed || monthClosed || cell.isNotApplicable) {
+    // A month still running is read-only for the same reason a locked one is:
+    // there is nothing to rate yet. Kept separate from monthClosed so the cell
+    // can say WHICH it is — "Locked" would send the manager to HR over a month
+    // that resolves itself on the 1st.
+    final monthNotEnded = !monthEnded(month, now);
+    if (isFeed || monthClosed || monthNotEnded || cell.isNotApplicable) {
       return ReadonlyScoreCell(
         key: ValueKey('ro_${cell.monthlyScoreId}'),
         cell: cell,
         maxScore: row.maxScore,
         isFeedRow: isFeed,
+        monthNotEnded: monthNotEnded,
       );
     }
     return ScoreCell(

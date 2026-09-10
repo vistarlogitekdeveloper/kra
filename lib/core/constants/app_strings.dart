@@ -1170,6 +1170,19 @@ class AppStrings {
   static const String managerRateCommentHint =
       'Leave an overall comment for the employee…';
   static const String managerRateReadOnlyLocked = 'Locked';
+
+  /// Shown on a cell whose month has not finished yet. Distinct from
+  /// "Locked", which means HR closed the month early — this one resolves by
+  /// itself when the month ends, and saying "Locked" would send the manager
+  /// to HR for nothing.
+  static const String managerRateReadOnlyMonthOpen = 'In progress';
+
+  /// Why the submit button is withheld mid-quarter. Names the date so it reads
+  /// as a schedule rather than a fault — the manager has done nothing wrong,
+  /// and their ratings are already saved.
+  static String managerRateSubmitOpensOn(String date, String lastMonth) =>
+      'Submit opens $date, once $lastMonth closes. Your ratings are saved '
+      'as you go.';
   static const String managerRateReadOnlyAuto = 'Auto';
   static const String managerRateOutOfRange =
       'Score must be between 0 and the item\'s maximum.';

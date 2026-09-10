@@ -1,5 +1,6 @@
 import '../../../../core/api/json_parse.dart';
 import '../../../employee/data/models/enums.dart';
+import '../../../reviews/data/models/monthly_review.dart';
 
 /// One cell in the manager-rate matrix — (KRA item × month).
 ///
@@ -19,6 +20,14 @@ class MonthlyScore {
   final String monthLabel;
   final ReviewMonthStatus monthStatus;
 
+  /// The calendar month this cell belongs to.
+  ///
+  /// Needed because [monthLabel] is a display string and [monthStatus] is an
+  /// HR flag — neither can answer "has this month ended yet". The live detail
+  /// query includes the whole month row (`include: { month: true }`), so the
+  /// payload carries it.
+  final DateTime? monthDate;
+
   final double? selfRating;
   final String? selfRemark;
 
@@ -37,6 +46,7 @@ class MonthlyScore {
     required this.monthId,
     required this.monthLabel,
     this.monthStatus = ReviewMonthStatus.open,
+    this.monthDate,
     this.selfRating,
     this.selfRemark,
     this.managerRating,
@@ -48,6 +58,30 @@ class MonthlyScore {
   /// True if the cell can be edited by the manager right now.
   bool get isEditable =>
       !isNotApplicable && monthStatus == ReviewMonthStatus.open;
+
+  /// Whether this cell may be rated as of [now].
+  ///
+  /// [isEditable] answers only "is this month unlocked and applicable" — it
+  /// knows about HR's explicit LOCKED flag and about N/A, and nothing about
+  /// the calendar. Every month of a cycle is seeded OPEN at creation, so on
+  /// 9 September the September column was editable, and `isComplete` treated
+  /// it as MANDATORY: the manager could not submit until they had invented a
+  /// rating for a month with twenty days still to run, and that fabricated
+  /// number was POSTed and landed in the incentive.
+  ///
+  /// Derives the calendar half from [ReviewPeriod.isRatableOn] rather than
+  /// restating it, so this cannot drift from the sheet, the card or the picker.
+  ///
+  /// Returns false when [monthDate] is unknown. That is the safe direction: a
+  /// cell whose month cannot be identified must not be scored, and the parse
+  /// is pinned against the live payload shape by tests, so in practice the
+  /// date is always present.
+  bool isRatableOn(DateTime now) {
+    if (!isEditable) return false;
+    final d = monthDate;
+    if (d == null) return false;
+    return ReviewPeriod.fromDate(d).isRatableOn(now);
+  }
 
   /// True once the manager has supplied a rating (or N/A was flagged
   /// upstream). Drives the per-cell "valid" / "missing" UI state.
@@ -71,6 +105,8 @@ class MonthlyScore {
           JsonParse.parseString(month?['status']) ??
               JsonParse.parseString(json['monthStatus']) ??
               'OPEN'),
+      monthDate: JsonParse.parseDate(month?['monthDate']) ??
+          JsonParse.parseDate(json['monthDate']),
       selfRating: JsonParse.parseDouble(json['selfRating']),
       selfRemark: JsonParse.parseString(json['selfRemark']),
       managerRating: JsonParse.parseDouble(json['managerRating']),
@@ -85,6 +121,7 @@ class MonthlyScore {
         'monthId': monthId,
         'monthLabel': monthLabel,
         'monthStatus': monthStatus.toApiString(),
+        'monthDate': monthDate?.toIso8601String(),
         'selfRating': selfRating,
         'selfRemark': selfRemark,
         'managerRating': managerRating,
@@ -98,6 +135,7 @@ class MonthlyScore {
     String? monthId,
     String? monthLabel,
     ReviewMonthStatus? monthStatus,
+    DateTime? monthDate,
     Object? selfRating = _sentinel,
     Object? selfRemark = _sentinel,
     Object? managerRating = _sentinel,
@@ -110,6 +148,10 @@ class MonthlyScore {
       monthId: monthId ?? this.monthId,
       monthLabel: monthLabel ?? this.monthLabel,
       monthStatus: monthStatus ?? this.monthStatus,
+      // MUST be carried. copyWith runs on every cell edit, so dropping it
+      // would null the date on the first keystroke and isRatableOn would then
+      // refuse the cell — locking the manager out of the matrix entirely.
+      monthDate: monthDate ?? this.monthDate,
       selfRating: identical(selfRating, _sentinel)
           ? this.selfRating
           : selfRating as double?,

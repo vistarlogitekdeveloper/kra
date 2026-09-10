@@ -24,6 +24,10 @@ class QuarterlyReviewMatrix extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         MatrixViewResponsive(
+          // One clock for the whole matrix, from the same state the
+          // completeness check reads — so the cells the manager can edit and
+          // the cells the footer counts can never disagree.
+          now: state.now,
           review: review,
           onScoreChanged: (id, rating) =>
               ref.read(managerRateProvider.notifier).setCellRating(id, rating),

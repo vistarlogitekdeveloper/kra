@@ -448,12 +448,36 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                   children: [
                     Text(
                       summary.employeeName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
                     ),
+                    // Designation, when the API supplies one. Rendered only
+                    // when present — a placeholder like "—" on every card
+                    // would be noise, and this is null on any deployment whose
+                    // list query has not been updated to select it.
+                    //
+                    // Ellipsised rather than wrapped: the card is a fixed-height
+                    // grid tile, so a two-line title would push the stage pill
+                    // out of alignment across the row.
+                    if ((summary.employeeDesignation ?? '').trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          summary.employeeDesignation!.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 6),
                     Row(
                       children: [

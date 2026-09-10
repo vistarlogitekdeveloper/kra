@@ -19,6 +19,7 @@ import 'manager_dashboard_providers.dart';
 import 'manager_review_providers.dart';
 import 'manager_team_providers.dart';
 import '../../../../core/observability/app_logger.dart';
+import '../../../reviews/data/models/monthly_review.dart';
 
 final managerRateRepositoryProvider = Provider<ManagerRateRepository>((ref) {
   // Org-scoped: recreated whenever the caller switches organisation, which
@@ -76,7 +77,18 @@ class ManagerRateState {
   TransitionError? get lastTransitionError =>
       lastSubmitResponse?.transitionError;
 
+  /// Injectable clock for the month-ratability rule.
+  ///
+  /// Whether a month may be rated depends on today's date, so every gate that
+  /// enforces it needs a clock that a test can pin — otherwise the matrix
+  /// asserts something different every month. Null means [DateTime.now].
+  final DateTime? clock;
+
+  /// Now, as the ratability rules see it.
+  DateTime get now => clock ?? DateTime.now();
+
   const ManagerRateState({
+    this.clock,
     this.review,
     this.reviewId,
     this.mode = ManagerRateMode.create,
@@ -92,20 +104,75 @@ class ManagerRateState {
     this.lastSubmitResponse,
   });
 
-  /// True iff every MANAGER-editable cell has a rating. Submit
-  /// disables until this is true — server enforces the same gate.
+  /// True iff every cell the manager can rate RIGHT NOW has a rating.
+  ///
+  /// "Right now" is the fix. This used to test `monthStatus == open`, and
+  /// every month of a cycle is seeded OPEN — so a month still in progress
+  /// counted as required. The manager could not submit until they had invented
+  /// a rating for it, the counter read "0 of 9" when only 3 cells were
+  /// legitimately fillable, and the fabricated number was POSTed into the
+  /// incentive.
+  ///
+  /// Goes through [MonthlyScore.isRatableOn] rather than restating the rule,
+  /// which is also what keeps it in step with the submit payload below.
   bool get isComplete {
     final r = review;
     if (r == null) return false;
+    final at = now;
+    var sawRatable = false;
     for (final row in r.rows) {
       if (row.scoreSource == ScoreSource.feed) continue;
       for (final cell in row.monthlyScores) {
-        if (cell.isNotApplicable) continue;
-        if (cell.monthStatus != ReviewMonthStatus.open) continue;
+        if (!cell.isRatableOn(at)) continue;
+        sawRatable = true;
         if (cell.managerRating == null) return false;
       }
     }
-    return true;
+    // "Every ratable cell is rated" is vacuously TRUE when nothing is ratable,
+    // which would enable submit on a review with no scores at all — early in a
+    // cycle, before its first month has ended. Complete has to mean there was
+    // something to complete.
+    return sawRatable;
+  }
+
+  /// The last month of the cycle, or null when the cycle carries none.
+  ReviewPeriod? get _lastCycleMonth {
+    final months = review?.cycle.months ?? const [];
+    ReviewPeriod? last;
+    for (final m in months) {
+      final d = m.monthDate;
+      if (d == null) continue;
+      final p = ReviewPeriod.fromDate(d);
+      if (last == null || p > last) last = p;
+    }
+    return last;
+  }
+
+  /// Whether the whole quarter has finished, so a submission can cover it.
+  ///
+  /// Submitting is a CYCLE-level act: the server only moves a review to
+  /// MANAGER_RATED_ALL when every non-N/A cell across every month is rated.
+  /// Offering the button mid-quarter therefore cannot succeed — the transition
+  /// is refused, the error is swallowed, and the manager lands on the
+  /// partial-success screen wondering whether their work was saved.
+  ///
+  /// Nothing is lost by waiting: the matrix auto-saves every rating as it is
+  /// typed, so withholding the button delays only the state transition, never
+  /// the work.
+  bool get quarterEnded {
+    final last = _lastCycleMonth;
+    if (last == null) return true; // nothing to wait for
+    return last.isRatableOn(now);
+  }
+
+  /// The day the submit button becomes available — the 1st of the month after
+  /// the cycle ends. Null once it already has.
+  DateTime? get submitOpensOn {
+    if (quarterEnded) return null;
+    final last = _lastCycleMonth;
+    if (last == null) return null;
+    final open = last.next;
+    return DateTime(open.year, open.month, 1);
   }
 
   /// Live weighted-total estimate (0–100). Server is authoritative —
@@ -130,6 +197,7 @@ class ManagerRateState {
   }
 
   ManagerRateState copyWith({
+    DateTime? clock,
     ManagerReviewDetail? review,
     String? reviewId,
     ManagerRateMode? mode,
@@ -145,6 +213,7 @@ class ManagerRateState {
     Object? lastSubmitResponse = _sentinel,
   }) {
     return ManagerRateState(
+      clock: clock ?? this.clock,
       review: review ?? this.review,
       reviewId: reviewId ?? this.reviewId,
       mode: mode ?? this.mode,
@@ -406,8 +475,10 @@ class ManagerRateNotifier extends StateNotifier<ManagerRateState> {
     for (final row in review.rows) {
       if (row.scoreSource == ScoreSource.feed) continue;
       for (final cell in row.monthlyScores) {
-        if (cell.isNotApplicable) continue;
-        if (cell.monthStatus != ReviewMonthStatus.open) continue;
+        // Same rule as isComplete, through the same predicate: never POST a
+        // rating for a month that has not ended. Restating it here is what let
+        // the two drift in the first place.
+        if (!cell.isRatableOn(state.now)) continue;
         scores.add(ManagerRateScore(
           monthlyScoreId: cell.monthlyScoreId,
           managerRating: cell.managerRating,
