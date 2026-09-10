@@ -53,17 +53,34 @@ class MatrixViewResponsive extends StatelessWidget {
   }
 }
 
-/// Whether [month] has finished as of [now], and so may be rated.
+/// Whether [month] is the one currently OPEN for rating as of [now].
 ///
 /// Lives here rather than in either view because both need it and neither
-/// owns it. Defers to [ReviewPeriod.isRatableOn] so the matrix cannot drift
-/// from the quarterly sheet or the employee home card.
+/// owns it. Defers to [ReviewPeriod.isOpenForRatingOn] so the matrix cannot
+/// drift from the quarterly sheet or the employee home card.
 ///
-/// A month with no date is treated as NOT ended: the matrix would otherwise
+/// Was `monthEnded`, which asked only whether the month had FINISHED and so
+/// left every earlier month writable: a manager rating August could still
+/// rewrite July. The submit rules still ask "has ended" — see
+/// [MonthlyScore.isRatableOn] — because those are a different question.
+///
+/// A month with no date is treated as CLOSED: the matrix would otherwise
 /// offer a writable cell for a month it cannot identify, which is the exact
 /// failure this rule exists to stop.
-bool monthEnded(ManagerReviewMonth month, DateTime now) {
+bool monthOpenForRating(ManagerReviewMonth month, DateTime now) {
   final d = month.monthDate;
   if (d == null) return false;
-  return ReviewPeriod.fromDate(d).isRatableOn(now);
+  return ReviewPeriod.fromDate(d).isOpenForRatingOn(now);
+}
+
+/// Whether [month] has not finished yet, as opposed to having finished and
+/// had its window close afterwards.
+///
+/// Both are read-only, so this decides only the WORDING. It goes through
+/// [ReviewPeriod.isRatableOn] — the "has ended" question — which is exactly
+/// what that predicate is still for now that the edit gate has its own.
+bool monthIsFuture(ManagerReviewMonth month, DateTime now) {
+  final d = month.monthDate;
+  if (d == null) return false;
+  return !ReviewPeriod.fromDate(d).isRatableOn(now);
 }

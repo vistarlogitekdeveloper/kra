@@ -151,8 +151,13 @@ void main() {
         currentStage: ReviewStage.selfRating,
         period: const ReviewPeriod(2026, 8));
 
+    // September, so AUGUST is the open month. `afterTheQuarter` (November)
+    // would leave October open and every month in this quarter read-only,
+    // which is right for the submit tests above but defeats this one: it
+    // needs one month HR-locked and one genuinely editable.
+    final augustWindow = DateTime(2026, 9, 3);
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
-      now: afterTheQuarter,
+      now: augustWindow,
       months: months,
       reviews: [july, august, null],
       editableSelf: true,
@@ -160,9 +165,12 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    // One month is open, so the sheet still advertises Self editing.
-    expect(find.text('You can edit the Self ratings on this sheet.'),
-        findsOneWidget);
+    // One month is open, so the sheet still advertises Self editing — but
+    // August is open AND still empty, so the banner names it rather than
+    // giving the generic line. (Under the old November clock no month in
+    // this quarter was open, so nothing was ever "due".)
+    expect(find.textContaining('Rate your Aug'), findsOneWidget,
+        reason: 'the banner should name the open, unrated month');
     // Exactly two pencils: the banner's, plus August's Self cell. July's
     // locked cell and September's absent review contribute none.
     expect(find.byIcon(Icons.edit_rounded), findsNWidgets(2));

@@ -83,6 +83,22 @@ class MonthlyScore {
     return ReviewPeriod.fromDate(d).isRatableOn(now);
   }
 
+  /// Whether this cell may be EDITED as of [now] — its month is the one
+  /// currently open, not merely one that has ended. See
+  /// [ReviewPeriod.isOpenForRatingOn].
+  ///
+  /// [isRatableOn] above is deliberately left as it is: the submit rules
+  /// need "has ended". `isComplete` asks which cells were ever due, and
+  /// the cycle-level gate asks whether the LAST month has closed —
+  /// narrowing either to the open month would make submit unreachable one
+  /// month later, permanently.
+  bool isOpenForRatingOn(DateTime now) {
+    if (!isEditable) return false;
+    final d = monthDate;
+    if (d == null) return false;
+    return ReviewPeriod.fromDate(d).isOpenForRatingOn(now);
+  }
+
   /// True once the manager has supplied a rating (or N/A was flagged
   /// upstream). Drives the per-cell "valid" / "missing" UI state.
   bool get isManagerFilled => isNotApplicable || managerRating != null;

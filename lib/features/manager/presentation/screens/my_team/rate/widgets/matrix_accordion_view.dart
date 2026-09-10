@@ -268,15 +268,16 @@ class _MonthBlock extends StatelessWidget {
     final monthClosed = month.status != ReviewMonthStatus.open;
     // A month still running is read-only too, but for a different reason —
     // see the table view.
-    final monthNotEnded = !monthEnded(month, now);
+    final monthNotEditable = !monthOpenForRating(month, now);
     final cellWidget =
-        (isFeed || monthClosed || monthNotEnded || cell.isNotApplicable)
+        (isFeed || monthClosed || monthNotEditable || cell.isNotApplicable)
             ? ReadonlyScoreCell(
                 key: ValueKey('ro_${cell.monthlyScoreId}'),
                 cell: cell,
                 maxScore: row.maxScore,
                 isFeedRow: isFeed,
-                monthNotEnded: monthNotEnded,
+                monthNotEditable: monthNotEditable,
+                monthIsFuture: monthIsFuture(month, now),
               )
             : ScoreCell(
                 key: ValueKey(cell.monthlyScoreId),
@@ -302,7 +303,7 @@ class _MonthBlock extends StatelessWidget {
                   letterSpacing: 0.5,
                 ),
               ),
-              if (monthClosed || monthNotEnded) ...[
+              if (monthClosed || monthNotEditable) ...[
                 const SizedBox(width: 6),
                 Icon(
                   Icons.lock_rounded,

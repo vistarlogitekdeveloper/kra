@@ -55,6 +55,24 @@ class ReviewPeriod {
   /// calendar month and anything ahead of it.
   bool isRatableOn(DateTime now) => this <= ReviewPeriod.openForRating(now);
 
+  /// Whether this is THE month whose window is open on [now] — the only
+  /// month a rating may be ENTERED for.
+  ///
+  /// Deliberately narrower than [isRatableOn], which is also true for every
+  /// month BEFORE the open one. Both questions are legitimate and they are
+  /// not the same one:
+  ///
+  ///   * "has this month ended"  → totals, and whether a submit is due.
+  ///   * "is this month open"    → whether a cell may be typed into.
+  ///
+  /// Using the first as an edit gate is what left September's rater free to
+  /// go back and rewrite July, long after that window closed.
+  ///
+  /// Compares [key] rather than the objects: ReviewPeriod does not override
+  /// `==`, and its own doc says the key is what equality goes through.
+  bool isOpenForRatingOn(DateTime now) =>
+      key == ReviewPeriod.openForRating(now).key;
+
   /// This month, pulled back to [ReviewPeriod.openForRating] if it has not
   /// ended yet.
   ///

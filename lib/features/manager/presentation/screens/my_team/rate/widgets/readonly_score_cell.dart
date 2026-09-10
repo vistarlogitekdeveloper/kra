@@ -19,16 +19,23 @@ class ReadonlyScoreCell extends StatelessWidget {
   final double maxScore;
   final bool isFeedRow;
 
-  /// The month has not finished yet, so nobody can rate it — as opposed to
-  /// HR having locked it.
-  final bool monthNotEnded;
+  /// The calendar puts this month out of reach — as opposed to HR having
+  /// locked it. Covers BOTH directions: a month that has not started, and
+  /// one whose rating window has closed.
+  final bool monthNotEditable;
+
+  /// Which direction. Only meaningful when [monthNotEditable] is true, and
+  /// it decides the wording: a future month is "In progress", a past one is
+  /// "Window closed". One flag could not say both.
+  final bool monthIsFuture;
 
   const ReadonlyScoreCell({
     super.key,
     required this.cell,
     required this.maxScore,
     this.isFeedRow = false,
-    this.monthNotEnded = false,
+    this.monthNotEditable = false,
+    this.monthIsFuture = false,
   });
 
   @override
@@ -95,8 +102,11 @@ class ReadonlyScoreCell extends StatelessWidget {
     }
     // Checked AFTER the HR lock: a month can be both, and "Locked" is the
     // more actionable of the two.
-    if (monthNotEnded) {
-      return AppStrings.managerRateReadOnlyMonthOpen.toUpperCase();
+    if (monthNotEditable) {
+      return (monthIsFuture
+              ? AppStrings.managerRateReadOnlyMonthOpen
+              : AppStrings.managerRateReadOnlyWindowClosed)
+          .toUpperCase();
     }
     return '';
   }

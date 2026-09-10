@@ -21,7 +21,11 @@ import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_s
 /// A rule that passes alone and fails in composition is the whole reason these
 /// exist.
 void main() {
-  final now = DateTime(2026, 11, 3); // after the quarter, so nothing is future
+  // August, so JULY below is the month whose window is open. It used to be
+  // November with the comment "after the quarter, so nothing is future" —
+  // true, but no longer sufficient: a month that has ended is now read-only
+  // unless it is THE open one, and in November that is October.
+  final now = DateTime(2026, 8, 3);
   const month = ReviewPeriod(2026, 7);
 
   MonthlyKraRow rowFor({

@@ -60,19 +60,41 @@ void main() {
       }
     });
 
-    test('the LIVE month is not yet ratable — the reported defect', () {
-      // The predecessor, isFutureMonth, asked "has this month started" and so
-      // answered false for September on 9 September, leaving its Self cell
-      // open and writable.
-      expect(isNotYetRatableMonth(september, now), isTrue,
+    test('exactly ONE month is open — neither the live one nor an old one', () {
+      // Two defects, one predicate. The first predecessor, isFutureMonth,
+      // asked "has this month STARTED" and so answered false for September on
+      // 5 September, leaving its Self cell open and writable. The second,
+      // isNotYetRatableMonth, asked "has this month ENDED" — which fixed the
+      // future but left EVERY past month writable, so a manager rating August
+      // could still go back and rewrite July.
+      expect(isMonthClosedForRating(september, now), isTrue,
           reason: 'September is still running on 5 September');
-      expect(isNotYetRatableMonth(august, now), isFalse,
+      expect(isMonthClosedForRating(august, now), isFalse,
           reason: 'August has ended, so it is the month under review');
-      expect(isNotYetRatableMonth(july, now), isFalse,
-          reason: 'an older month stays open for a late entry');
-      // Across a year boundary.
-      expect(isNotYetRatableMonth(const ReviewPeriod(2027, 1), now), isTrue);
-      expect(isNotYetRatableMonth(const ReviewPeriod(2025, 12), now), isFalse);
+      expect(isMonthClosedForRating(july, now), isTrue,
+          reason: "July's window closed when August's opened — this is the "
+              'reported defect: rating August must not reopen July');
+      // Across a year boundary, in both directions.
+      expect(isMonthClosedForRating(const ReviewPeriod(2027, 1), now), isTrue);
+      expect(isMonthClosedForRating(const ReviewPeriod(2025, 12), now), isTrue);
+    });
+
+    test('the open month walks forward with the calendar', () {
+      // Pins the rule as a relationship to `now` rather than to a fixed month,
+      // so a test that happens to pass in September keeps passing in January.
+      for (final at in [
+        DateTime(2026, 9, 5),
+        DateTime(2026, 10, 1),
+        DateTime(2027, 1, 20), // year rollover: December is the open month
+      ]) {
+        final open = ReviewPeriod.openForRating(at);
+        expect(isMonthClosedForRating(open, at), isFalse,
+            reason: 'the open month at $at is ${open.key}');
+        expect(isMonthClosedForRating(open.previous, at), isTrue,
+            reason: 'the month before it has closed');
+        expect(isMonthClosedForRating(open.next, at), isTrue,
+            reason: 'the month after it has not ended');
+      }
     });
 
     test('the employee cannot self-rate the live month either', () {
@@ -139,14 +161,29 @@ void main() {
     );
   });
 
-  test('a past month with no self-rating stays closed to reviewers', () {
-    // The rule is about order, not about the calendar: rating a KRA the
-    // employee never rated inverts the pipeline whenever it happens. The
-    // employee can still go back and rate it, which reopens the cell.
+  test('a CLOSED past month is shut to everyone, self-rating included', () {
+    // This test used to assert the opposite of its last two lines, and it
+    // was right to at the time: the rule was about ORDER, not the calendar,
+    // so July stayed open for a late entry and a self-rated July stayed
+    // open to its reviewer.
+    //
+    // Both are now false. Once August's window opened, July's closed — for
+    // the employee as well as every reviewer. That is the requested
+    // behaviour, and it has a consequence worth stating in a test rather
+    // than discovering in production: a month nobody rated in time can no
+    // longer be rated at all. HR reopening it is the only route back.
     expect(open(ReviewStage.reportingManagerRating, row(), july), isFalse);
-    expect(open(ReviewStage.selfRating, row(), july), isTrue);
+    expect(open(ReviewStage.selfRating, row(), july), isFalse,
+        reason: 'a late self-entry for July is no longer possible');
     expect(
       open(ReviewStage.reportingManagerRating, row(selfValue: 60), july),
+      isFalse,
+      reason: 'even a self-rated July is out of window',
+    );
+    // The ordering rule still holds INSIDE the open month.
+    expect(open(ReviewStage.reportingManagerRating, row(), august), isFalse);
+    expect(
+      open(ReviewStage.reportingManagerRating, row(selfValue: 60), august),
       isTrue,
     );
   });

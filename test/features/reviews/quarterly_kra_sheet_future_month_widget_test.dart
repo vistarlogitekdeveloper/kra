@@ -59,14 +59,17 @@ void main() {
       );
 
   testWidgets(
-      'the reporting manager gets no Rate button for an un-self-rated '
-      'August or a still-running September', (tester) async {
+      'the reporting manager gets a Rate button ONLY for the open month',
+      (tester) async {
+    // 5 September, so August is open. July has ENDED but its window has
+    // closed, and it carries a self score — under the old rule that made it
+    // the one Rate affordance on the sheet.
     await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
       now: now,
       months: months,
       reviews: [
-        review(months[0], selfValue: 100), // July done
-        review(months[1]), // August: nobody has self-rated
+        review(months[0], selfValue: 100), // July: self-rated but CLOSED
+        review(months[1], selfValue: 100), // August: the open month
         review(months[2]), // September: still running
       ],
       editableManager: true,
@@ -74,9 +77,30 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    // Exactly ONE Rate affordance: July, the only month with a self score.
-    expect(find.text('Rate'), findsOneWidget);
-    // August says the SELF rating is what is outstanding, not the manager.
+    expect(find.text('Rate'), findsOneWidget,
+        reason: 'August only — July is closed, September has not ended');
+  });
+
+  testWidgets(
+      'an un-self-rated OPEN month says the SELF rating is what is missing',
+      (tester) async {
+    await tester.pumpWidget(host(quarterlyKraSheetBodyForTest(
+      now: now,
+      months: months,
+      reviews: [
+        review(months[0], selfValue: 100), // July: closed
+        review(months[1]), // August: open, nobody has self-rated
+        review(months[2]), // September: still running
+      ],
+      editableManager: true,
+    )));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    // Nothing to rate anywhere: August needs its self-rating first, and the
+    // other two months are out of window in opposite directions.
+    expect(find.text('Rate'), findsNothing);
+    // And it says WHICH thing is outstanding.
     expect(find.text('Self'), findsOneWidget);
   });
 

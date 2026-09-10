@@ -268,14 +268,15 @@ class _CellPicker extends StatelessWidget {
     // there is nothing to rate yet. Kept separate from monthClosed so the cell
     // can say WHICH it is — "Locked" would send the manager to HR over a month
     // that resolves itself on the 1st.
-    final monthNotEnded = !monthEnded(month, now);
-    if (isFeed || monthClosed || monthNotEnded || cell.isNotApplicable) {
+    final monthNotEditable = !monthOpenForRating(month, now);
+    if (isFeed || monthClosed || monthNotEditable || cell.isNotApplicable) {
       return ReadonlyScoreCell(
         key: ValueKey('ro_${cell.monthlyScoreId}'),
         cell: cell,
         maxScore: row.maxScore,
         isFeedRow: isFeed,
-        monthNotEnded: monthNotEnded,
+        monthNotEditable: monthNotEditable,
+        monthIsFuture: monthIsFuture(month, now),
       );
     }
     return ScoreCell(

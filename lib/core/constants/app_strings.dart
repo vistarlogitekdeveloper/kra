@@ -1184,6 +1184,12 @@ class AppStrings {
   /// to HR for nothing.
   static const String managerRateReadOnlyMonthOpen = 'In progress';
 
+  /// A month that HAS finished but whose rating window has since passed.
+  /// Distinct from `managerRateReadOnlyMonthOpen` ("In progress"), which is
+  /// the opposite direction in time — saying "In progress" about July in
+  /// October would be plainly false.
+  static const String managerRateReadOnlyWindowClosed = 'Window closed';
+
   /// Why the submit button is withheld mid-quarter. Names the date so it reads
   /// as a schedule rather than a fault — the manager has done nothing wrong,
   /// and their ratings are already saved.

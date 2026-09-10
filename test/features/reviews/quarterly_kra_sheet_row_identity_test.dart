@@ -175,12 +175,19 @@ void main() {
     )));
     await tester.pump();
 
-    // The Rate affordances are July's and August's, in column order.
+    // Only AUGUST is open for rating on 15 September, so it is the single
+    // Rate affordance. July has a self score and would have offered one
+    // under the old "any month that has ended" rule — which is what made
+    // this an .at(1) before.
     final rateButtons = find.text('Rate');
-    expect(rateButtons, findsWidgets);
-    await tester.ensureVisible(rateButtons.at(1));
+    // TWO, not one: the fixture gives August two KRA rows (A and B), and
+    // each contributes its own affordance. Before the window rule there
+    // were four — July A/B as well — which is what made this an .at(1).
+    expect(rateButtons, findsNWidgets(2),
+        reason: 'August\'s two KRAs; July\'s window has closed');
+    await tester.ensureVisible(rateButtons.first);
     await tester.pumpAndSettle();
-    await tester.tap(rateButtons.at(1), warnIfMissed: false); // August, 1st KRA
+    await tester.tap(rateButtons.first, warnIfMissed: false);
     await tester.pump();
 
     expect(editedRowId, 'aug-a',

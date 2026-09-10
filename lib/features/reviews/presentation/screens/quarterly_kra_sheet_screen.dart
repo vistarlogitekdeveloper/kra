@@ -255,7 +255,9 @@ class _QuarterlyKraSheetScreenState
     // The gate is still needed after the cell fix, because scores written for
     // the live month BEFORE that fix shipped are already in the database and
     // the submit loop would go on offering them.
-    if (!r.period.isRatableOn(_now)) return false;
+    // The OPEN month only — not every month that has ended. Rating August
+    // must not reopen July.
+    if (!r.period.isOpenForRatingOn(_now)) return false;
     // Some organisations run a pipeline with no self-rating at all. Checked
     // before identity: under that flow it is not that someone ELSE rates the
     // employee, it is that the stage does not exist.
@@ -2860,7 +2862,7 @@ class _GridState extends State<_Grid> {
     // holding it up. A future month shows nothing at all; a started month
     // still waiting on the employee says so.
     if (!open) {
-      if (isNotYetRatableMonth(widget.months[monthIdx], widget.now)) {
+      if (isMonthClosedForRating(widget.months[monthIdx], widget.now)) {
         return Text(_fmt(null),
             style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -4585,7 +4587,13 @@ List<String> kraNamesWithoutRaterInFlow(
 ///
 /// Delegates to [ReviewPeriod.isRatableOn] so there is exactly one definition
 /// of "ratable" and this cannot drift from the banner, the card or the picker.
-bool isNotYetRatableMonth(ReviewPeriod m, DateTime now) => !m.isRatableOn(now);
+/// Renamed from `isNotYetRatableMonth`, which only ever asked about the
+/// FUTURE. It now covers both directions — a month that has not started
+/// AND one whose window has closed — so the old name would have been a
+/// second lie in the same place (the first was "not STARTED", which let
+/// the live month through).
+bool isMonthClosedForRating(ReviewPeriod m, DateTime now) =>
+    !m.isOpenForRatingOn(now);
 
 /// Whether one cell is OPEN for entry yet — independently of WHO is looking.
 ///
@@ -4612,7 +4620,7 @@ bool isCellOpenForEntry({
   required DateTime now,
   ReviewFlow flow = ReviewFlow.standard,
 }) {
-  if (isNotYetRatableMonth(month, now)) return false;
+  if (isMonthClosedForRating(month, now)) return false;
   if (stage == ReviewStage.selfRating) return true;
 
   // The self-first ordering only means anything in a flow that HAS a
