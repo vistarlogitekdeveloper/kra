@@ -130,7 +130,18 @@ class MonthlyReviewSummary {
             JsonParse.parseDouble(json['incentiveEligibleAmount']),
         payoutStatus:
             PayoutStatus.fromApi(JsonParse.parseString(json['payoutStatus'])),
-        projectLocation: JsonParse.parseString(json['projectLocation']),
+        // Object on the wire in some payloads ({id, name}), a flat string in
+        // others — take the NAME, never the stringified map. `parseString`
+        // falls back to `value.toString()`, so an unguarded read would put a
+        // literal "{id: loc_x, name: HO}" on the card. The manager module's
+        // TeamMember already had to fix exactly this; see its live-contract
+        // test.
+        projectLocation: () {
+          final loc = JsonParse.parseMap(json['projectLocation']);
+          return loc != null
+              ? JsonParse.parseString(loc['name'])
+              : JsonParse.parseString(json['projectLocation']);
+        }(),
         reworkRequested: JsonParse.parseBool(json['reworkRequested']) ?? false,
         selfScorePct: JsonParse.parseDouble(json['selfScorePct']),
         managementReviewPct: JsonParse.parseDouble(json['managementReviewPct']),
