@@ -855,7 +855,30 @@ class AppStrings {
       "$monthLabel self-rating closes in $days "
       "${days == 1 ? deadlineDay : deadlineDays}";
 
-  // ───── Monthly deadline notices (self 7th / manager 10th) ─────
+  /// "the 10th" / "the 12th" / "the 3rd" — an ordinal day for deadline copy.
+  ///
+  /// English ordinals, because the app is English-only today; the 11th-13th
+  /// exceptions are the ones a naive last-digit rule gets wrong.
+  static String ordinalDay(int day) {
+    final suffix = (day % 100 >= 11 && day % 100 <= 13)
+        ? 'th'
+        : switch (day % 10) { 1 => 'st', 2 => 'nd', 3 => 'rd', _ => 'th' };
+    return 'the $day$suffix';
+  }
+
+  /// The recurring due date for a stage, for copy that sits beside the action.
+  ///
+  /// Phrased per MONTH rather than as a date, because the quarterly sheet shows
+  /// three months at once and a single date would be wrong for two of them.
+  static String dueByEachMonth(int day) =>
+      ' Due by ${ordinalDay(day)} of each month.';
+
+  // ───── Monthly deadline notices ─────
+  //
+  // Dates are NOT written here. Every countdown resolves through
+  // ReviewStage.deadlineDay so the copy cannot drift from the schedule the
+  // app counts down to — this header claimed "self 7th / manager 10th" long
+  // after both had moved.
   static const String deadlineSelfRatingTitle = 'Self-rating deadline';
   static const String deadlineManagerRatingTitle = 'Manager rating deadline';
 

@@ -32,7 +32,7 @@ class EmployeeDashboard {
   bool get hasActiveCycle => cycle != null;
 
   /// Days from today to the self-rating deadline — the fixed
-  /// [MonthlyDeadlines.selfRatingDay] (7th) of the current calendar
+  /// [MonthlyDeadlines.selfRatingDay] (the 10th) of the current calendar
   /// month. Returns `null` when there is no active cycle (so the home
   /// banner stays hidden between cycles). Negative values mean the
   /// deadline has passed.

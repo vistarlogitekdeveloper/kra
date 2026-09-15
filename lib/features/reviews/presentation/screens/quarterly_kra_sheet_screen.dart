@@ -1528,32 +1528,7 @@ class _Sheet extends StatelessWidget {
     // the wrong month, believe they are finished, and still be chased as overdue.
     final dueMonth = _currentMonthNeedingSelfRating(
         months, reviews, clock ?? DateTime.now());
-    final scopeLabel = canSelf
-        ? (dueMonth != null
-            ? 'Rate your ${dueMonth.shortLabel} Self column — that month has '
-                'closed and it is still empty.'
-            : 'You can edit the Self ratings on this sheet.')
-        : canMgr
-            // The same seat reads differently in each pipeline. Under
-            // administrators-only it is management picking up whatever HR and
-            // Accounts were not assigned, so naming the reporting manager here
-            // would describe a relationship the flow no longer uses.
-            ? (stageIsRelationshipGated(
-                    ReviewStage.reportingManagerRating, flow)
-                ? 'You can rate the KRAs assigned to you as Reporting Manager — '
-                    'tap a Review cell.'
-                : 'You can rate the KRAs left to Management — the ones not '
-                    'assigned to HR or Accounts. Tap a Review cell.')
-            : canHr
-                ? 'You can rate the KRAs assigned to HR — tap a Review cell.'
-                : canFin
-                    ? 'You can rate the KRAs assigned to Accounts — '
-                        'tap a Review cell.'
-                    : canMgmt
-                        ? 'You can enter the Management rating for each KRA.'
-                        : allComplete
-                            ? 'This quarter is completed — scores are locked.'
-                            : 'View only — you cannot edit this sheet.';
+
 
     // Payout follows the FINAL score (management override → Review average →
     // self), quarter-averaged across the three months.
