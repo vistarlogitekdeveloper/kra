@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/error_text.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
@@ -52,7 +53,7 @@ class _AdminReviewDashboardScreenState
       body: listAsync.when(
         loading: () => const _Skeleton(),
         error: (e, _) => _ErrorView(
-          message: e.toString(),
+          message: userFacingError(e),
           onRetry: () =>
               ref.invalidate(quarterlyReviewDashboardProvider(selected)),
         ),

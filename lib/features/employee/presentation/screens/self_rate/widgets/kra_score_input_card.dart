@@ -266,12 +266,15 @@ class _KraScoreInputCardState extends State<KraScoreInputCard> {
     try {
       // Any file type — Excel, Word, PowerPoint, images, PDF, whatever the
       // evidence happens to be. Restricting extensions only blocked valid proof.
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) return; // cancelled — normal
-      final file = result.files.single;
+      // `pickFile` (singular) rather than `pickFiles`: this attaches one piece
+      // of evidence, and the single-file API returns a nullable PlatformFile
+      // instead of a list we then have to assert has exactly one element.
+      //
+      // `withData: true` is gone from the call — it was never needed here.
+      // This site only forwards the name and path; the bytes are read at the
+      // other attachment site, which actually uploads them.
+      final file = await FilePicker.pickFile(type: FileType.any);
+      if (file == null) return; // cancelled — normal
       widget.onAttach(file.name, file.path);
     } catch (e) {
       if (!mounted) return;

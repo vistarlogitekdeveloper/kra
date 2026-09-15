@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../../../core/api/error_text.dart';
 import '../../../../../../core/api/api_error.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_strings.dart';
@@ -56,7 +57,7 @@ class ManagerDashboardScreen extends ConsumerWidget {
               );
             }
             return _DashboardError(
-              message: e.toString(),
+              message: userFacingError(e),
               onRetry: () => ref.invalidate(managerDashboardProvider),
             );
           },

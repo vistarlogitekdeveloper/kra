@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/error_text.dart';
 import '../../../../core/api/api_error.dart';
 import '../../../../core/utils/name_format.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -25,6 +26,14 @@ import '../widgets/empty_state.dart';
 class EmployeeDetailScreen extends ConsumerWidget {
   final String employeeId;
   const EmployeeDetailScreen({super.key, required this.employeeId});
+
+  /// True for the backend's "no such employee in your organization" answer.
+  ///
+  /// `employees.service.getById` fetches by id and then rejects when the row
+  /// belongs to another organization, so a cross-tenant read is a 404 rather
+  /// than a 403 — it does not even confirm the employee exists elsewhere.
+  static bool _isNotFound(Object e) =>
+      e is ApiError && (e.statusCode == 404 || e.code == 'RES_001');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -58,14 +67,27 @@ class EmployeeDetailScreen extends ConsumerWidget {
           error: (e, _) => ListView(
             padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
             children: [
-              EmptyState(
-                icon: Icons.error_outline_rounded,
-                title: AppStrings.errorGeneric,
-                message: e.toString(),
-                actionLabel: AppStrings.commonRetry,
-                onAction: () =>
-                    ref.invalidate(employeeDetailProvider(employeeId)),
-              ),
+              // A 404 here is almost always tenant isolation rather than a
+              // fault: the shell keeps each tab's navigation stack alive, so a
+              // detail screen opened before an organization switch survives it
+              // and refetches against the new tenant. Retrying cannot help, so
+              // the action returns to the list instead.
+              _isNotFound(e)
+                  ? EmptyState(
+                      icon: Icons.person_off_outlined,
+                      title: AppStrings.employeesTitle,
+                      message: AppStrings.employeeNotInThisOrg,
+                      actionLabel: AppStrings.orgViewPeople,
+                      onAction: () => context.go(AppRoutes.hrEmployees),
+                    )
+                  : EmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: AppStrings.errorGeneric,
+                      message: userFacingError(e),
+                      actionLabel: AppStrings.commonRetry,
+                      onAction: () =>
+                          ref.invalidate(employeeDetailProvider(employeeId)),
+                    ),
             ],
           ),
           data: (employee) => _DetailContent(employee: employee, ref: ref),

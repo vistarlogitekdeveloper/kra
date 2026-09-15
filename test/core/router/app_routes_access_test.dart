@@ -124,7 +124,11 @@ void main() {
     });
 
     test('known aliases map to canonical enum cases', () {
-      expect(UserRole.fromApi('SUPER_ADMIN'), UserRole.admin);
+      // SUPER_ADMIN is its OWN role, no longer an alias of ADMIN — the two
+      // used to collapse together, which made it impossible to grant the
+      // super-admin tier anything ADMIN did not already have.
+      expect(UserRole.fromApi('SUPER_ADMIN'), UserRole.superAdmin);
+      expect(UserRole.fromApi('ADMIN'), UserRole.admin);
       expect(UserRole.fromApi('OPS_EXCELLENCE'), UserRole.ops);
       // Tolerant of case + whitespace.
       expect(UserRole.fromApi('  hr_admin  '), UserRole.hrAdmin);

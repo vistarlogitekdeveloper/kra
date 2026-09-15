@@ -19,6 +19,22 @@ abstract class AuthRepository {
   /// a network outage would trap the user in a logged-in state.
   Future<void> logout();
 
+  /// Replaces the stored token pair and re-reads the signed-in user.
+  ///
+  /// Used when the SERVER hands back a new pair outside the login flow — today
+  /// only the organisation switch, which re-issues a super admin's tokens
+  /// against a different tenant. The organisation is a JWT claim, so nothing in
+  /// the app changes tenant until the stored tokens do.
+  ///
+  /// Re-reads the user rather than trusting the caller: the new token carries a
+  /// different `organizationId`, and every org-scoped read depends on the
+  /// [User] reflecting it. Returns null when the swap or the re-read fails, so
+  /// the previous session is left intact.
+  Future<User?> adoptTokens({
+    required String accessToken,
+    required String refreshToken,
+  });
+
   /// Returns the cached user if a valid session exists, else null.
   /// Consults local storage only — does not make a network call.
   Future<User?> getCurrentUser();

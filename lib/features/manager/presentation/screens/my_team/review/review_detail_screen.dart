@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../../../core/api/error_text.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/utils/name_format.dart';
 import '../../../../../../core/constants/app_strings.dart';
@@ -59,7 +60,7 @@ class ReviewDetailScreen extends ConsumerWidget {
       body: async.when(
         loading: () => const _DetailLoading(),
         error: (e, _) => _DetailError(
-          message: e.toString(),
+          message: userFacingError(e),
           onRetry: () => ref.invalidate(managerReviewDetailProvider(reviewId)),
         ),
         data: (review) => _DetailBody(review: review),

@@ -446,14 +446,74 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      summary.employeeName,
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
+                    // Name and project location on ONE line —
+                    // "Yash Thikekar - HO".
+                    //
+                    // NOT appended to the name string. This Text is
+                    // maxLines: 1 with an ellipsis, so a long name —
+                    // "Dattatraya Somnath Bamankar" is a real one on this
+                    // list — would have eaten the suffix entirely and
+                    // dropped the very field this was added to show.
+                    //
+                    // Two Flexibles instead, so an over-long pair SHARES
+                    // the squeeze rather than one starving the other.
+                    // Same font size for both so they sit on a common
+                    // baseline under the default centre alignment; weight
+                    // and colour carry the hierarchy instead.
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            summary.employeeName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        // Rendered only when present. A dangling " - " on
+                        // an employee with no location mapped would read
+                        // as a rendering fault rather than as missing data.
+                        if ((summary.projectLocation ?? '').trim().isNotEmpty)
+                          Flexible(
+                            child: Text(
+                              ' - ${summary.projectLocation!.trim()}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
+                    // Designation, when the API supplies one. Rendered only
+                    // when present — a placeholder like "—" on every card
+                    // would be noise, and this is null on any deployment whose
+                    // list query has not been updated to select it.
+                    //
+                    // Ellipsised rather than wrapped: the card is a fixed-height
+                    // grid tile, so a two-line title would push the stage pill
+                    // out of alignment across the row.
+                    if ((summary.employeeDesignation ?? '').trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          summary.employeeDesignation!.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 6),
                     Row(
                       children: [

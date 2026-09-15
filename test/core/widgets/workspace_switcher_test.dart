@@ -38,7 +38,8 @@ void main() {
     });
 
     test('employee with reports gets My KRA + My Team', () {
-      expect(labels(UserRole.employee, hasReports: true), ['My KRA', 'My Team']);
+      expect(
+          labels(UserRole.employee, hasReports: true), ['My KRA', 'My Team']);
     });
 
     test('manager gets My KRA + My Team (no Reviews / HR)', () {
@@ -77,7 +78,10 @@ void main() {
     });
 
     test('true for employee with reports', () {
-      expect(WorkspaceSwitcher.hasExtras(mockUser(UserRole.employee, hasReports: true)), isTrue);
+      expect(
+          WorkspaceSwitcher.hasExtras(
+              mockUser(UserRole.employee, hasReports: true)),
+          isTrue);
     });
 
     test('true for reviewer roles (HR / Accounts) — they get Reviews', () {

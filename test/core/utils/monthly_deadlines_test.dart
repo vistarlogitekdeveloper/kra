@@ -7,8 +7,7 @@ void main() {
     final ref = DateTime(2026, 6, 22);
 
     test('resolves every non-terminal stage to its fixed day of month', () {
-      expect(
-          MonthlyDeadlines.forStage(ReviewStage.selfRating, ref),
+      expect(MonthlyDeadlines.forStage(ReviewStage.selfRating, ref),
           DateTime(2026, 6, 10));
       // Account & HR (both raters) fall due on the 12th, the reporting manager
       // on the 13th — they no longer share a date.
@@ -25,8 +24,7 @@ void main() {
       expect(
           MonthlyDeadlines.forStage(ReviewStage.managementReview, ref),
           DateTime(2026, 6, 15));
-      expect(
-          MonthlyDeadlines.forStage(ReviewStage.incentivePayout, ref),
+      expect(MonthlyDeadlines.forStage(ReviewStage.incentivePayout, ref),
           DateTime(2026, 6, 20));
     });
 
@@ -69,8 +67,7 @@ void main() {
   group('MonthlyDeadlines.daysRemaining', () {
     test('is positive before, 0 on the day, negative after', () {
       final deadline = DateTime(2026, 6, 10);
-      expect(
-          MonthlyDeadlines.daysRemaining(deadline, DateTime(2026, 6, 7)), 3);
+      expect(MonthlyDeadlines.daysRemaining(deadline, DateTime(2026, 6, 7)), 3);
       expect(
           MonthlyDeadlines.daysRemaining(deadline, DateTime(2026, 6, 10)), 0);
       expect(
@@ -80,8 +77,7 @@ void main() {
     test('ignores the time of day (date-only compare)', () {
       final deadline = DateTime(2026, 6, 10);
       expect(
-        MonthlyDeadlines.daysRemaining(
-            deadline, DateTime(2026, 6, 9, 23, 59)),
+        MonthlyDeadlines.daysRemaining(deadline, DateTime(2026, 6, 9, 23, 59)),
         1,
       );
     });
@@ -92,8 +88,7 @@ void main() {
       final deadline = DateTime(2026, 6, 13);
       expect(
           MonthlyDeadlines.isOverdue(deadline, DateTime(2026, 6, 13)), false);
-      expect(
-          MonthlyDeadlines.isOverdue(deadline, DateTime(2026, 6, 14)), true);
+      expect(MonthlyDeadlines.isOverdue(deadline, DateTime(2026, 6, 14)), true);
     });
   });
 }

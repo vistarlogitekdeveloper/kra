@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 
 import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
@@ -11,8 +11,14 @@ import '../../data/models/team_member.dart';
 import '../../data/models/team_member_profile.dart';
 import '../../data/repositories/api_manager_team_repository.dart';
 import '../../data/repositories/manager_team_repository.dart';
+import '../../../../core/observability/app_logger.dart';
 
 final managerTeamRepositoryProvider = Provider<ManagerTeamRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   return ApiManagerTeamRepository(dio: ref.read(dioProvider));
 });
 
@@ -218,7 +224,8 @@ class ManagerTeamListController extends StateNotifier<ManagerTeamListState> {
       }
     } catch (e, st) {
       assert(() {
-        debugPrint('team list parse failed: $e\n$st');
+        AppLog.e('manager.team', 'team list parse failed',
+            error: e, stackTrace: st);
         return true;
       }());
       state = state.copyWith(

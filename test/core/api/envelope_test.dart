@@ -6,7 +6,10 @@ import 'package:vistar_app/core/api/envelope.dart';
 void main() {
   group('unwrapObject', () {
     test('returns data map from success envelope', () {
-      final response = _fakeResponse({'success': true, 'data': {'id': '1'}});
+      final response = _fakeResponse({
+        'success': true,
+        'data': {'id': '1'}
+      });
       expect(unwrapObject(response), {'id': '1'});
     });
 
@@ -22,7 +25,10 @@ void main() {
     });
 
     test('throws on non-map data', () {
-      final response = _fakeResponse({'success': true, 'data': [1, 2, 3]});
+      final response = _fakeResponse({
+        'success': true,
+        'data': [1, 2, 3]
+      });
       expect(() => unwrapObject(response), throwsA(isA<ApiError>()));
     });
   });
@@ -156,8 +162,7 @@ void main() {
 
     test('wraps unknown errors into generic ApiError', () {
       expect(
-        () => rethrowAsApiError(
-            Exception('random'), StackTrace.current),
+        () => rethrowAsApiError(Exception('random'), StackTrace.current),
         throwsA(isA<ApiError>().having(
           (e) => e.code,
           'code',

@@ -139,7 +139,15 @@ class _KraTemplateFormScreenState extends ConsumerState<KraTemplateFormScreen> {
     });
   }
 
-  void _reorder(int oldIndex, int newIndex) {
+  /// Reorder handler for [ReorderableListView.onReorder].
+  ///
+  /// The `if (newIndex > oldIndex) newIndex -= 1` IS required. [onReorder]
+  /// reports `newIndex` as a slot in the list as it looked BEFORE the dragged
+  /// item was lifted out, so once we `removeAt(oldIndex)` every index above it
+  /// has shifted down by one. Dropping the correction moves the item one slot
+  /// too far on every downward drag. Every example in the Flutter SDK does the
+  /// same adjustment; there is no `onReorderItem` variant that avoids it.
+  void _reorderItem(int oldIndex, int newIndex) {
     setState(() {
       if (newIndex > oldIndex) newIndex -= 1;
       final movedItem = _items.removeAt(oldIndex);
@@ -422,7 +430,7 @@ class _KraTemplateFormScreenState extends ConsumerState<KraTemplateFormScreen> {
       shrinkWrap: true,
       buildDefaultDragHandles: false,
       physics: const NeverScrollableScrollPhysics(),
-      onReorder: _reorder,
+      onReorder: _reorderItem,
       children: [
         for (int i = 0; i < _items.length; i++)
           Padding(

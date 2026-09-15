@@ -61,6 +61,13 @@ void main() {
     ReviewPeriod(2026, 9),
   ];
 
+  // Every review below sits in JULY, so the clock has to sit in August for
+  // July to be the month whose window is open. Only the open month is
+  // editable now — a month that has merely ended is read-only — and these
+  // fixtures previously passed no clock at all, so they read the real
+  // calendar and changed behaviour from one month to the next.
+  final julyWindow = DateTime(2026, 8, 5);
+
   testWidgets(
       'each KRA shows its single assigned reviewer, not a three-rater average',
       (tester) async {
@@ -72,6 +79,7 @@ void main() {
     await tester.pumpWidget(host(
       const Size(1280, 900),
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
       ),
@@ -95,6 +103,7 @@ void main() {
     await tester.pumpWidget(host(
       const Size(1280, 900),
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         // Not the employee, not the manager, not HR/Finance/management.
@@ -117,6 +126,7 @@ void main() {
     await tester.pumpWidget(host(
       const Size(1280, 900),
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         // The reporting manager owns the Review cell for a RM-assigned KRA.
@@ -137,6 +147,7 @@ void main() {
     await tester.pumpWidget(host(
       const Size(1280, 900),
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
       ),
@@ -156,6 +167,7 @@ void main() {
     await tester.pumpWidget(host(
       const Size(1280, 900),
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         editableHr: true, // signed in as HR
@@ -176,6 +188,7 @@ void main() {
     await tester.pumpWidget(host(
       const Size(1280, 900),
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         editableFinance: true, // signed in as Accounts / Finance
@@ -198,6 +211,7 @@ void main() {
     await tester.pumpWidget(host(
       const Size(1280, 900),
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         editableHr: true,

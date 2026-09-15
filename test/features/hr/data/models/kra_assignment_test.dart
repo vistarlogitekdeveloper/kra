@@ -29,8 +29,7 @@ void main() {
       expect(a.templateName, 'Employee KRA - Default');
     });
 
-    test('falls back to flat *Name fields when nested objects are absent',
-        () {
+    test('falls back to flat *Name fields when nested objects are absent', () {
       final a = KraAssignment.fromJson(const {
         'id': 'asgn_2',
         'employeeId': 'emp_2',

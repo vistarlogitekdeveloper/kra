@@ -37,7 +37,9 @@ class ReviewGeneration {
     final skippedReasons = rawSkipped is List
         ? rawSkipped
             .map((e) {
-              if (e is Map && e['reason'] is String) return e['reason'] as String;
+              if (e is Map && e['reason'] is String) {
+                return e['reason'] as String;
+              }
               if (e is String) return e;
               return null;
             })
@@ -59,7 +61,10 @@ class ReviewGeneration {
     if (v is int) return v;
     if (v is num) return v.toInt();
     if (v is String) return int.tryParse(v) ?? 0;
-    if (v is bool) return v ? 1 : 0; // tolerate the single-assign {created:bool} shape
+    // Tolerate the single-assign `{created: bool}` shape.
+    if (v is bool) {
+      return v ? 1 : 0;
+    }
     return 0;
   }
 }

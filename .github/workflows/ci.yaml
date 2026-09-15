@@ -1,0 +1,285 @@
+name: CI
+
+# The gate that keeps §1-§14 of CLAUDE.md true. Every step below was run
+# locally before being switched on here, and the two that would have failed are
+# handled explicitly rather than left to go red on the first push:
+#
+#   * build_runner  — the project has no codegen yet, so the step is
+#                     conditional on the dependency existing. It starts working
+#                     by itself the day freezed/riverpod_generator land.
+#   * coverage      — measured at 16.1% overall. §12 wants >= 60%, so this
+#                     gates on a RATCHET (never regress) instead of asserting a
+#                     number the repo does not meet. Raise MIN_COVERAGE as
+#                     coverage climbs; never lower it.
+#
+# Anything else failing here is a real regression.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # A second push to the same branch cancels the first — a queue of stale runs
+  # on a busy branch just delays the answer that matters.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned to the exact version in CLAUDE.md §2. A floating "stable" makes CI a
+  # moving target: the build that goes green today can go red tomorrow with no
+  # commit in between.
+  FLUTTER_VERSION: 3.47.2
+  # The ratchet. Current measured floor is 16.1%; this sits just below it so a
+  # rounding difference between runners cannot fail an untouched build.
+  MIN_COVERAGE: 16
+
+jobs:
+  # ── Gate 1: everything that does not need a platform toolchain ───────────
+  # Kept as one job on purpose. format/analyze/test share a single `pub get`,
+  # and splitting them would triple the setup cost to parallelise ~90 seconds
+  # of work.
+  static-and-tests:
+    name: Format, analyze, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Fails if pubspec.yaml and pubspec.lock disagree — a lock file that was
+      # not committed alongside a dependency change means CI and the developer
+      # resolved different graphs, which is exactly what exact pinning exists
+      # to prevent.
+      - name: Check the lock file is current
+        run: |
+          git diff --exit-code pubspec.lock || {
+            echo "::error::pubspec.lock changed during pub get - commit it"
+            exit 1
+          }
+
+      # §12 / §13.2
+      - name: dart format
+        run: dart format --set-exit-if-changed --output=none lib test
+
+      # §12 / §13.1 — verified locally at 0 issues, so --fatal-infos is safe
+      # to enforce from day one rather than aspirational.
+      - name: flutter analyze
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+      # §12. Conditional because there is no codegen in the project yet: an
+      # unconditional `dart run build_runner` fails with "Could not find
+      # package build_runner", which would be a red build reporting the absence
+      # of a feature rather than a defect. The condition disappears on its own
+      # once the dependency is added.
+      - name: build_runner (only if codegen is configured)
+        run: |
+          if grep -qE '^\s*build_runner:' pubspec.yaml; then
+            echo "build_runner present - running codegen"
+            dart run build_runner build --delete-conflicting-outputs
+            git diff --exit-code || {
+              echo "::error::generated files are stale - commit build_runner output"
+              exit 1
+            }
+          else
+            echo "no build_runner dependency yet - skipping (see CLAUDE.md Part C)"
+          fi
+
+      # §12
+      - name: flutter test --coverage
+        run: flutter test --coverage
+
+      # The ratchet. lcov's DA: records are line-hit counts, so this needs no
+      # extra tooling installed on the runner.
+      - name: Coverage ratchet
+        run: |
+          node - <<'EOF'
+          const fs = require('fs');
+          const min = Number(process.env.MIN_COVERAGE);
+          const txt = fs.readFileSync('coverage/lcov.info', 'utf8');
+          let total = 0, hit = 0;
+          for (const line of txt.split(/\r?\n/)) {
+            if (!line.startsWith('DA:')) continue;
+            total++;
+            if (Number(line.slice(3).split(',')[1]) > 0) hit++;
+          }
+          const pct = total ? (100 * hit / total) : 0;
+          console.log(`coverage ${pct.toFixed(1)}% (${hit}/${total} lines), floor ${min}%`);
+          if (pct < min) {
+            console.log(`::error::coverage ${pct.toFixed(1)}% fell below the ${min}% floor`);
+            process.exit(1);
+          }
+          // Nudge, not a failure: the point of a ratchet is that it moves.
+          if (pct > min + 5) {
+            console.log(`::warning::coverage is ${pct.toFixed(1)}% - raise MIN_COVERAGE in ci.yaml`);
+          }
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          retention-days: 14
+
+  # ── Gate 2: the web release, as WASM ─────────────────────────────────────
+  web-wasm:
+    name: Web release (WASM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: Build web (WASM)
+        run: flutter build web --release --wasm
+
+      # NOT redundant with the step above. `flutter build web --wasm` has been
+      # observed reporting "Failed to compile application for the Web" while the
+      # wrapper still surfaced a zero exit status, so trusting the exit code
+      # alone would let a build that produced no WasmGC module pass this gate.
+      # Assert the artifact.
+      - name: Assert the WasmGC module was actually produced
+        run: |
+          test -f build/web/main.dart.wasm || {
+            echo "::error::main.dart.wasm missing - dart2wasm did not run."
+            echo "Most likely a dependency pulled in dart:html or dart:js_util,"
+            echo "which do not exist under dart2wasm. See CLAUDE.md Part C."
+            exit 1
+          }
+          ls -l build/web/main.dart.wasm
+
+      # §7: initial payload < 3 MB compressed. A browser downloads either the
+      # WasmGC module or the JS fallback, never both, so the budget is checked
+      # against the larger of the two paths rather than their sum.
+      - name: Payload budget
+        run: |
+          node - <<'EOF'
+          const fs = require('fs'), zlib = require('zlib');
+          const gz = (f) => fs.existsSync(f)
+            ? zlib.gzipSync(fs.readFileSync(f)).length : 0;
+          const shell = gz('build/web/flutter.js')
+            + gz('build/web/flutter_bootstrap.js')
+            + gz('build/web/main.dart.mjs');
+          const wasmPath = shell + gz('build/web/main.dart.wasm');
+          const jsPath = shell + gz('build/web/main.dart.js');
+          const worst = Math.max(wasmPath, jsPath);
+          const mb = (n) => (n / 1048576).toFixed(2);
+          console.log(`wasm path ${mb(wasmPath)} MB | js fallback ${mb(jsPath)} MB`);
+          const budget = 3 * 1048576;
+          if (worst > budget) {
+            console.log(`::error::initial payload ${mb(worst)} MB exceeds the 3.00 MB budget`);
+            process.exit(1);
+          }
+          console.log(`within budget (worst path ${mb(worst)} MB of 3.00 MB)`);
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-wasm
+          path: build/web
+          retention-days: 7
+
+  # ── Gate 3: Android release ──────────────────────────────────────────────
+  android:
+    name: Android release
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      # §10 requires --obfuscate --split-debug-info for release. The symbol
+      # directory is kept as an artifact: without it an obfuscated stack trace
+      # from the field cannot be read back.
+      - name: Build APK (obfuscated)
+        run: |
+          flutter build apk --release \
+            --obfuscate --split-debug-info=build/symbols/android
+
+      # Same reason as the WASM assertion: `flutter build apk` has been observed
+      # returning exit status 0 after `Gradle task assembleRelease failed with
+      # exit code 1`. Without this the Android gate would report success while
+      # having produced nothing.
+      - name: Assert the APK was actually produced
+        run: |
+          shopt -s nullglob
+          apks=(build/app/outputs/flutter-apk/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "::error::no APK produced - the Gradle build failed despite a zero exit status"
+            exit 1
+          fi
+          ls -lh "${apks[@]}"
+
+      # §10 requires the symbols be kept — an obfuscated stack trace from the
+      # field is unreadable without them, so a build whose symbols were not
+      # retained is not a shippable build.
+      - name: Assert debug symbols were emitted
+        run: |
+          test -d build/symbols/android && [ -n "$(ls -A build/symbols/android)" ] || {
+            echo "::error::--split-debug-info produced no symbols"
+            exit 1
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-symbols
+          path: build/symbols/android
+          retention-days: 30
+
+  # ── Gate 4: iOS release ──────────────────────────────────────────────────
+  # macOS runners are billed at a multiple of Linux, so this is limited to
+  # pushes to main and manual runs. A PR gets the other three gates, which is
+  # where Dart-level breakage shows up; a genuinely iOS-specific break is rare
+  # and caught before release rather than on every PR.
+  ios:
+    name: iOS release (no codesign)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      # --no-codesign: signing needs certificates this workflow deliberately
+      # does not hold. It still proves the iOS toolchain compiles the app,
+      # which is what this gate is for.
+      - name: Build iOS (no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --obfuscate --split-debug-info=build/symbols/ios
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-debug-symbols
+          path: build/symbols/ios
+          retention-days: 30

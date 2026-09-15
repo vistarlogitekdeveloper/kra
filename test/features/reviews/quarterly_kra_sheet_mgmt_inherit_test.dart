@@ -58,6 +58,13 @@ void main() {
     ReviewPeriod(2026, 9),
   ];
 
+  // Every review below sits in JULY, so the clock has to sit in August for
+  // July to be the month whose window is open. Only the open month is
+  // editable now — a month that has merely ended is read-only — and these
+  // fixtures previously passed no clock at all, so they read the real
+  // calendar and changed behaviour from one month to the next.
+  final julyWindow = DateTime(2026, 8, 5);
+
   // The inherited (not-yet-confirmed) management value renders italic; a value
   // management has actually set is upright. Match on that so the totals row's
   // echo of the same percent never confuses the assertion.
@@ -73,6 +80,7 @@ void main() {
     final review = reviewWith(rmRow(reviewerScore: 9));
     await tester.pumpWidget(host(
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         editableManagement: true, // signed in as management (HR_ADMIN / ADMIN)
@@ -91,6 +99,7 @@ void main() {
     final review = reviewWith(rmRow(reviewerScore: 9));
     await tester.pumpWidget(host(
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         // editableManagement defaults to false — a non-management viewer.
@@ -110,6 +119,7 @@ void main() {
     final review = reviewWith(rmRow(reviewerScore: 9, mgmtScore: 7));
     await tester.pumpWidget(host(
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         editableManagement: true,
@@ -129,6 +139,7 @@ void main() {
     final review = reviewWith(rmRow(reviewerScore: 9));
     await tester.pumpWidget(host(
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         editableManagement: true,
@@ -148,6 +159,7 @@ void main() {
     final review = reviewWith(rmRow(reviewerScore: 9));
     await tester.pumpWidget(host(
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         // No management rights and no lock callback wired.
@@ -169,6 +181,7 @@ void main() {
     );
     await tester.pumpWidget(host(
       quarterlyKraSheetBodyForTest(
+        now: julyWindow,
         months: months,
         reviews: [review, null, null],
         editableManagement: true,

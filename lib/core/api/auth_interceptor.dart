@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../storage/secure_storage_service.dart';
 import 'api_constants.dart';
 import 'refresh_interceptor.dart';
+import '../observability/app_logger.dart';
 
 /// Attaches the access token to outgoing requests as a Bearer header.
 ///
@@ -62,7 +63,9 @@ class AuthInterceptor extends Interceptor {
       // call ever made. Never let that happen: log, then send the request
       // through unauthenticated and let the reactive 401 path recover.
       if (kDebugMode) {
-        debugPrint('AuthInterceptor.onRequest failed for ${options.path}: $e');
+        AppLog.w('auth.interceptor',
+            'could not attach a token to ${options.method} ${options.path}',
+            error: e);
         debugPrintStack(stackTrace: st);
       }
     }

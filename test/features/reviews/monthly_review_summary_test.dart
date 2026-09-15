@@ -48,7 +48,8 @@ void main() {
     // displayStage: a cursor sitting at the manager's stage is only credible once
     // the self-rating that advanced it exists. Without one the review is treated
     // as never started and belongs to the employee — covered separately below.
-    test('reporting-manager rating badges for the reporting manager, '
+    test(
+        'reporting-manager rating badges for the reporting manager, '
         'whatever their own role', () {
       final s = summary(
         stage: ReviewStage.reportingManagerRating,
@@ -158,8 +159,10 @@ void main() {
   // The dashboard chip reads [displayStage]/[displayStatus], which repair a
   // stage cursor that in-place score saves left frozen at Self-Rating — while
   // NEVER regressing (or over-riding) a cursor the backend already advanced.
-  group('MonthlyReviewSummary.displayStage — scores repair a frozen cursor', () {
-    test('cursor stuck at Self-Rating but management scored → Management '
+  group('MonthlyReviewSummary.displayStage — scores repair a frozen cursor',
+      () {
+    test(
+        'cursor stuck at Self-Rating but management scored → Management '
         'Review (submitted)', () {
       final s = summary(
         stage: ReviewStage.selfRating,
@@ -171,7 +174,8 @@ void main() {
       expect(s.displayStatus, StageStatus.submitted);
     });
 
-    test('cursor at Self-Rating with only a self score → Self-Rating, but '
+    test(
+        'cursor at Self-Rating with only a self score → Self-Rating, but '
         'submitted (self is in)', () {
       final s = summary(
         stage: ReviewStage.selfRating,
@@ -191,7 +195,8 @@ void main() {
       expect(s.displayStatus, StageStatus.inProgress);
     });
 
-    test('a cursor already advanced past Self-Rating is authoritative — a '
+    test(
+        'a cursor already advanced past Self-Rating is authoritative — a '
         'partial Review average never bumps it to Management Review', () {
       final s = summary(
         stage: ReviewStage.reportingManagerRating,
@@ -269,7 +274,8 @@ void main() {
       expect(s.payoutSettled, isFalse);
     });
 
-    test('a MID-PIPELINE cursor with no scores is refused too — this is how the '
+    test(
+        'a MID-PIPELINE cursor with no scores is refused too — this is how the '
         'quarter dashboard read "Management Review · 0%" while the monthly list '
         'correctly read Self-Rating', () {
       // The pipeline only advances off the back of a score: save-scores moves the
@@ -319,7 +325,8 @@ void main() {
       expect(s.needsActionBy(UserRole.management, userId: 'boss1'), isTrue);
     });
 
-    test('a mid-pipeline cursor WITH a score is trusted — awaiting the manager '
+    test(
+        'a mid-pipeline cursor WITH a score is trusted — awaiting the manager '
         'after a self-rating is the normal state', () {
       final s = summary(
         stage: ReviewStage.reportingManagerRating,
@@ -355,7 +362,8 @@ void main() {
       expect(s.payoutSettled, isTrue);
     });
 
-    test('a genuine ZERO score is not mistaken for never-rated — the employee '
+    test(
+        'a genuine ZERO score is not mistaken for never-rated — the employee '
         'self-rated 0, which is a real assessment', () {
       final s = summary(
         stage: ReviewStage.selfRating,
@@ -410,7 +418,8 @@ void main() {
       );
     });
 
-    test('an untouched month IS worth landing on for the employee who still '
+    test(
+        'an untouched month IS worth landing on for the employee who still '
         'owes the self-rating — never skip past their pending work', () {
       final rows = [summary(stage: ReviewStage.selfRating)];
       expect(
@@ -442,22 +451,31 @@ void main() {
   });
 
   group('MonthlyReviewSummary.needsActionBy — org-level stages', () {
-    test('still light up for exactly the roles agreed in the pipeline spec, '
+    test(
+        'still light up for exactly the roles agreed in the pipeline spec, '
         'independent of any reporting relationship', () {
       const table = <ReviewStage, Set<UserRole>>{
         // HR and Finance are now SEPARATE Review raters.
+        // SUPER_ADMIN is on every org-level stage: the org-wide tier holds
+        // every seat beneath it.
         ReviewStage.accountHrRating: {
           UserRole.hr,
           UserRole.hrAdmin,
+          UserRole.superAdmin,
         },
         // HR_ADMIN holds the Accounts seat too — one UserRole can't say
         // "HR Admin AND Accounts", and that post covers both.
-        ReviewStage.financeRating: {UserRole.finance, UserRole.hrAdmin},
+        ReviewStage.financeRating: {
+          UserRole.finance,
+          UserRole.hrAdmin,
+          UserRole.superAdmin,
+        },
         // Management approval/override. MANAGEMENT is the intended holder;
         // HR_ADMIN is here only until the backend's employees enum can store
         // MANAGEMENT, at which point it drops out. See ReviewStage.actorRoles.
         ReviewStage.managementReview: {
           UserRole.management,
+          UserRole.superAdmin,
           // HR_ADMIN shares the seat only while the backend cannot store
           // MANAGEMENT — see FeatureFlags.roleTiers.
           if (!FeatureFlags.roleTiers) UserRole.hrAdmin,
@@ -466,6 +484,7 @@ void main() {
           UserRole.finance,
           UserRole.hr,
           UserRole.hrAdmin,
+          UserRole.superAdmin,
         },
       };
       for (final entry in table.entries) {
@@ -484,8 +503,7 @@ void main() {
           expect(
             s.needsActionBy(role, userId: 'somebody-else'),
             shouldBadge,
-            reason:
-                '${entry.key.name} for role $role — expected $shouldBadge',
+            reason: '${entry.key.name} for role $role — expected $shouldBadge',
           );
         }
       }
