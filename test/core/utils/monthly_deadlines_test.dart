@@ -10,17 +10,18 @@ void main() {
       expect(
           MonthlyDeadlines.forStage(ReviewStage.selfRating, ref),
           DateTime(2026, 6, 10));
-      // The three Review raters run in parallel and share the same deadline.
+      // Account & HR (both raters) fall due on the 12th, the reporting manager
+      // on the 13th — they no longer share a date.
+      expect(
+          MonthlyDeadlines.forStage(ReviewStage.accountHrRating, ref),
+          DateTime(2026, 6, 12));
+      expect(
+          MonthlyDeadlines.forStage(ReviewStage.financeRating, ref),
+          DateTime(2026, 6, 12));
       expect(
         MonthlyDeadlines.forStage(ReviewStage.reportingManagerRating, ref),
         DateTime(2026, 6, 13),
       );
-      expect(
-          MonthlyDeadlines.forStage(ReviewStage.accountHrRating, ref),
-          DateTime(2026, 6, 13));
-      expect(
-          MonthlyDeadlines.forStage(ReviewStage.financeRating, ref),
-          DateTime(2026, 6, 13));
       expect(
           MonthlyDeadlines.forStage(ReviewStage.managementReview, ref),
           DateTime(2026, 6, 15));

@@ -1189,24 +1189,56 @@ class _Sheet extends StatelessWidget {
     // the wrong month, believe they are finished, and still be chased as overdue.
     final dueMonth = _currentMonthNeedingSelfRating(
         months, reviews, clock ?? DateTime.now());
-    final scopeLabel = canSelf
-        ? (dueMonth != null
-            ? 'Rate your ${dueMonth.shortLabel} Self column — that is the '
-                'current month, and it is still empty.'
-            : 'You can edit the Self ratings on this sheet.')
-        : canMgr
-            ? 'You can rate the KRAs assigned to you as Reporting Manager — '
-                'tap a Review cell.'
-            : canHr
-                ? 'You can rate the KRAs assigned to HR — tap a Review cell.'
-                : canFin
-                    ? 'You can rate the KRAs assigned to Accounts — '
-                        'tap a Review cell.'
-                    : canMgmt
-                        ? 'You can enter the Management rating for each KRA.'
-                        : allComplete
-                            ? 'This quarter is completed — scores are locked.'
-                            : 'View only — you cannot edit this sheet.';
+    // The deadline for whichever stage this viewer actually owns.
+    //
+    // Until now only the employee self-rate and manager-rate screens carried a
+    // deadline cue, so HR, Accounts and Management — who do all their work on
+    // THIS sheet — were never told a date anywhere in the app. Resolved from
+    // ReviewStage.deadlineDay, so it is the same schedule everything else
+    // counts down to.
+    // Whose stage this viewer owns, and therefore which deadline applies. A
+    // flat if-chain rather than nested ternaries: each branch now carries a
+    // stage as well as a sentence.
+    final String scopeBase;
+    final ReviewStage? scopeStage;
+    if (canSelf) {
+      scopeBase = dueMonth != null
+          ? 'Rate your ${dueMonth.shortLabel} Self column — that is the '
+              'current month, and it is still empty.'
+          : 'You can edit the Self ratings on this sheet.';
+      scopeStage = ReviewStage.selfRating;
+    } else if (canMgr) {
+      scopeBase = 'You can rate the KRAs assigned to you as Reporting '
+          'Manager — tap a Review cell.';
+      scopeStage = ReviewStage.reportingManagerRating;
+    } else if (canHr) {
+      scopeBase = 'You can rate the KRAs assigned to HR — tap a Review cell.';
+      scopeStage = ReviewStage.accountHrRating;
+    } else if (canFin) {
+      scopeBase =
+          'You can rate the KRAs assigned to Accounts — tap a Review cell.';
+      scopeStage = ReviewStage.financeRating;
+    } else if (canMgmt) {
+      scopeBase = 'You can enter the Management rating for each KRA.';
+      scopeStage = ReviewStage.managementReview;
+    } else if (allComplete) {
+      scopeBase = 'This quarter is completed — scores are locked.';
+      scopeStage = null; // nothing is due on a finished quarter
+    } else {
+      scopeBase = 'View only — you cannot edit this sheet.';
+      scopeStage = null;
+    }
+
+    // The deadline for the stage this viewer actually owns.
+    //
+    // Until now only the employee self-rate and manager-rate screens carried a
+    // deadline cue, so HR, Accounts and Management — who do all their work on
+    // THIS sheet — were never shown a date anywhere in the app. Resolved from
+    // ReviewStage.deadlineDay, the same source every other countdown uses.
+    final dueDay = scopeStage?.deadlineDay;
+    final scopeLabel = dueDay == null
+        ? scopeBase
+        : '$scopeBase${AppStrings.dueByEachMonth(dueDay)}';
 
     // Payout follows the FINAL score (management override → Review average →
     // self), quarter-averaged across the three months.

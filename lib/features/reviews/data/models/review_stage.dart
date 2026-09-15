@@ -164,15 +164,30 @@ enum ReviewStage {
 
   /// Day of the reference month the stage is due. `null` for the terminal
   /// [completed] stage. See `MonthlyDeadlines.forStage`.
+  ///
+  /// THE single source for the official schedule — every countdown, banner and
+  /// notice in the app resolves here, so a date changed here changes
+  /// everywhere:
+  ///
+  ///   Self-Rating .............. 10th
+  ///   Account & HR Rating ...... 12th
+  ///   Reporting Manager Rating . 13th
+  ///   Management Review ........ 15th
+  ///   Incentive Payout ......... 20th
+  ///
+  /// The Account/HR side falls due BEFORE the reporting manager, which is why
+  /// the three Review raters no longer share one date. `accountHrRating` is the
+  /// HR rater and `financeRating` the Accounts one; together they are the
+  /// schedule's single "Account & HR Rating" line, so both carry the 12th.
   int? get deadlineDay {
     switch (this) {
       case ReviewStage.selfRating:
         return 10;
-      case ReviewStage.reportingManagerRating:
-        return 13;
       case ReviewStage.accountHrRating:
-        return 13;
+        return 12;
       case ReviewStage.financeRating:
+        return 12;
+      case ReviewStage.reportingManagerRating:
         return 13;
       case ReviewStage.managementReview:
         return 15;
@@ -294,8 +309,7 @@ enum ReviewStage {
 
   /// True when ANY of [roles] may act on this stage — the multi-role form.
   /// Someone holding both the HR and Accounts seats can act on either.
-  bool isActionableByAny(Set<UserRole> roles) =>
-      roles.any(actorRoles.contains);
+  bool isActionableByAny(Set<UserRole> roles) => roles.any(actorRoles.contains);
 
   /// Stages decided by WHO the caller is to a review rather than by role:
   ///   * [selfRating] — the review's owner, whatever their role.

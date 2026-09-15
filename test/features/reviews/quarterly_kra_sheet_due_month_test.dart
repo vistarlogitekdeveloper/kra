@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/constants/app_strings.dart';
 import 'package:vistar_app/core/enums/kra_reviewer.dart';
 import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_kra_row.dart';
@@ -62,9 +63,12 @@ void main() {
         child: MaterialApp(home: Scaffold(body: child)),
       );
 
-  const genericHint = 'You can edit the Self ratings on this sheet.';
-  const augustHint = "Rate your Aug '26 Self column — that is the current "
-      'month, and it is still empty.';
+  // The scope line now carries the stage deadline. Derived, not restated, so
+  // these tests keep passing when the published schedule changes.
+  final due = AppStrings.dueByEachMonth(ReviewStage.selfRating.deadlineDay!);
+  final genericHint = 'You can edit the Self ratings on this sheet.$due';
+  final augustHint = "Rate your Aug '26 Self column — that is the current "
+      'month, and it is still empty.$due';
 
   testWidgets(
       'an earlier month rated but the current one empty → the hint '
