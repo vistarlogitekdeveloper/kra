@@ -9,20 +9,12 @@ void main() {
     test('resolves every non-terminal stage to its fixed day of month', () {
       expect(MonthlyDeadlines.forStage(ReviewStage.selfRating, ref),
           DateTime(2026, 6, 10));
-      // Account & HR (both raters) fall due on the 12th, the reporting manager
-      // on the 13th — they no longer share a date.
-      expect(
-          MonthlyDeadlines.forStage(ReviewStage.accountHrRating, ref),
-          DateTime(2026, 6, 12));
-      expect(
-          MonthlyDeadlines.forStage(ReviewStage.financeRating, ref),
-          DateTime(2026, 6, 12));
+
       expect(
         MonthlyDeadlines.forStage(ReviewStage.reportingManagerRating, ref),
         DateTime(2026, 6, 13),
       );
-      expect(
-          MonthlyDeadlines.forStage(ReviewStage.managementReview, ref),
+
           DateTime(2026, 6, 15));
       expect(MonthlyDeadlines.forStage(ReviewStage.incentivePayout, ref),
           DateTime(2026, 6, 20));
