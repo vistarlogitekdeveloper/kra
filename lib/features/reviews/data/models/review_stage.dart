@@ -179,7 +179,14 @@ enum ReviewStage {
   /// the three Review raters no longer share one date. `accountHrRating` is the
   /// HR rater and `financeRating` the Accounts one; together they are the
   /// schedule's single "Account & HR Rating" line, so both carry the 12th.
-  int? get deadlineDay {
+  int? get deadlineDay => DeadlineSchedule.dayFor(this);
+
+  /// The circulated table, frozen in the client.
+  ///
+  /// Used whenever the server has not told us otherwise — offline, an older
+  /// backend, or a failed fetch — so the app always has an answer and never
+  /// shows a blank deadline.
+  int? get publishedDeadlineDay {
     switch (this) {
       case ReviewStage.selfRating:
         return 10;
@@ -318,4 +325,52 @@ enum ReviewStage {
   bool get isRelationshipStage =>
       this == ReviewStage.selfRating ||
       this == ReviewStage.reportingManagerRating;
+}
+
+/// The deadline schedule actually in force.
+///
+/// The days are a published business rule, but the backend allows per-instance
+/// env overrides (`KRA_*_DEADLINE_DAY`) and serves the resolved table from
+/// `GET /config/deadlines`. Its startup log states that the app follows those
+/// values, so the app has to actually read them — otherwise an override moves
+/// the reminder emails and leaves every screen counting to the old date, which
+/// is the drift this whole exercise removed.
+///
+/// Resolved ONCE at boot and held process-wide rather than passed around,
+/// because [ReviewStage.deadlineDay] and [MonthlyDeadlines] are synchronous and
+/// read from a dozen widgets. Empty until [adopt] is called, so behaviour is
+/// identical to the frozen table unless the server disagrees.
+class DeadlineSchedule {
+  DeadlineSchedule._();
+
+  static Map<ReviewStage, int> _resolved = const {};
+
+  /// True once the server schedule has been adopted.
+  static bool get isResolved => _resolved.isNotEmpty;
+
+  /// Stages whose server day differs from the published table — non-empty only
+  /// when an override is in play, which is worth surfacing in diagnostics.
+  static Map<ReviewStage, int> get overrides => {
+        for (final e in _resolved.entries)
+          if (e.key.publishedDeadlineDay != e.value) e.key: e.value,
+      };
+
+  /// Adopt the server-resolved schedule. Ignores days outside 1–31 rather than
+  /// trusting the payload blindly: a bad value here would land in user-facing
+  /// copy and in every countdown.
+  static void adopt(Map<ReviewStage, int> days) {
+    _resolved = {
+      for (final e in days.entries)
+        if (e.value >= 1 && e.value <= 31) e.key: e.value,
+    };
+  }
+
+  /// Back to the frozen table. For tests, and for a sign-out that might be
+  /// followed by a sign-in against a different backend.
+  static void reset() => _resolved = const {};
+
+  /// The day [stage] is due: the server value if we have one, else the
+  /// published table. Null only for the terminal stage.
+  static int? dayFor(ReviewStage stage) =>
+      _resolved[stage] ?? stage.publishedDeadlineDay;
 }

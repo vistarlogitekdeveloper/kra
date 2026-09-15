@@ -80,6 +80,12 @@ class ApiConstants {
   // Marked via options.extra['skipAuth'] = true at the call site.
   // /auth/me explicitly is NOT in this list — it requires a valid
   // access token to identify the current user.
+  /// The backend's resolved deadline schedule (day-of-month per stage).
+  ///
+  /// Public and mounted ahead of the auth middleware, so the app can read it
+  /// before anyone signs in. See `DeadlineSchedule`.
+  static const String configDeadlines = '/config/deadlines';
+
   static const Set<String> noAuthEndpoints = {
     authLogin,
     authRefresh,

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../reviews/data/models/review_stage.dart';
+import '../../../reviews/presentation/providers/deadline_schedule_providers.dart';
 import '../../data/models/user.dart';
 import 'auth_providers.dart';
 
@@ -17,6 +19,16 @@ import 'auth_providers.dart';
 /// cached user data. Failures are silent (network may be unavailable
 /// at boot — that's fine, we'll re-fetch later).
 final appBootProvider = FutureProvider<void>((ref) async {
+  // Adopt the backend's deadline schedule before anything renders a date.
+  //
+  // Fire-and-forget for the same reason /auth/me is: boot must not block on
+  // the network, and a failure is harmless — the published table stays in
+  // force. Not awaited, so a Render cold start cannot hold up the first frame.
+  // ignore: unawaited_futures
+  ref.read(deadlineScheduleRepositoryProvider).fetch().then((days) {
+    if (days != null) DeadlineSchedule.adopt(days);
+  });
+
   final storage = ref.read(secureStorageProvider);
   final hasSession = await storage.hasSession();
   if (!hasSession) return;
