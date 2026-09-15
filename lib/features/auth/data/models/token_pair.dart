@@ -5,6 +5,13 @@
 /// token (NOT the refresh token). Refresh tokens rotate on every use,
 /// so their lifetime is policy-defined by the backend.
 class TokenPair {
+  /// Access-token lifetime assumed when a response omits `expiresIn`.
+  ///
+  /// Named rather than inlined because two callers need the same fallback:
+  /// [TokenPair.fromJson], and the organisation switch, whose response carries
+  /// a token pair without an expiry. Two independent 900s would drift.
+  static const int defaultExpiresIn = 900;
+
   final String accessToken;
   final String refreshToken;
   final int expiresIn;
@@ -19,7 +26,7 @@ class TokenPair {
     return TokenPair(
       accessToken: json['accessToken'] as String,
       refreshToken: json['refreshToken'] as String,
-      expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 900,
+      expiresIn: (json['expiresIn'] as num?)?.toInt() ?? defaultExpiresIn,
     );
   }
 }

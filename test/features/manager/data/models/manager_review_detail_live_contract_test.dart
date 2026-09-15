@@ -140,8 +140,7 @@ void main() {
           'month': {'monthLabel': 'May 2026', 'status': 'OPEN'},
         },
       ];
-      final cells =
-          ManagerReviewDetail.fromJson(json).rows.first.monthlyScores;
+      final cells = ManagerReviewDetail.fromJson(json).rows.first.monthlyScores;
       expect(
         cells.map((c) => c.monthlyScoreId).toSet(),
         {'rms_e2_1_apr', 'rms_e2_1_may'},

@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/api/json_parse.dart';
+import '../../../../core/enums/review_flow.dart';
 
 /// All roles in the Vistar KRA system.
+///
 /// HR_ADMIN has elevated privileges within the HR module (audit log, dashboard).
-/// ADMIN is the super-user, also routed to the HR dashboard.
+/// ADMIN is the legacy super-user, also routed to the HR dashboard. SUPER_ADMIN
+/// is the organisation-wide top tier and holds every seat below it.
 enum UserRole {
   admin,
   hrAdmin,
@@ -25,7 +28,23 @@ enum UserRole {
   /// backend so that the day its employees enum gains `MANAGEMENT`, holders are
   /// read correctly instead of falling through [fromApi]'s default to
   /// [employee] — which would silently demote the founder to a plain employee.
-  management;
+  management,
+
+  /// The organisation-wide top tier — the backend's `SUPER_ADMIN`.
+  ///
+  /// Its own role rather than an alias of [admin], which is what it used to
+  /// collapse into. That collapse meant the app could not tell a SUPER_ADMIN
+  /// from an ADMIN at all, so it could never grant one more than the other.
+  ///
+  /// The backend documents this role as sitting above `HR_ADMIN` as the
+  /// role-granting authority, and its `RoleEnum` stores it — but as of this
+  /// writing NO backend route guard names it, and `requireRoles` is a flat
+  /// exact-match with no hierarchy. So a SUPER_ADMIN is currently REJECTED by
+  /// every privileged endpoint (they all require `HR_ADMIN` / `ADMIN`), and the
+  /// client-side access granted for it runs ahead of the API on purpose. See
+  /// `docs/SUPER_ADMIN_BACKEND_SPEC.md` for the change list that makes it real;
+  /// until that ships, writes answer 403.
+  superAdmin;
 
   /// Tolerates "ADMIN" / "Admin" / "admin" / "EMPLOYEE" / "HR_ADMIN" etc.
   /// and falls back to [employee] on any unknown value rather than
@@ -38,8 +57,12 @@ enum UserRole {
     final normalized = value.trim().toUpperCase();
     switch (normalized) {
       case 'ADMIN':
-      case 'SUPER_ADMIN':
         return UserRole.admin;
+      // Its own role now. Collapsing it into ADMIN made the two
+      // indistinguishable, so the app could never grant one more than the
+      // other — which is exactly what a super-admin tier needs to do.
+      case 'SUPER_ADMIN':
+        return UserRole.superAdmin;
       case 'HR_ADMIN':
         return UserRole.hrAdmin;
       case 'MANAGEMENT':
@@ -75,8 +98,44 @@ enum UserRole {
     }
   }
 
-  /// The on-wire form (UPPERCASE) — used when echoing back to the API.
-  String toApiString() => name.toUpperCase();
+  /// The on-wire form — used when echoing a role back to the API.
+  ///
+  /// Spelled out per case rather than `name.toUpperCase()`, which silently
+  /// dropped the underscore on every multi-word role: `hrAdmin` became
+  /// `HRADMIN`, `bdManager` `BDMANAGER`, `warehouseMgr` `WAREHOUSEMGR` — none
+  /// of which the backend's employees `RoleEnum` accepts, so they come back as
+  /// `VAL_001 Validation failed`. Latent while only the scalar `role` is echoed
+  /// from a cached user, but [FeatureFlags.multiRole] sends the whole `roles`
+  /// array, which would have made it a 400 on every save.
+  ///
+  /// [UserRole.fromApi] of this value must return the same case for every role
+  /// — there is a round-trip test over `UserRole.values` pinning exactly that.
+  String toApiString() {
+    switch (this) {
+      case UserRole.admin:
+        return 'ADMIN';
+      case UserRole.hrAdmin:
+        return 'HR_ADMIN';
+      case UserRole.employee:
+        return 'EMPLOYEE';
+      case UserRole.manager:
+        return 'MANAGER';
+      case UserRole.ops:
+        return 'OPS';
+      case UserRole.hr:
+        return 'HR';
+      case UserRole.finance:
+        return 'FINANCE';
+      case UserRole.bdManager:
+        return 'BD_MANAGER';
+      case UserRole.warehouseMgr:
+        return 'WAREHOUSE_MGR';
+      case UserRole.management:
+        return 'MANAGEMENT';
+      case UserRole.superAdmin:
+        return 'SUPER_ADMIN';
+    }
+  }
 
   String get displayName {
     switch (this) {
@@ -100,6 +159,8 @@ enum UserRole {
         return 'Warehouse Manager';
       case UserRole.management:
         return 'Management';
+      case UserRole.superAdmin:
+        return 'Super Admin';
     }
   }
 }
@@ -128,6 +189,17 @@ class User {
   /// did before until a `roles` array actually arrives.
   final Set<UserRole> roles;
   final String organizationId;
+
+  /// Which review pipeline this user's organisation runs.
+  ///
+  /// Carried on the user because it has to be readable by EVERY role: only a
+  /// super admin may call `/organizations`, so HR, managers and employees
+  /// cannot look their own organisation up. The auth payload is the one place
+  /// all of them see.
+  ///
+  /// Defaults to [ReviewFlow.standard] when absent, which is the case on any
+  /// server that has not shipped the field — see [ReviewFlow.fromApi].
+  final ReviewFlow reviewFlow;
   final String? projectLocationId;
   final bool hasReports;
 
@@ -138,6 +210,7 @@ class User {
     required this.role,
     Set<UserRole>? roles,
     required this.organizationId,
+    this.reviewFlow = ReviewFlow.standard,
     this.projectLocationId,
     this.hasReports = false,
   }) : roles = roles ?? const {};
@@ -152,16 +225,17 @@ class User {
 
   /// [roles], or `{role}` when the backend sent only the scalar. Never empty, so
   /// callers never have to special-case a role-less user.
-  Set<UserRole> get effectiveRoles =>
-      roles.isEmpty ? {role} : {role, ...roles};
+  Set<UserRole> get effectiveRoles => roles.isEmpty ? {role} : {role, ...roles};
 
   /// The super-admin tier: the only one that may change other people's access.
   ///
-  /// [UserRole.admin] is that tier — the backend's `ADMIN` / `SUPER_ADMIN` both
-  /// map to it. Deliberately NOT [UserRole.hrAdmin]: HR admins administer
-  /// employee records, but handing out roles (including their own) is a
-  /// privilege-escalation path, so it stays above them.
-  bool get isSuperAdmin => hasRole(UserRole.admin);
+  /// [UserRole.superAdmin] is that tier, with [UserRole.admin] kept alongside it
+  /// so existing ADMIN holders don't lose the privilege they have today.
+  /// Deliberately NOT [UserRole.hrAdmin]: HR admins administer employee records,
+  /// but handing out roles (including their own) is a privilege-escalation path,
+  /// so it stays above them.
+  bool get isSuperAdmin =>
+      hasAnyRole(const {UserRole.superAdmin, UserRole.admin});
 
   factory User.fromJson(Map<String, dynamic> json) {
     // The login endpoint returns `name`; /auth/me returns `fullName`.
@@ -193,6 +267,9 @@ class User {
               : 'EMPLOYEE')),
       roles: parsedRoles,
       organizationId: JsonParse.parseString(json['organizationId']) ?? '',
+      // Absent on any server without the field, which resolves to the
+      // standard pipeline — see ReviewFlow.fromApi.
+      reviewFlow: ReviewFlow.fromApi(JsonParse.parseString(json['reviewFlow'])),
       projectLocationId: JsonParse.parseString(json['projectLocationId']),
       hasReports: json['hasReports'] as bool? ?? false,
     );
@@ -205,6 +282,7 @@ class User {
         'role': role.toApiString(),
         'roles': [for (final r in effectiveRoles) r.toApiString()],
         'organizationId': organizationId,
+        'reviewFlow': reviewFlow.toApiString(),
         'projectLocationId': projectLocationId,
         'hasReports': hasReports,
       };
@@ -216,6 +294,7 @@ class User {
     UserRole? role,
     Set<UserRole>? roles,
     String? organizationId,
+    ReviewFlow? reviewFlow,
     String? projectLocationId,
     bool? hasReports,
   }) {
@@ -226,6 +305,7 @@ class User {
       role: role ?? this.role,
       roles: roles ?? this.roles,
       organizationId: organizationId ?? this.organizationId,
+      reviewFlow: reviewFlow ?? this.reviewFlow,
       projectLocationId: projectLocationId ?? this.projectLocationId,
       hasReports: hasReports ?? this.hasReports,
     );

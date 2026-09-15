@@ -12,6 +12,9 @@ import 'package:vistar_app/features/manager/presentation/providers/manager_rate_
 /// dependencies) — these focus on the math that drives the matrix
 /// footer and submit gate, where regressions would silently corrupt
 /// the user-visible totals.
+/// Fixed clock: May 2026 has ended, so the fixtures' cells are ratable.
+final testNow = DateTime(2026, 9, 5);
+
 void main() {
   group('ManagerRateState.isComplete', () {
     test('false when review is null', () {
@@ -38,7 +41,8 @@ void main() {
           ],
         ),
       ]);
-      final state = ManagerRateState(review: review, reviewId: 'r1');
+      final state =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(state.isComplete, isTrue);
     });
 
@@ -46,7 +50,8 @@ void main() {
       final review = _review(rows: [
         _row(cells: [_cell(rating: 8.0), _cell(rating: null)]),
       ]);
-      final state = ManagerRateState(review: review, reviewId: 'r1');
+      final state =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(state.isComplete, isFalse);
     });
 
@@ -63,7 +68,8 @@ void main() {
           cells: [_cell(rating: 8.0)],
         ),
       ]);
-      final state = ManagerRateState(review: review, reviewId: 'r1');
+      final state =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(state.isComplete, isTrue);
     });
 
@@ -74,7 +80,8 @@ void main() {
           _cell(rating: null, isNotApplicable: true),
         ]),
       ]);
-      final state = ManagerRateState(review: review, reviewId: 'r1');
+      final state =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(state.isComplete, isTrue);
     });
 
@@ -85,7 +92,8 @@ void main() {
           _cell(rating: null, status: ReviewMonthStatus.locked),
         ]),
       ]);
-      final state = ManagerRateState(review: review, reviewId: 'r1');
+      final state =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(state.isComplete, isTrue);
     });
   });
@@ -100,7 +108,8 @@ void main() {
       final review = _review(rows: [
         _row(cells: [_cell(rating: null), _cell(rating: null)]),
       ]);
-      final s = ManagerRateState(review: review, reviewId: 'r1');
+      final s =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(s.weightedTotalPct, 0);
     });
 
@@ -113,7 +122,8 @@ void main() {
           cells: [_cell(rating: 10.0), _cell(rating: 10.0)],
         ),
       ]);
-      final s = ManagerRateState(review: review, reviewId: 'r1');
+      final s =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(s.weightedTotalPct, closeTo(100, 0.01));
     });
 
@@ -125,7 +135,8 @@ void main() {
           cells: [_cell(rating: 5.0), _cell(rating: 5.0)],
         ),
       ]);
-      final s = ManagerRateState(review: review, reviewId: 'r1');
+      final s =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(s.weightedTotalPct, closeTo(50, 0.01));
     });
 
@@ -142,7 +153,8 @@ void main() {
           ],
         ),
       ]);
-      final s = ManagerRateState(review: review, reviewId: 'r1');
+      final s =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(s.weightedTotalPct, closeTo(100, 0.01));
     });
 
@@ -157,7 +169,8 @@ void main() {
           cells: [_cell(rating: 100.0)],
         ),
       ]);
-      final s = ManagerRateState(review: review, reviewId: 'r1');
+      final s =
+          ManagerRateState(clock: testNow, review: review, reviewId: 'r1');
       expect(s.weightedTotalPct, lessThanOrEqualTo(100.0));
       expect(s.weightedTotalPct, greaterThanOrEqualTo(0.0));
     });
@@ -271,16 +284,23 @@ ReviewRow _row({
   );
 }
 
+/// A cell in a month that has ENDED as of [testNow], so it is ratable.
+///
+/// The date is not decoration: a cell whose month cannot be identified is
+/// deliberately not ratable, so a fixture without one makes every
+/// completeness assertion vacuous.
 MonthlyScore _cell({
   ReviewMonthStatus status = ReviewMonthStatus.open,
   bool isNotApplicable = false,
   double? rating,
+  DateTime? monthDate,
 }) {
   return MonthlyScore(
     monthlyScoreId: 'cell-${rating ?? "null"}-${isNotApplicable ? "na" : "ok"}',
     monthId: 'm-1',
     monthLabel: 'May',
     monthStatus: status,
+    monthDate: monthDate ?? DateTime(2026, 5, 1),
     isNotApplicable: isNotApplicable,
     managerRating: rating,
   );

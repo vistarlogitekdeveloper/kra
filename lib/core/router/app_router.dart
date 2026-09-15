@@ -34,6 +34,7 @@ import '../../features/hr/presentation/screens/kra_assign_screen.dart';
 import '../../features/hr/presentation/screens/kra_template_form_screen.dart';
 import '../../features/hr/presentation/screens/kra_templates_screen.dart';
 import '../../features/hr/presentation/screens/locations_screen.dart';
+import '../../features/hr/presentation/screens/organizations_screen.dart';
 import '../../features/hr/presentation/screens/review_compliance_screen.dart';
 import '../../features/manager/presentation/screens/manager_shell_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_confirm_screen.dart';
@@ -111,6 +112,11 @@ class AppRoutes {
   static const String hrReviews = '/hr/reviews';
   static const String hrReports = '/hr/reports';
   static const String hrLocations = '/hr/locations';
+
+  /// Tenant administration. Lives under /hr because the HR shell is the only
+  /// area a super admin lands in, but it is gated on SUPER_ADMIN alone — an
+  /// HR_ADMIN reaching it would only get 403s from /organizations.
+  static const String hrOrganizations = '/hr/organizations';
   static const String hrAuditLog = '/hr/reports/audit-log';
   static const String hrReviewCompliance = '/hr/reports/review-compliance';
 
@@ -174,7 +180,11 @@ class AppRoutes {
   ///
   /// Plain HR is a REVIEW-only role; the admin console is HR_ADMIN / ADMIN only.
   static bool canAccessHr(UserRole role) =>
-      role == UserRole.hrAdmin || role == UserRole.admin;
+      role == UserRole.hrAdmin ||
+      role == UserRole.admin ||
+      // The org-wide tier holds every seat beneath it, HR administration
+      // included.
+      role == UserRole.superAdmin;
 
   /// Multi-role forms of the three predicates below: true when ANY held role
   /// grants the area. A user with several seats gets the union of their access,
@@ -203,12 +213,17 @@ class AppRoutes {
       // Management performs the Management review, so it needs the Reviews
       // workspace — but NOT the HR console (see [canAccessHr]): signing off on
       // reviews is not the same authority as administering employees.
-      role == UserRole.management;
+      role == UserRole.management ||
+      role == UserRole.superAdmin;
 
   /// True if [role] may access any `/manager/*` route. Drives the
   /// router's role-guard redirect.
   static bool canAccessManager(UserRole role, {bool hasReports = false}) {
-    if (role == UserRole.hrAdmin || role == UserRole.admin) return true;
+    if (role == UserRole.hrAdmin ||
+        role == UserRole.admin ||
+        role == UserRole.superAdmin) {
+      return true;
+    }
     if (hasReports) return true;
     switch (role) {
       case UserRole.manager:
@@ -272,7 +287,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
         // Role guard: the HR module is HR/HR_ADMIN/ADMIN only. Other roles
         // get bounced to their own dashboard if they deep-link in.
-        if (goingToHrArea && !AppRoutes.canAccessHrAny(authState.user.effectiveRoles)) {
+        if (goingToHrArea &&
+            !AppRoutes.canAccessHrAny(authState.user.effectiveRoles)) {
           return AppRoutes.dashboardForRole(authState.user.role);
         }
         // Bare /hr → /hr/home for HR/HR_ADMIN/ADMIN.
@@ -647,6 +663,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.hrLocations,
         builder: (_, __) => const LocationsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrOrganizations,
+        builder: (_, __) => const OrganizationsScreen(),
       ),
       GoRoute(
         path: AppRoutes.hrEmployeeNew,

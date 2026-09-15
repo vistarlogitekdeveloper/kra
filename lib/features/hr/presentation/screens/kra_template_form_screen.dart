@@ -139,9 +139,15 @@ class _KraTemplateFormScreenState extends ConsumerState<KraTemplateFormScreen> {
     });
   }
 
-  void _reorder(int oldIndex, int newIndex) {
+  /// Reorder handler for [ReorderableListView.onReorderItem].
+  ///
+  /// No `if (newIndex > oldIndex) newIndex -= 1` here — that adjustment was
+  /// only needed by the deprecated `onReorder`, which reported `newIndex` as if
+  /// the dragged item were still in the list. `onReorderItem` already accounts
+  /// for its removal, so repeating the correction would move the item one slot
+  /// short on every downward drag.
+  void _reorderItem(int oldIndex, int newIndex) {
     setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
       final movedItem = _items.removeAt(oldIndex);
       final movedCtrls = _itemControllers.removeAt(oldIndex);
       _items.insert(newIndex, movedItem);
@@ -422,7 +428,7 @@ class _KraTemplateFormScreenState extends ConsumerState<KraTemplateFormScreen> {
       shrinkWrap: true,
       buildDefaultDragHandles: false,
       physics: const NeverScrollableScrollPhysics(),
-      onReorder: _reorder,
+      onReorderItem: _reorderItem,
       children: [
         for (int i = 0; i < _items.length; i++)
           Padding(

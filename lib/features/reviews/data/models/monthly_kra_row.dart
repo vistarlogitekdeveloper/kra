@@ -93,7 +93,9 @@ class MonthlyKraRow {
     if (raw != null) {
       raw.forEach((k, v) {
         final map = JsonParse.parseMap(v);
-        if (map != null) scores[ReviewStage.fromApi(k)] = RowScore.fromJson(map);
+        if (map != null) {
+          scores[ReviewStage.fromApi(k)] = RowScore.fromJson(map);
+        }
       });
     }
     return MonthlyKraRow(
@@ -123,7 +125,8 @@ class MonthlyKraRow {
         'maxScore': maxScore,
         'target': target,
         'trackingMethod': trackingMethod,
-        if (reviewerGroup != null) 'reviewerGroup': reviewerGroup!.toApiString(),
+        if (reviewerGroup != null)
+          'reviewerGroup': reviewerGroup!.toApiString(),
         'displayOrder': displayOrder,
         'stageScores':
             stageScores.map((k, v) => MapEntry(k.toApiString(), v.toJson())),

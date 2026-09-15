@@ -14,6 +14,8 @@ import '../../../providers/manager_rate_providers.dart';
 import 'widgets/auto_save_indicator.dart';
 import 'widgets/manager_total_footer.dart';
 import 'widgets/quarterly_review_matrix.dart';
+import '../../../../../reviews/data/models/monthly_review.dart';
+import '../../../../../employee/presentation/widgets/_formatters.dart';
 
 /// The manager-rate matrix screen. Loads the review on mount via
 /// the notifier, hands off the matrix UI to
@@ -103,7 +105,14 @@ class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
                 filledCount: _filledCount(state),
                 totalCount: _totalCount(state),
                 primaryLabel: AppStrings.managerRateReviewCta,
-                isPrimaryEnabled: state.isComplete,
+                // Submitting is a CYCLE-level act on the server, so the button
+                // only appears once the whole quarter has ended. Mid-quarter it
+                // could not succeed: the MANAGER_RATED_ALL transition requires
+                // every month, so the review would land on the partial-success
+                // screen. Ratings auto-save regardless, so nothing waits but
+                // the transition itself.
+                isPrimaryEnabled: state.isComplete && state.quarterEnded,
+                disabledReasonOverride: _submitOpensHint(state),
                 isSubmitting: state.isSubmitting,
                 onPrimary: () =>
                     context.go(AppRoutes.managerRateReview(widget.reviewId)),
@@ -112,14 +121,32 @@ class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
     );
   }
 
+  /// Why submit is withheld, when the reason is the calendar rather than
+  /// missing scores. Null once the quarter has ended, so the footer falls back
+  /// to its normal "incomplete scores" wording.
+  String? _submitOpensHint(ManagerRateState s) {
+    final opensOn = s.submitOpensOn;
+    if (opensOn == null) return null;
+    final lastMonth = ReviewPeriod.fromDate(opensOn).previous;
+    return AppStrings.managerRateSubmitOpensOn(
+      EmployeeFormatters.date(opensOn),
+      lastMonth.label,
+    );
+  }
+
+  /// Cells the manager has rated, out of the ones they can rate TODAY.
+  ///
+  /// Counted with the same predicate as the denominator and as
+  /// [ManagerRateState.isComplete]. When these disagreed the footer promised
+  /// "0 of 9" while only 3 cells were fillable, and submit stayed disabled on
+  /// "Incomplete scores" with no way to satisfy it.
   int _filledCount(ManagerRateState s) {
     final review = s.review;
     if (review == null) return 0;
     int n = 0;
     for (final row in review.rows) {
       for (final c in row.monthlyScores) {
-        if (c.isNotApplicable) continue;
-        if (!c.isEditable) continue;
+        if (!c.isRatableOn(s.now)) continue;
         if (c.managerRating != null) n++;
       }
     }
@@ -132,8 +159,7 @@ class _ManagerRateScreenState extends ConsumerState<ManagerRateScreen> {
     int n = 0;
     for (final row in review.rows) {
       for (final c in row.monthlyScores) {
-        if (c.isNotApplicable) continue;
-        if (!c.isEditable) continue;
+        if (!c.isRatableOn(s.now)) continue;
         n++;
       }
     }

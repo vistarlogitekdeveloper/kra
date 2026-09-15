@@ -7,57 +7,80 @@ environment:
   sdk: ">=3.0.0 <4.0.0"
   flutter: ">=3.10.0"
 
+# Every version is pinned EXACTLY, with no `^` range and never `any`, so a
+# `pub get` on a fresh machine or a CI runner resolves the same graph this was
+# tested against. A caret range means the build that ships is not necessarily
+# the build that was verified.
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.6
+  cupertino_icons: 1.0.9
 
   # Browser APIs for the web build — used to download a proof attachment
   # (Blob + object URL) so a reporting manager can open the employee's evidence.
   # Already present transitively; declared directly because we import it.
-  web: ^1.1.1
+  # `package:web` is also the only JS-interop route that compiles under
+  # dart2wasm — `dart:html` does not exist there.
+  web: 1.1.1
 
   # State management
-  flutter_riverpod: ^2.4.9
+  flutter_riverpod: 2.6.1
 
   # Routing
-  go_router: ^13.0.0
+  go_router: 13.2.5
 
   # Networking
-  dio: ^5.4.0
+  dio: 5.9.2
 
-  # Secure token storage
-  flutter_secure_storage: ^9.0.0
+  # Secure token storage.
+  #
+  # 11.x, not 9.x, because the web implementation had to stop using
+  # `dart:html`/`dart:js_util`: those libraries do not exist under dart2wasm, so
+  # 9.x made `flutter build web --wasm` fail outright. This app talks to it
+  # through exactly one wrapper (core/storage/secure_storage_service.dart), so
+  # the major bump lands in one file.
+  flutter_secure_storage: 11.0.0
 
   # Local key-value persistence (non-secrets — used for self-rate
   # auto-save / draft resume in the Employee module).
-  shared_preferences: ^2.2.2
+  shared_preferences: 2.5.5
 
-  # Connectivity awareness
-  connectivity_plus: ^5.0.2
+  # Connectivity awareness. 7.x for the same dart2wasm reason as secure
+  # storage: 5.x's web plugin imports `dart:html`.
+  connectivity_plus: 7.3.1
 
   # UI
-  google_fonts: ^6.1.0
-  shimmer: ^3.0.0
+  google_fonts: 6.3.3
+  shimmer: 3.0.0
 
   # Utilities
-  intl: ^0.19.0
+  intl: 0.19.0
 
-  # File attachment picker (self-rate "proof" — local-only for now)
-  file_picker: ^8.0.0
+  # File attachment picker (self-rate "proof" — local-only for now).
+  #
+  # 12.x rather than 8.x for a transitive reason, not a feature one: 8.x pins
+  # `win32 ^5.9.0` while flutter_secure_storage 11's Windows implementation
+  # needs `win32 ^6.0.1`, so the two could not co-resolve. 12.x dropped its
+  # direct win32 dependency altogether.
+  #
+  # It IS a breaking API change, in both of this app's two call sites:
+  # `FilePicker.platform` is gone (the methods are static now), `pickFiles`
+  # returns a plain `List<PlatformFile>` instead of a nullable result object,
+  # and `withData: true` is superseded by `PlatformFile.readAsBytes()`.
+  file_picker: 12.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: 3.0.2
 
   # Launcher-icon generation (build-time only, never shipped). Regenerate with:
   #   dart run tool/make_app_icon.dart && dart run flutter_launcher_icons
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: 0.13.1
 
   # Used only by tool/make_app_icon.dart to letterbox the logo onto a square
   # canvas. Declared directly rather than leaned on transitively.
-  image: ^4.1.7
+  image: 4.8.0
 
 # Launcher icons are generated from a SQUARE source, produced by
 # tool/make_app_icon.dart. The brand logo is a wide 3:2 wordmark, so it is

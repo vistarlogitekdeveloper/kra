@@ -14,10 +14,11 @@ import '../../../../core/utils/proof_file_saver.dart';
 import '../../../../core/widgets/adaptive_leading.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/workspace_drawer.dart';
-import '../../../auth/data/models/user.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
+import '../../../../core/enums/review_flow.dart';
+import '../../data/models/review_flow.dart';
 import '../../data/models/review_stage.dart';
 import '../../data/models/row_score.dart';
 import '../../../hr/presentation/widgets/confirm_action_dialog.dart';
@@ -105,7 +106,17 @@ IconData _reviewerIcon(KraReviewer r) {
 /// signed-in user's own sheet.
 class QuarterlyKraSheetScreen extends ConsumerStatefulWidget {
   final String? employeeId;
-  const QuarterlyKraSheetScreen({super.key, this.employeeId});
+
+  /// Injectable clock, for the month-ratability gates.
+  ///
+  /// Whether a month may be rated depends on today's date, so the gates that
+  /// enforce it cannot be tested deterministically against the real clock —
+  /// they would assert something different every month. Null means
+  /// `DateTime.now()`, so production is unaffected.
+  @visibleForTesting
+  final DateTime? clock;
+
+  const QuarterlyKraSheetScreen({super.key, this.employeeId, this.clock});
 
   @override
   ConsumerState<QuarterlyKraSheetScreen> createState() =>
@@ -116,6 +127,12 @@ class _QuarterlyKraSheetScreenState
     extends ConsumerState<QuarterlyKraSheetScreen> {
   ReviewPeriod? _anchor;
   bool _saving = false;
+
+  /// Now, as the ratability gates see it. Read through a getter rather than
+  /// captured in `initState` so a sheet left open across midnight — or across
+  /// a month boundary, which is exactly when this rule changes — re-evaluates
+  /// instead of holding a stale answer.
+  DateTime get _now => widget.clock ?? DateTime.now();
 
   /// Locally-attached proof files, one per KRA, keyed by "reviewId|rowId".
   /// Kept only for this session — there's no upload endpoint yet, so the file
@@ -149,7 +166,7 @@ class _QuarterlyKraSheetScreenState
   ///   4. default to the Reporting Manager — the relationship every employee
   ///      has — so a KRA is never left unassigned.
   MonthlyReview? _applyReviewerMap(
-      MonthlyReview? r, KraReviewerAssignment map) {
+      MonthlyReview? r, KraReviewerAssignment map, ReviewFlow flow) {
     if (r == null) return r;
     // Match the template's ordering so position-based fallback lines up.
     final ordered = [...r.rows]
@@ -158,10 +175,39 @@ class _QuarterlyKraSheetScreenState
       for (var i = 0; i < ordered.length; i++)
         () {
           final row = ordered[i];
-          final reviewer = row.reviewerGroup ??
+          // What the SERVER has for this row, as distinct from what the local
+          // assignment template guesses. The difference decides whether a
+          // re-point is safe — see below.
+          final stored = row.reviewerGroup;
+          var reviewer = stored ??
               map.byName[kraNameKey(row.name)] ??
               (i < map.byOrder.length ? map.byOrder[i] : null) ??
-              KraReviewer.reportingManager;
+              defaultReviewerFor(flow);
+          // A row assigned to a reviewer this flow does not use has NO eligible
+          // rater — nobody can score it, and the cell offers no tap target to
+          // anyone. Re-point it at a seat the flow actually has, but ONLY when
+          // the server holds no assignment for the row.
+          //
+          // That condition is not caution, it is the server's rule. writeRowScores
+          // carries a per-KRA reviewer guard in raw SQL: a Review-cycle rater may
+          // only score a row assigned to them, and it passes any stage when
+          // `reviewer_group IS NULL`. So re-pointing a row the server has STORED
+          // as the reporting manager produces an ACCOUNT_HR_RATING write that
+          // matches nothing, inserts zero rows, and — in its own words —
+          // "Mismatches are silently skipped". HTTP 200, no error, no score.
+          //
+          // Faking a rateable cell there is worse than showing none: the rater
+          // enters a value, sees it accepted, and finds it gone on the next
+          // refresh. So leave it visibly on the seat the flow does not use, and
+          // let the sheet say so — the fix is to reassign the KRA, which is what
+          // an administrators-only organisation should have done anyway.
+          //
+          // Only ever redirects AWAY from a removed stage, so on the standard
+          // flow (where every stage is present) this whole branch is a no-op.
+          if (stored == null &&
+              !stageIsInFlow(stageForReviewer(reviewer), flow)) {
+            reviewer = defaultReviewerFor(flow);
+          }
           return row.reviewerGroup == reviewer
               ? row
               : row.copyWith(reviewerGroup: reviewer);
@@ -174,9 +220,12 @@ class _QuarterlyKraSheetScreenState
     if (r == null) return null;
     for (final row in r.rows) {
       if (row.id != rowId) continue;
-      final s = row.scoreFor(stage);
-      if (s?.value != null && row.maxScore > 0) {
-        return (s!.value! / row.maxScore) * 100;
+      // Bound to a local so the null check promotes it; `s?.value` cannot be
+      // promoted through the null-aware access, which is why this previously
+      // needed two bang operators to say something already proven.
+      final value = row.scoreFor(stage)?.value;
+      if (value != null && row.maxScore > 0) {
+        return (value / row.maxScore) * 100;
       }
       return null;
     }
@@ -195,6 +244,24 @@ class _QuarterlyKraSheetScreenState
   // per-review — never per-sheet.
   bool _canEditSelf(MonthlyReview r, ReviewScope? scope) {
     if (scope == null || r.isComplete) return false;
+    // A month that has not ENDED cannot be rated by anyone, including its own
+    // employee. Enforced here as well as in isCellOpenForEntry because this
+    // gate feeds `_submittableReviews`, and that is a far worse failure than an
+    // open cell: with a score already present for the live month, the "Submit
+    // self-rating" bar appeared, its dialog named that month, and confirming
+    // advanced an unfinished month to the reporting-manager stage and notified
+    // the manager and HR. Irreversible from the employee's side.
+    //
+    // The gate is still needed after the cell fix, because scores written for
+    // the live month BEFORE that fix shipped are already in the database and
+    // the submit loop would go on offering them.
+    // The OPEN month only — not every month that has ended. Rating August
+    // must not reopen July.
+    if (!r.period.isOpenForRatingOn(_now)) return false;
+    // Some organisations run a pipeline with no self-rating at all. Checked
+    // before identity: under that flow it is not that someone ELSE rates the
+    // employee, it is that the stage does not exist.
+    if (!stageIsInFlow(ReviewStage.selfRating, scope.reviewFlow)) return false;
     return scope.userId == r.employeeId;
   }
 
@@ -208,6 +275,17 @@ class _QuarterlyKraSheetScreenState
   // Still excludes the employee themselves and anyone else's manager.
   bool _canEditManager(MonthlyReview r, ReviewScope? scope) {
     if (scope == null || r.isComplete) return false;
+    final flow = scope.reviewFlow;
+    if (!stageIsInFlow(ReviewStage.reportingManagerRating, flow)) return false;
+    // Under a flow that has taken rating out of the reporting line, this seat
+    // is MANAGEMENT's — the KRAs left over once HR and Accounts have taken
+    // theirs — and the question becomes "what role do you hold?", not "are you
+    // this employee's manager?". Asking the relationship there would lock out
+    // the only people the flow grants it to.
+    if (!stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow)) {
+      return canActOnStage(
+          ReviewStage.reportingManagerRating, flow, scope.effectiveRoles);
+    }
     return r.managerId != null && r.managerId == scope.userId;
   }
 
@@ -228,7 +306,14 @@ class _QuarterlyKraSheetScreenState
   // review. [_canEditManagement] adds the lock and gates per-KRA score entry.
   bool _hasManagementRole(ReviewScope? scope) =>
       scope != null &&
-      (scope.role == UserRole.hrAdmin || scope.role == UserRole.admin);
+      // Reads the MODEL's answer rather than restating a role list, which is
+      // how `management` — the stage's primary actor — came to be missing here
+      // while `managementReview.actorRoles` named it all along: the founder /
+      // CEO tier could not open the sign-off UI it exclusively owns. Deriving
+      // the gate means the two can no longer drift apart, and the
+      // FeatureFlags.roleTiers narrowing is honoured for free.
+      canActOnStage(
+          ReviewStage.managementReview, scope.reviewFlow, scope.effectiveRoles);
 
   bool _canEditManagement(MonthlyReview r, ReviewScope? scope) =>
       _hasManagementRole(scope) && !r.isComplete;
@@ -368,6 +453,138 @@ class _QuarterlyKraSheetScreenState
   bool _hasSelfScore(MonthlyReview r) =>
       r.rows.any((row) => row.scoreFor(ReviewStage.selfRating)?.value != null);
 
+  // ── The reporting manager's own submit ────────────────────────────────────
+  //
+  // The manager's counterpart to the employee's "Submit self-rating". Their
+  // per-KRA scores already persist the moment the rating sheet closes, so this
+  // adds the missing "I'm done" step rather than any new score writing.
+  //
+  // Scoped to the manager's OWN ratings. Each KRA is assigned to exactly one
+  // Review-cycle reviewer ([MonthlyKraRow.reviewStage]), and the three raters
+  // work in parallel on separate stages, so submitting
+  // `REPORTING_MANAGER_RATING` finalises this manager's KRAs and leaves HR's
+  // and Accounts' rows untouched for them to submit themselves.
+
+  /// Months whose manager review this viewer may submit. The per-review rule
+  /// itself lives in [managerCanSubmitReview] so it can be tested directly.
+  List<MonthlyReview> _managerSubmittableReviews(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) =>
+      // No manager rating in this flow means nothing for a manager to submit.
+      // Checked here rather than inside managerCanSubmitReview so that rule
+      // stays a pure function of the review and the viewer.
+      scope == null ||
+              !stageIsInFlow(
+                  ReviewStage.reportingManagerRating, scope.reviewFlow)
+          ? const []
+          : [
+              for (final r in reviews.whereType<MonthlyReview>())
+                if (managerCanSubmitReview(r, scope.userId, now: _now)) r,
+            ];
+
+  /// The manager-submit action, or null when there is nothing to submit — which
+  /// keeps the bar off employees' own sheets, off other managers' reports, and
+  /// off months already submitted or not yet rated.
+  Future<void> Function()? _managerSubmitAction(
+    List<MonthlyReview?> reviews,
+    ReviewScope? scope,
+  ) {
+    if (scope == null) return null;
+    final targets = _managerSubmittableReviews(reviews, scope);
+    if (targets.isEmpty) return null;
+    return () => _submitManagerReview(targets, scope);
+  }
+
+  /// Submits the reporting manager's review for [targets] and confirms it.
+  Future<void> _submitManagerReview(
+    List<MonthlyReview> targets,
+    ReviewScope scope,
+  ) async {
+    final months = targets.map((r) => r.period.label).join(', ');
+    // Coverage across the quarter, so "3 of 5" reads correctly for a
+    // multi-month submit rather than quoting only the first month.
+    final rated =
+        targets.fold<int>(0, (sum, r) => sum + managerRatedKraCount(r));
+    final total =
+        targets.fold<int>(0, (sum, r) => sum + managerAssignedKras(r).length);
+
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.mgrSubmitConfirmTitle,
+      message: '${AppStrings.mgrSubmitConfirmMessage}\n\n'
+          '${AppStrings.mgrSubmitCoverage(rated, total)}\n\n$months',
+      confirmLabel: AppStrings.mgrSubmitConfirmAction,
+      cancelLabel: AppStrings.commonCancel,
+      icon: Icons.task_alt_rounded,
+      accentColor: AppColors.primaryPurple,
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(monthlyReviewRepositoryProvider);
+      for (final review in targets) {
+        // approved: true is what separates this from the rework send-back,
+        // which posts the same stage with approved: false.
+        await repo.submitStage(
+          review.id,
+          ReviewStage.reportingManagerRating,
+          approved: true,
+          actorId: scope.userId,
+          actorName: scope.userName,
+        );
+      }
+      ref.invalidate(quarterlySheetProvider);
+      // The manager's team list badges review state from the summary.
+      ref.invalidate(monthlyReviewListProvider);
+      if (mounted) await _showManagerSubmittedDialog();
+    } catch (e) {
+      if (mounted) {
+        final conflict = e is ApiError && e.statusCode == 409;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(conflict
+                ? AppStrings.mgrSubmitAlreadyMoved
+                : '${AppStrings.mgrSubmitFailed} '
+                    '${e is ApiError ? e.message : e}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showManagerSubmittedDialog() => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surfaceElevated,
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.success, size: 44),
+          title: const Text(
+            AppStrings.mgrSubmitDoneTitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            AppStrings.mgrSubmitDoneMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          actions: [
+            Center(
+              child: FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple),
+                child: const Text(AppStrings.commonClose),
+              ),
+            ),
+          ],
+        ),
+      );
+
   /// The submit action, or null when there is nothing to submit — which keeps the
   /// bar off other people's sheets, off months already submitted, and off months
   /// with nothing rated yet.
@@ -481,10 +698,17 @@ class _QuarterlyKraSheetScreenState
     ReviewScope? scope,
   ) =>
       [
-        for (final r in reviews.whereType<MonthlyReview>())
-          if (r.currentStage == ReviewStage.reportingManagerRating &&
-              _canEditManager(r, scope))
-            r,
+        // Handing the sheet back asks the EMPLOYEE to revise their own
+        // self-rating. A flow with no self-rating has nothing to hand back and
+        // nobody to hand it to, so the action must not be offered there — it
+        // would move the review backwards into a stage that admits no actor and
+        // strand it.
+        if (stageIsInFlow(
+            ReviewStage.selfRating, scope?.reviewFlow ?? ReviewFlow.standard))
+          for (final r in reviews.whereType<MonthlyReview>())
+            if (r.currentStage == ReviewStage.reportingManagerRating &&
+                _canEditManager(r, scope))
+              r,
       ];
 
   /// The rework action, or null when this viewer has nothing to hand back —
@@ -873,13 +1097,15 @@ class _QuarterlyKraSheetScreenState
         ),
         data: (data) {
           final mappedReviews = [
-            for (final r in data.reviews) _applyReviewerMap(r, reviewerMap),
+            for (final r in data.reviews)
+              _applyReviewerMap(
+                  r, reviewerMap, scope?.reviewFlow ?? ReviewFlow.standard),
           ];
           final canManage = _hasManagementRole(scope);
           return _Sheet(
             months: data.months,
             reviews: mappedReviews,
-            scope: scope,
+            flow: scope?.reviewFlow ?? ReviewFlow.standard,
             onPrevQuarter: () => setState(() => _anchor =
                 quarterMonthsFor(_anchor!)
                     .first
@@ -915,6 +1141,8 @@ class _QuarterlyKraSheetScreenState
             onSendBackForRework: _reworkAction(mappedReviews, scope),
             // The employee finalises their own rating; null for everyone else.
             onSubmitSelfRating: _submitAction(mappedReviews, scope),
+            // The reporting manager's counterpart, scoped to their own KRAs.
+            onSubmitManagerReview: _managerSubmitAction(mappedReviews, scope),
           );
         },
       ),
@@ -940,6 +1168,74 @@ extension _Let<T> on T {
   R let<R>(R Function(T) f) => f(this);
 }
 
+// ── The reporting manager's submit rule ──────────────────────────────────────
+//
+// Top-level and visible for testing because "submit only MY ratings" is the
+// whole point of the manager's submit, and that scoping deserves a direct test
+// rather than being reachable only through a rendered widget.
+
+/// The KRAs on [r] assigned to the reporting manager.
+///
+/// A row with no assigned reviewer (legacy data) falls back to the reporting
+/// manager, matching how the Review column itself resolves a row's stage.
+@visibleForTesting
+List<MonthlyKraRow> managerAssignedKras(MonthlyReview r) => [
+      for (final row in r.rows)
+        if ((row.reviewStage ?? ReviewStage.reportingManagerRating) ==
+            ReviewStage.reportingManagerRating)
+          row,
+    ];
+
+/// How many of the manager's own KRAs carry a manager score. Surfaced in the
+/// confirm dialog so submitting a partly-rated month is a deliberate choice.
+@visibleForTesting
+int managerRatedKraCount(MonthlyReview r) => managerAssignedKras(r)
+    .where((row) =>
+        row.scoreFor(ReviewStage.reportingManagerRating)?.value != null)
+    .length;
+
+/// Whether [managerUserId] may submit their reporting-manager review of [r].
+///
+/// Mirrors the employee's rule, scoped to the manager's own KRAs:
+///   * they are this review's reporting manager (a RELATIONSHIP, not a role)
+///     and the month is not already completed;
+///   * at least one KRA assigned to THEM carries their score — submitting an
+///     untouched month would finalise an empty review. HR's and Accounts' rows
+///     are ignored here, so rating an HR-assigned KRA never unlocks the
+///     manager's submit;
+///   * they have not already submitted, which a stage record for
+///     `REPORTING_MANAGER_RATING` proves, so the button goes away once used.
+///
+/// Deliberately NOT gated on the cursor still sitting at the manager's stage,
+/// for the same reason the employee's rule isn't: a backend that auto-advances
+/// on save moves the cursor before submit is ever pressed, and the window would
+/// never open. A server that disagrees is handled on the response (409).
+@visibleForTesting
+
+/// The identity test requires a NON-EMPTY id on both sides. A review with a
+/// blank `managerId` would otherwise match a viewer with a blank `userId` and
+/// hand them the submit — unlikely, but it fails open, so it is ruled out here.
+bool managerCanSubmitReview(
+  MonthlyReview r,
+  String managerUserId, {
+  required DateTime now,
+}) =>
+    // A month that has not ended must not be submitted. Submitting freezes a
+    // partial rating: it advances the review, snapshots the weighted manager
+    // percentage into the computed score, and makes the bar vanish (the
+    // stage-record test below goes false) before the month it covers is over.
+    //
+    // Note what was NOT wrong: the POST targets the right review id and the
+    // confirmation dialog names the right month. The defect is purely that it
+    // was offered too early.
+    r.period.isRatableOn(now) &&
+    !r.isComplete &&
+    managerUserId.isNotEmpty &&
+    (r.managerId ?? '').isNotEmpty &&
+    r.managerId == managerUserId &&
+    managerRatedKraCount(r) > 0 &&
+    r.recordFor(ReviewStage.reportingManagerRating) == null;
+
 /// Builds the quarterly-sheet body from plain data (no providers/auth) so
 /// widget tests can exercise its layout in isolation — e.g. assert the grid
 /// renders a full "100%" editable cell without a RenderFlex overflow.
@@ -947,6 +1243,11 @@ extension _Let<T> on T {
 Widget quarterlyKraSheetBodyForTest({
   required List<ReviewPeriod> months,
   required List<MonthlyReview?> reviews,
+
+  /// Which pipeline the organisation runs. The sheet reads nothing else
+  /// off the review scope, so this is the whole of it — and it decides
+  /// whether the Self columns are drawn at all.
+  ReviewFlow flow = ReviewFlow.standard,
   bool editableSelf = true,
   bool editableManager = false,
   bool editableHr = false,
@@ -956,6 +1257,7 @@ Widget quarterlyKraSheetBodyForTest({
   Future<void> Function()? onReopenManagement,
   Future<void> Function()? onSendBackForRework,
   Future<void> Function()? onSubmitSelfRating,
+  Future<void> Function()? onSubmitManagerReview,
 
   /// Pins "today" so a test can assert the current-month copy deterministically.
   DateTime? now,
@@ -968,14 +1270,32 @@ Widget quarterlyKraSheetBodyForTest({
     required String rowId,
     required ReviewStage stage,
   })? onEdit,
+
+  /// Observes which (review, row, stage) a Reason & Proof edit was aimed
+  /// at. The ROW ID is the point: the backend mints one per row PER
+  /// REVIEW, so a save handed the canonical (month-1) id targets a row the
+  /// edited month does not contain — the server then matches nothing and
+  /// returns 200 having saved nothing.
+  void Function({
+    required MonthlyReview review,
+    required String rowId,
+    required ReviewStage stage,
+  })? onJustify,
+
+  /// Observes every row id the sheet looks an attachment up by, so a test
+  /// can assert it never asks a month for an id that month has no row for.
+  void Function(String reviewId, String rowId)? onFileNameFor,
 }) {
   double? pct(MonthlyReview? r, String rowId, ReviewStage stage) {
     if (r == null) return null;
     for (final row in r.rows) {
       if (row.id != rowId) continue;
-      final s = row.scoreFor(stage);
-      if (s?.value != null && row.maxScore > 0) {
-        return (s!.value! / row.maxScore) * 100;
+      // Bound to a local so the null check promotes it; `s?.value` cannot be
+      // promoted through the null-aware access, which is why this previously
+      // needed two bang operators to say something already proven.
+      final value = row.scoreFor(stage)?.value;
+      if (value != null && row.maxScore > 0) {
+        return (value / row.maxScore) * 100;
       }
       return null;
     }
@@ -986,7 +1306,7 @@ Widget quarterlyKraSheetBodyForTest({
     clock: now,
     months: months,
     reviews: reviews,
-    scope: null,
+    flow: flow,
     onPrevQuarter: () {},
     onNextQuarter: () {},
     pct: pct,
@@ -1015,12 +1335,18 @@ Widget quarterlyKraSheetBodyForTest({
       required kraName,
       required monthLabel,
       required canEdit,
-    }) async {},
-    fileNameFor: (_, __, ___) => null,
+    }) async {
+      onJustify?.call(review: review, rowId: rowId, stage: stage);
+    },
+    fileNameFor: (review, rowId, stage) {
+      onFileNameFor?.call(review.id, rowId);
+      return null;
+    },
     onLockManagement: onLockManagement,
     onReopenManagement: onReopenManagement,
     onSendBackForRework: onSendBackForRework,
     onSubmitSelfRating: onSubmitSelfRating,
+    onSubmitManagerReview: onSubmitManagerReview,
   );
 }
 
@@ -1034,7 +1360,15 @@ class _Sheet extends StatelessWidget {
   final DateTime? clock;
   final List<ReviewPeriod> months;
   final List<MonthlyReview?> reviews;
-  final ReviewScope? scope;
+
+  /// The pipeline this organisation runs — the only thing the sheet ever
+  /// needed off the review scope.
+  ///
+  /// Resolved ONCE by the screen and passed down, rather than each of the
+  /// seven consumers below writing `scope?.reviewFlow ?? standard` for
+  /// itself. That restating is what left the flow badge, the legend and
+  /// the grid able to disagree about which pipeline was running.
+  final ReviewFlow flow;
   final VoidCallback onPrevQuarter;
   final VoidCallback onNextQuarter;
   final double? Function(MonthlyReview?, String, ReviewStage) pct;
@@ -1088,11 +1422,15 @@ class _Sheet extends StatelessWidget {
   /// still at Self-Rating and has something rated to submit.
   final Future<void> Function()? onSubmitSelfRating;
 
+  /// The reporting manager's explicit "I'm done" for the KRAs assigned to
+  /// them. Null unless they actually have a month of their own to submit.
+  final Future<void> Function()? onSubmitManagerReview;
+
   const _Sheet({
     this.clock,
     required this.months,
     required this.reviews,
-    required this.scope,
+    required this.flow,
     required this.onPrevQuarter,
     required this.onNextQuarter,
     required this.pct,
@@ -1108,6 +1446,7 @@ class _Sheet extends StatelessWidget {
     this.onReopenManagement,
     this.onSendBackForRework,
     this.onSubmitSelfRating,
+    this.onSubmitManagerReview,
   });
 
   MonthlyReview? get _any =>
@@ -1189,56 +1528,7 @@ class _Sheet extends StatelessWidget {
     // the wrong month, believe they are finished, and still be chased as overdue.
     final dueMonth = _currentMonthNeedingSelfRating(
         months, reviews, clock ?? DateTime.now());
-    // The deadline for whichever stage this viewer actually owns.
-    //
-    // Until now only the employee self-rate and manager-rate screens carried a
-    // deadline cue, so HR, Accounts and Management — who do all their work on
-    // THIS sheet — were never told a date anywhere in the app. Resolved from
-    // ReviewStage.deadlineDay, so it is the same schedule everything else
-    // counts down to.
-    // Whose stage this viewer owns, and therefore which deadline applies. A
-    // flat if-chain rather than nested ternaries: each branch now carries a
-    // stage as well as a sentence.
-    final String scopeBase;
-    final ReviewStage? scopeStage;
-    if (canSelf) {
-      scopeBase = dueMonth != null
-          ? 'Rate your ${dueMonth.shortLabel} Self column — that is the '
-              'current month, and it is still empty.'
-          : 'You can edit the Self ratings on this sheet.';
-      scopeStage = ReviewStage.selfRating;
-    } else if (canMgr) {
-      scopeBase = 'You can rate the KRAs assigned to you as Reporting '
-          'Manager — tap a Review cell.';
-      scopeStage = ReviewStage.reportingManagerRating;
-    } else if (canHr) {
-      scopeBase = 'You can rate the KRAs assigned to HR — tap a Review cell.';
-      scopeStage = ReviewStage.accountHrRating;
-    } else if (canFin) {
-      scopeBase =
-          'You can rate the KRAs assigned to Accounts — tap a Review cell.';
-      scopeStage = ReviewStage.financeRating;
-    } else if (canMgmt) {
-      scopeBase = 'You can enter the Management rating for each KRA.';
-      scopeStage = ReviewStage.managementReview;
-    } else if (allComplete) {
-      scopeBase = 'This quarter is completed — scores are locked.';
-      scopeStage = null; // nothing is due on a finished quarter
-    } else {
-      scopeBase = 'View only — you cannot edit this sheet.';
-      scopeStage = null;
-    }
 
-    // The deadline for the stage this viewer actually owns.
-    //
-    // Until now only the employee self-rate and manager-rate screens carried a
-    // deadline cue, so HR, Accounts and Management — who do all their work on
-    // THIS sheet — were never shown a date anywhere in the app. Resolved from
-    // ReviewStage.deadlineDay, the same source every other countdown uses.
-    final dueDay = scopeStage?.deadlineDay;
-    final scopeLabel = dueDay == null
-        ? scopeBase
-        : '$scopeBase${AppStrings.dueByEachMonth(dueDay)}';
 
     // Payout follows the FINAL score (management override → Review average →
     // self), quarter-averaged across the three months.
@@ -1290,6 +1580,18 @@ class _Sheet extends StatelessWidget {
                             color: AppColors.textMuted,
                             fontWeight: FontWeight.w600)),
                   ),
+                  // Which pipeline the sheet BELIEVES it is running.
+                  //
+                  // Shown unconditionally, including for the standard flow.
+                  // Its absence cost a long debugging session: an organisation
+                  // had been switched to administrators-only, the server was
+                  // dropping the field from /auth/me, and the sheet was quietly
+                  // running the standard pipeline — refusing every rating while
+                  // it waited for a self-rating that flow does not have. The
+                  // screen looked correct and said nothing. Naming the flow
+                  // makes "the setting didn't reach me" and "you aren't allowed"
+                  // two visibly different failures.
+                  _FlowBadge(flow: flow),
                 ],
               ),
             ),
@@ -1303,10 +1605,19 @@ class _Sheet extends StatelessWidget {
                   record:
                       r.returnedRecordFor(ReviewStage.reportingManagerRating)!,
                 ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: _ReviewerLegend(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: _ReviewerLegend(flow: flow),
             ),
+            // KRAs assigned to a reviewer this flow does not use. Nobody can
+            // score them and the server would drop a score aimed anywhere else,
+            // so say so plainly instead of leaving three rows that quietly
+            // refuse every attempt.
+            () {
+              final stranded = kraNamesWithoutRaterInFlow(reviews, flow);
+              if (stranded.isEmpty) return const SizedBox.shrink();
+              return _StrandedKraNotice(names: stranded);
+            }(),
             // Frame the table so its edge columns don't merge with the screen
             // edge — a bordered, rounded card (matching the header/payout cards)
             // with a little internal padding, and a horizontal margin that keeps
@@ -1325,6 +1636,10 @@ class _Sheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: _Grid(
                   now: clock ?? DateTime.now(),
+                  // The grid decides both cell openness and WHICH COLUMNS
+                  // EXIST, so the flow has to reach it or it draws three
+                  // Self columns nobody can ever fill.
+                  reviewFlow: flow,
                   rows: rows,
                   months: months,
                   reviews: reviews,
@@ -1348,6 +1663,12 @@ class _Sheet extends StatelessWidget {
               const SizedBox(height: 14),
               _SubmitSelfRatingBar(onSubmit: onSubmitSelfRating!),
             ],
+            // The manager's submit sits above the rework bar: approving is the
+            // common path, handing it back the exception.
+            if (onSubmitManagerReview != null) ...[
+              const SizedBox(height: 14),
+              _ManagerSubmitBar(onSubmit: onSubmitManagerReview!),
+            ],
             if (onSendBackForRework != null) ...[
               const SizedBox(height: 14),
               _ReworkBar(onSendBack: onSendBackForRework!),
@@ -1367,6 +1688,7 @@ class _Sheet extends StatelessWidget {
             const SizedBox(height: 16),
             _PayoutCard(
               qSelf: qSelf,
+              showSelfAverage: stageIsInFlow(ReviewStage.selfRating, flow),
               qFinal: qFinal,
               eligibleMonthly: eligibleMonthly,
               quarterEligible: quarterEligible,
@@ -1647,13 +1969,138 @@ class _HeaderCard extends StatelessWidget {
       );
 }
 
-/// A compact key explaining the per-KRA reviewer colours and the pending
-/// status, so the single-reviewer model reads clearly at the top of the sheet.
-class _ReviewerLegend extends StatelessWidget {
-  const _ReviewerLegend();
+/// "These KRAs have nobody to rate them."
+///
+/// Raised when a KRA is assigned to a reviewer the active flow does not use —
+/// in practice, a KRA still pointing at the Reporting Manager on an
+/// administrators-only organisation. The row cannot be scored by anyone, and
+/// the server's per-KRA reviewer guard would silently discard a score entered
+/// against a different seat, so an unexplained dead row is the worst possible
+/// presentation: it looks like a permissions problem and is actually a
+/// configuration one.
+///
+/// Names the KRAs and says who can fix it, because the fix is a reassignment in
+/// the KRA assignment screen, not anything the rater can do from here.
+class _StrandedKraNotice extends StatelessWidget {
+  final List<String> names;
+  const _StrandedKraNotice({required this.names});
 
   @override
   Widget build(BuildContext context) {
+    final plural = names.length > 1;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.person_off_rounded,
+              size: 15, color: AppColors.warning),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  plural
+                      ? '${names.length} KRAs have no reviewer in this flow'
+                      : 'This KRA has no reviewer in this flow',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${names.join(', ')} — assigned to the Reporting Manager, '
+                  'which this flow does not use. ${plural ? 'They' : 'It'} '
+                  'cannot be rated by anyone until HR reassigns '
+                  '${plural ? 'them' : 'it'} to HR or Accounts in the KRA '
+                  'assignment.',
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.4,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Names the review pipeline this sheet is running.
+///
+/// Deliberately always visible. Which flow is in effect is decided three
+/// layers away — an organisation column, the login payload, the review scope —
+/// and when that plumbing broke there was no way to tell from the screen. The
+/// sheet sat there refusing ratings and looking perfectly normal. A viewer who
+/// can read "Standard flow" on an organisation they switched to
+/// administrators-only knows immediately that the setting never arrived, which
+/// is a completely different problem from not having permission.
+class _FlowBadge extends StatelessWidget {
+  final ReviewFlow flow;
+  const _FlowBadge({required this.flow});
+
+  @override
+  Widget build(BuildContext context) {
+    final isStandard = flow == ReviewFlow.standard;
+    // The standard flow is the overwhelmingly common case, so it is stated
+    // quietly; a non-default pipeline is worth actually noticing.
+    final color = isStandard ? AppColors.textMuted : AppColors.primaryPurple;
+    return Tooltip(
+      message: flow.description,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: isStandard ? 0.06 : 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(isStandard ? Icons.route_rounded : Icons.admin_panel_settings,
+              size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            flow.displayName,
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: color,
+                letterSpacing: 0.2),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A compact key explaining the per-KRA reviewer colours and the pending
+/// status, so the single-reviewer model reads clearly at the top of the sheet.
+class _ReviewerLegend extends StatelessWidget {
+  /// Which pipeline is running, so the key does not advertise a reviewer the
+  /// flow has removed. Under administrators-only there is no reporting-manager
+  /// rating, and listing "Manager" there sent people looking for a column that
+  /// cannot be filled by anyone.
+  final ReviewFlow flow;
+  const _ReviewerLegend({this.flow = ReviewFlow.standard});
+
+  @override
+  Widget build(BuildContext context) {
+    // Derived from the flow rather than a hand-written list per flow — the same
+    // reason actorRolesFor defers to the stage instead of restating its roles.
+    final reviewers = [
+      for (final r in KraReviewer.values)
+        if (stageIsInFlow(stageForReviewer(r), flow)) r,
+    ];
     return Wrap(
       spacing: 12,
       runSpacing: 6,
@@ -1664,7 +2111,7 @@ class _ReviewerLegend extends StatelessWidget {
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textMuted)),
-        for (final r in KraReviewer.values) _dot(r),
+        for (final r in reviewers) _dot(r),
         const Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.schedule_rounded, size: 11, color: AppColors.warning),
           SizedBox(width: 3),
@@ -1687,7 +2134,7 @@ class _ReviewerLegend extends StatelessWidget {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       const SizedBox(width: 4),
-      Text(r.shortLabel,
+      Text(reviewerShortLabelFor(r, flow),
           style: TextStyle(
               fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
     ]);
@@ -1695,6 +2142,10 @@ class _ReviewerLegend extends StatelessWidget {
 }
 
 class _Grid extends StatefulWidget {
+  /// The organisation's review pipeline. Needed here because cell openness
+  /// depends on it: a flow without a self-rating must not wait for one.
+  final ReviewFlow reviewFlow;
+
   /// See [_Sheet.clock] — the sheet resolves it once and passes it down.
   final DateTime now;
   final List<dynamic> rows; // MonthlyKraRow
@@ -1730,6 +2181,7 @@ class _Grid extends StatefulWidget {
   final double Function(ReviewStage) qAvg;
 
   const _Grid({
+    required this.reviewFlow,
     required this.now,
     required this.rows,
     required this.months,
@@ -1764,9 +2216,33 @@ class _GridState extends State<_Grid> {
       _wTrk = 158,
       _wMon = 70,
       _wQtr = 56;
-  // Per month: Self | Review | Mgmt (3 cols). Quarter: Self | Review | Final.
+
+  /// Whether the sheet draws its Self columns at all.
+  ///
+  /// Derived from the flow rather than named per flow: a pipeline with no
+  /// self-rating stage never collects a self score, so those three month
+  /// columns and the Qtr Self column are a dash in every row and a 0% in
+  /// the totals. Under administrators-only that is exactly the state — the
+  /// employee does not rate — and three dead columns pushed the two live
+  /// ones off the right edge of the screen.
+  bool get _showSelf =>
+      stageIsInFlow(ReviewStage.selfRating, widget.reviewFlow);
+
+  // Per month: Self | Review | Mgmt. Quarter: Self | Review | Final. Each
+  // loses its Self column where the flow has no self-rating.
+  int get _colsPerMonth => _showSelf ? 3 : 2;
+  int get _qtrCols => _showSelf ? 3 : 2;
+
+  // Must agree with the header, main-row and totals builders. Hide a
+  // column in one of them and keep counting its width here and the sheet
+  // scrolls past its own content; the reverse clips the last column.
   double get _totalWidth =>
-      _wWt + _wKra + _wTgt + _wTrk + _wMon * 9 + _wQtr * 3;
+      _wWt +
+      _wKra +
+      _wTgt +
+      _wTrk +
+      _wMon * 3 * _colsPerMonth +
+      _wQtr * _qtrCols;
 
   String _fmt(double? p) => p == null ? '—' : '${p.round()}%';
 
@@ -1838,10 +2314,14 @@ class _GridState extends State<_Grid> {
   }
 
   // The stages that carry a Reason & Proof entry for a KRA row: the employee's
-  // SELF evidence, plus the assigned reviewer's (RM/HR/Accounts) if the KRA is
-  // assigned. Legacy unassigned rows keep just the employee slot.
+  // SELF evidence where the flow HAS a self-rating, plus the assigned
+  // reviewer's (RM/HR/Accounts). On the standard flow a legacy unassigned row
+  // keeps just the employee slot.
   List<ReviewStage> _evidenceStages(MonthlyKraRow? row) {
-    final stages = <ReviewStage>[ReviewStage.selfRating];
+    // Only the stages this flow actually has. A self remark left behind by
+    // an organisation that later moved to administrators-only would
+    // otherwise light the "justified" dot with evidence no longer shown.
+    final stages = <ReviewStage>[if (_showSelf) ReviewStage.selfRating];
     final rs = row?.reviewStage;
     if (rs != null) stages.add(rs);
     return stages;
@@ -1849,14 +2329,20 @@ class _GridState extends State<_Grid> {
 
   // A KRA is "justified" if ANY month has a reason or attachment on the employee
   // entry OR its assigned reviewer's entry.
-  bool _anyJustified(String rowId) {
+  bool _anyJustified(String canonicalRowId) {
     for (final r in widget.reviews) {
       if (r == null) continue;
-      final row = _rowIn(r, rowId);
+      final row = _rowIn(r, canonicalRowId);
+      // `fileNameFor` resolves by EXACT id on the screen's side, so it needs
+      // the id belonging to THIS month's review — the canonical one only ever
+      // matches the first month, which left the dot green off month 1's
+      // attachment alone and blind to the other two. `_rowIn` has already
+      // done the resolution, so reuse its answer rather than repeating it.
+      final id = row?.id ?? canonicalRowId;
       for (final stage in _evidenceStages(row)) {
         final s = row?.scoreFor(stage);
         if (s?.remark?.trim().isNotEmpty ?? false) return true;
-        if (widget.fileNameFor(r, rowId, stage) != null) return true;
+        if (widget.fileNameFor(r, id, stage) != null) return true;
       }
     }
     return false;
@@ -1916,23 +2402,25 @@ class _GridState extends State<_Grid> {
         // someone opening this to "do my self-rating" can easily fill in the
         // wrong month, believe they are done, and still be shown as overdue.
         for (final m in widget.months) ...[
-          _cell(
-              _wMon,
-              Text('${m.shortLabel}\nSelf',
-                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
-                  textAlign: TextAlign.right)),
+          if (_showSelf)
+            _cell(
+                _wMon,
+                Text('${m.shortLabel}\nSelf',
+                    style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
+                    textAlign: TextAlign.right)),
           _cell(
               _wMon,
               Text('${m.shortLabel}\nReview',
-                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
                   textAlign: TextAlign.right)),
           _cell(
               _wMon,
               Text('${m.shortLabel}\nMgmt',
-                  style: _isCurrentMonth(m, widget.now) ? hNow : h,
+                  style: _isOpenReviewMonth(m, widget.now) ? hNow : h,
                   textAlign: TextAlign.right)),
         ],
-        _cell(_wQtr, Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
+        if (_showSelf)
+          _cell(_wQtr, Text('Qtr\nSelf', style: h, textAlign: TextAlign.right)),
         _cell(_wQtr, Text('Qtr\nReview', style: h, textAlign: TextAlign.right)),
         _cell(_wQtr, Text('Qtr\nFinal', style: h, textAlign: TextAlign.right)),
       ]),
@@ -1992,28 +2480,35 @@ class _GridState extends State<_Grid> {
       _cell(_wTgt, _targetCell(row), align: Alignment.centerLeft),
       _cell(_wTrk, _trackingCell(row), align: Alignment.centerLeft),
       for (var i = 0; i < 3; i++) ...[
-        _cell(
-            _wMon,
-            _scoreCell(i, rowId, maxScore, name, ReviewStage.selfRating,
-                canEdit: (r) =>
-                    widget.canEditSelf(r) &&
-                    _open(i, row, ReviewStage.selfRating))),
+        if (_showSelf)
+          _cell(
+              _wMon,
+              _scoreCell(i, rowId, maxScore, name, ReviewStage.selfRating,
+                  canEdit: (r) =>
+                      widget.canEditSelf(r) &&
+                      _open(i, row, ReviewStage.selfRating))),
         _cell(_wMon, _reviewCell(i, row)),
         _cell(
             _wMon,
             _scoreCell(i, rowId, maxScore, name, ReviewStage.managementReview,
                 canEdit: (r) =>
                     widget.canEditManagement(r) &&
+                    // Per-ROW, unlike the three gates around it. Under
+                    // administrators-only, management rates the leftover KRAs
+                    // and must not overwrite HR's or Accounts' own scores.
+                    managementMayScoreRow(
+                        row as MonthlyKraRow, widget.reviewFlow) &&
                     !r.isManagementLocked &&
                     _open(i, row, ReviewStage.managementReview))),
       ],
-      _cell(
-          _wQtr,
-          Text(
-              _fmt(qAvgRow((i) => widget.pct(widget.reviews[i],
-                  _monthRowId(i, rowId), ReviewStage.selfRating))),
-              style:
-                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+      if (_showSelf)
+        _cell(
+            _wQtr,
+            Text(
+                _fmt(qAvgRow((i) => widget.pct(widget.reviews[i],
+                    _monthRowId(i, rowId), ReviewStage.selfRating))),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 12))),
       _cell(
           _wQtr,
           Text(_fmt(qAvgRow((i) => _reviewPct(widget.reviews[i], rowId))),
@@ -2211,7 +2706,8 @@ class _GridState extends State<_Grid> {
           Icon(_reviewerIcon(reviewer), size: 11, color: color),
           const SizedBox(width: 3),
           Flexible(
-            child: Text('Reviewed by ${reviewer.shortLabel}',
+            child: Text(
+                'Reviewed by ${reviewerShortLabelFor(reviewer, widget.reviewFlow)}',
                 maxLines: 1,
                 softWrap: false,
                 overflow: TextOverflow.ellipsis,
@@ -2237,6 +2733,7 @@ class _GridState extends State<_Grid> {
       row: monthRow,
       month: widget.months[monthIdx],
       now: widget.now,
+      flow: widget.reviewFlow,
     );
   }
 
@@ -2340,7 +2837,7 @@ class _GridState extends State<_Grid> {
     // holding it up. A future month shows nothing at all; a started month
     // still waiting on the employee says so.
     if (!open) {
-      if (isFutureMonth(widget.months[monthIdx], widget.now)) {
+      if (isMonthClosedForRating(widget.months[monthIdx], widget.now)) {
         return Text(_fmt(null),
             style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -2376,7 +2873,8 @@ class _GridState extends State<_Grid> {
 
   // "<reviewer> review pending" — a compact amber chip (clock + short tag) that
   // tells the viewer exactly which reviewer this KRA is still waiting on.
-  Widget _pendingChip(KraReviewer reviewer) => _pendingTag(reviewer.cellTag);
+  Widget _pendingChip(KraReviewer reviewer) =>
+      _pendingTag(reviewerCellTagFor(reviewer, widget.reviewFlow));
 
   Widget _pendingTag(String tag) {
     return Container(
@@ -2435,7 +2933,8 @@ class _GridState extends State<_Grid> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                    'employee + reviewer evidence · one per month · reason ≤ 300 chars',
+                    '${_showSelf ? 'employee + reviewer' : 'reviewer'} '
+                    'evidence · one per month · reason ≤ 300 chars',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -2473,10 +2972,29 @@ class _GridState extends State<_Grid> {
     );
   }
 
-  Widget _monthCard(
-      dynamic row, int i, String rowId, String name, KraReviewer? reviewer) {
+  Widget _monthCard(dynamic row, int i, String canonicalRowId, String name,
+      KraReviewer? reviewer) {
     final review = widget.reviews[i];
     final label = widget.months[i].shortLabel;
+    // THIS month's own row id — every id below travels to the SERVER on save.
+    //
+    // The backend mints a row id with randomUUID() per row PER REVIEW, so the
+    // canonical id (taken from the first month present) names a row the other
+    // two months do not contain. See [_rowIn]. [_scoreCell] already resolves
+    // this; the evidence path did not, and the write is
+    //   INSERT ... SELECT ... WHERE EXISTS (mrr.id = $2 AND mrr.review_id = $6)
+    // so a canonical id against month 2 or 3 matched nothing, inserted zero
+    // rows and returned 200 OK. The employee typed a reason, got no error, and
+    // the card still read "Add reason & proof".
+    //
+    // Resolving it HERE, once, is also the only SAFE shape. The same id feeds
+    // _currentScore in _openJustification, which is an exact-id lookup: fixing
+    // only the save key would leave `current` null, and the save would then
+    // write `value: null` over the stored score (the SQL does
+    // `value = EXCLUDED.value` unconditionally) and, with no stored file
+    // seeded, `clearProofFile: true` over the stored attachment. A one-line
+    // fix in the wrong place turns a silent no-op into silent destruction.
+    final rowId = _monthRowId(i, canonicalRowId);
     final ReviewStage? rs = row.reviewStage as ReviewStage?;
     return Container(
       padding: const EdgeInsets.all(10),
@@ -2508,13 +3026,17 @@ class _GridState extends State<_Grid> {
                     color: AppColors.textMuted,
                     fontStyle: FontStyle.italic))
           else ...[
-            _evidenceTile(review, rowId, name, label, ReviewStage.selfRating,
-                'Employee', Icons.person_rounded, widget.canEditSelf(review)),
+            // No employee slot on a flow without a self-rating: nobody can
+            // ever fill it, so it read "No entry" in all three months for
+            // the life of the quarter.
+            if (_showSelf)
+              _evidenceTile(review, rowId, name, label, ReviewStage.selfRating,
+                  'Employee', Icons.person_rounded, widget.canEditSelf(review)),
             if (rs != null) ...[
               // Min gap + a Spacer pins the reviewer tile to the card's bottom;
               // since the row's cards share a height, the reviewer tiles line
               // up across all three months regardless of the employee entry.
-              const SizedBox(height: 8),
+              if (_showSelf) const SizedBox(height: 8),
               const Spacer(),
               _evidenceTile(
                   review,
@@ -2643,11 +3165,12 @@ class _GridState extends State<_Grid> {
         _cell(_wTgt, const SizedBox.shrink(), align: Alignment.centerLeft),
         _cell(_wTrk, const SizedBox.shrink(), align: Alignment.centerLeft),
         for (var i = 0; i < 3; i++) ...[
-          _cell(
-              _wMon,
-              Text('${widget.monthTotal(i, ReviewStage.selfRating).round()}%',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 12))),
+          if (_showSelf)
+            _cell(
+                _wMon,
+                Text('${widget.monthTotal(i, ReviewStage.selfRating).round()}%',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 12))),
           _cell(
               _wMon,
               Text('${monthReview(i).round()}%',
@@ -2662,8 +3185,11 @@ class _GridState extends State<_Grid> {
                   style: const TextStyle(
                       fontWeight: FontWeight.w700, fontSize: 12))),
         ],
-        _cell(_wQtr,
-            Text('${widget.qAvg(ReviewStage.selfRating).round()}%', style: t)),
+        if (_showSelf)
+          _cell(
+              _wQtr,
+              Text('${widget.qAvg(ReviewStage.selfRating).round()}%',
+                  style: t)),
         _cell(
             _wQtr,
             Text('${qReview().round()}%',
@@ -2685,12 +3211,19 @@ class _GridState extends State<_Grid> {
 
 class _PayoutCard extends StatelessWidget {
   final double qSelf;
+
+  /// Whether to print the self average at all. A flow without a
+  /// self-rating never collects one, so the line reads a flat 0% beside a
+  /// real final average — which looks like the employee scored zero rather
+  /// than like the row does not apply to them.
+  final bool showSelfAverage;
   final double qFinal;
   final double eligibleMonthly;
   final double quarterEligible;
   final double payout;
   const _PayoutCard({
     required this.qSelf,
+    required this.showSelfAverage,
     required this.qFinal,
     required this.eligibleMonthly,
     required this.quarterEligible,
@@ -2713,7 +3246,8 @@ class _PayoutCard extends StatelessWidget {
           const Text(AppStrings.quarterlyPayoutTitle,
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
           const SizedBox(height: 12),
-          _row('Quarter self average', '${qSelf.round()}%'),
+          if (showSelfAverage)
+            _row('Quarter self average', '${qSelf.round()}%'),
           _row('Quarter final average', '${qFinal.round()}%'),
           _row('Monthly incentive',
               EmployeeFormatters.currencyInr(eligibleMonthly)),
@@ -3112,6 +3646,86 @@ class _ReworkNotice extends StatelessWidget {
 /// Separate from the rating cells on purpose: returning the work is a decision
 /// about the whole month, not one KRA, and it is destructive enough to the
 /// employee's flow that it should not sit inside a tap-to-rate cell.
+/// The reporting manager's "I'm done" bar — their counterpart to
+/// [_SubmitSelfRatingBar].
+///
+/// Same shape and placement as the employee's on purpose: the manager already
+/// recognises this bar from rating their own KRAs, and the action it performs is
+/// the same kind of finalisation. It only ever covers the KRAs assigned to this
+/// manager; HR and Accounts submit their own stages.
+class _ManagerSubmitBar extends StatefulWidget {
+  final Future<void> Function() onSubmit;
+  const _ManagerSubmitBar({required this.onSubmit});
+
+  @override
+  State<_ManagerSubmitBar> createState() => _ManagerSubmitBarState();
+}
+
+class _ManagerSubmitBarState extends State<_ManagerSubmitBar> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onSubmit();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border:
+            Border.all(color: AppColors.primaryPurple.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.task_alt_rounded,
+                  size: 18, color: AppColors.primaryPurple),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  AppStrings.mgrSubmitHint,
+                  style:
+                      TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _busy ? null : _run,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: _busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send_rounded, size: 18),
+            label: const Text(
+              AppStrings.mgrSubmitAction,
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReworkBar extends StatefulWidget {
   final Future<void> Function() onSendBack;
   const _ReworkBar({required this.onSendBack});
@@ -3405,13 +4019,24 @@ class _JustificationDialogState extends State<_JustificationDialog> {
 
   /// Max attachment size (raw bytes).
   ///
-  /// INTERIM VALUE — sized to fit under the LIVE server's 1 MB request-body
-  /// limit, so attachments work today without waiting on a deploy. A base64
-  /// upload is ~4/3 of the raw bytes plus a small JSON envelope, so ~700 KB raw
-  /// → ~0.95 MB body, safely under 1 MB. Once the server's `src/app.js` limit is
-  /// raised to 10 MB (already coded, not yet deployed) this should go back to
-  /// 5 MB (and the server's PROOF_FILE_MAX_BASE64 to ~7 MB) for Office files.
-  static const int _maxProofBytes = 700 * 1024;
+  /// 5 MB, which is exactly what the server is built for. base64 is 4/3 of
+  /// raw, so 5 MB → ceil(5242880 / 3) * 4 = 6,990,508 bytes, under the
+  /// server's `PROOF_FILE_MAX_BASE64` (7 MB) with ~350 KB of headroom, and
+  /// well under `express.json({ limit: '10mb' })` once the JSON envelope is
+  /// added. Both server constants are already in the repo — this is not
+  /// asking the backend for anything new.
+  ///
+  /// DEPLOY COUPLING: as of 2026-09-10 those two server changes were committed
+  /// but NOT pushed, and the live API still enforced the older ~1 MB body
+  /// limit — which is why this was pinned to 700 KB. Against an undeployed
+  /// backend a file over ~700 KB is now rejected by the SERVER rather than by
+  /// us, so [_pickFile] accepts it and the failure surfaces on save. That is
+  /// deliberate — the cap belongs where the limit actually is — but the two
+  /// rejections do NOT read alike: zod's carries a real message ("Proof file
+  /// is too large (max ~5 MB).") which [_saveErrorText] surfaces, while a raw
+  /// 413 from the body parser is not in the app's JSON envelope and falls back
+  /// to the generic "Could not save. Please try again."
+  static const int _maxProofBytes = 5 * 1024 * 1024;
 
   void _say(String msg) {
     if (!mounted) return;
@@ -3422,29 +4047,30 @@ class _JustificationDialogState extends State<_JustificationDialog> {
     // Every failure path below used to be a silent `return`, which is
     // indistinguishable from "the button is dead". Say something instead.
     try {
-      // `withData: true` is what makes this work on the WEB build. A browser
-      // never exposes a filesystem path, so `PlatformFile.path` is ALWAYS null
-      // there — the old `if (path == null) return;` meant picking a file
-      // silently did nothing at all on web. Bytes are the portable
-      // representation (and are what the upload needs anyway).
+      // Bytes, not a path: a browser never exposes a filesystem path, so
+      // `PlatformFile.path` is ALWAYS null on web — an earlier
+      // `if (path == null) return;` meant picking a file silently did nothing
+      // there. Bytes are the portable representation and are what the upload
+      // needs anyway.
+      //
+      // Read via `readAsBytes()` rather than the old `withData: true` +
+      // `f.bytes`: that flag is deprecated in file_picker 12, and reading on
+      // demand means a file the user then cancels out of is never loaded into
+      // memory at all.
+      //
       // Any file type — Excel, Word, PowerPoint, images, PDF, whatever the
       // employee's evidence happens to be. Restricting extensions just blocked
       // legitimate proof; the size cap below is the real guard.
-      final res = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        withData: true,
-      );
-      if (res == null || res.files.isEmpty) return; // user cancelled — normal
-      final f = res.files.single;
-      final bytes = f.bytes;
-      if (bytes == null) {
-        _say('Could not read "${f.name}". Try another file.');
-        return;
-      }
+      final f = await FilePicker.pickFile(type: FileType.any);
+      if (f == null) return; // user cancelled — normal
+      final bytes = await f.readAsBytes();
       if (bytes.length > _maxProofBytes) {
-        final kb = (bytes.length / 1024).round();
-        _say('"${f.name}" is $kb KB — attachments are capped at ~700 KB for '
-            'now (raised once the server upload limit is deployed).');
+        // Both numbers derived from the constant. The old copy hardcoded
+        // "~700 KB", so raising the cap would have left the app refusing a
+        // file while quoting a limit it no longer enforced.
+        final mb = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
+        const capMb = _maxProofBytes ~/ (1024 * 1024);
+        _say('"${f.name}" is $mb MB — attachments are capped at $capMb MB.');
         return;
       }
       setState(() => _file = (name: f.name, bytes: bytes));
@@ -3574,7 +4200,7 @@ class _FilePickRow extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          AppStrings.ratingProofFileLocalNote,
+          AppStrings.ratingProofFileKeptNote,
           style: TextStyle(
               fontSize: 10.5, color: AppColors.textMuted, height: 1.3),
         ),
@@ -3800,21 +4426,159 @@ bool canRateReviewStage(
   MonthlyReview review,
 ) {
   if (scope == null || review.isComplete) return false;
-  return stage.isActionableByAny(scope.effectiveRoles);
+  // Flow-aware. For ReviewFlow.standard this is a pass-through to
+  // stage.actorRoles, so the original pipeline is unchanged; for admin-only it
+  // returns an empty set for the stages that flow removes, which reads as
+  // "nobody can act here".
+  return canActOnStage(stage, scope.reviewFlow, scope.effectiveRoles);
 }
 
-/// Whether a month has not begun yet.
-bool isFutureMonth(ReviewPeriod m, DateTime now) =>
-    m.year > now.year || (m.year == now.year && m.month > now.month);
+/// The [ReviewStage] a KRA's assigned reviewer group rates at.
+///
+/// Mirrors [MonthlyKraRow.reviewStage] but takes the group directly, so the
+/// reviewer map can be checked against a flow before it is written onto a row.
+@visibleForTesting
+ReviewStage stageForReviewer(KraReviewer reviewer) {
+  switch (reviewer) {
+    case KraReviewer.reportingManager:
+      return ReviewStage.reportingManagerRating;
+    case KraReviewer.hr:
+      return ReviewStage.accountHrRating;
+    case KraReviewer.accounts:
+      return ReviewStage.financeRating;
+  }
+}
+
+/// The reviewer an unassigned KRA falls back to under [flow].
+///
+/// The reporting manager on the standard pipeline, which is the historical
+/// default and stays exactly that. Any flow that removes the manager rating
+/// falls back to HR instead — leaving it on the manager would produce rows no
+/// role in the flow can rate.
+@visibleForTesting
+KraReviewer defaultReviewerFor(ReviewFlow flow) =>
+    stageIsInFlow(ReviewStage.reportingManagerRating, flow)
+        ? KraReviewer.reportingManager
+        : KraReviewer.hr;
+
+/// The reviewer's on-screen name under [flow].
+///
+/// [KraReviewer.reportingManager] is the seat that MOVES between pipelines: the
+/// employee's own reporting manager on the standard flow, MANAGEMENT under
+/// administrators-only. Printing "Manager" in the second case names the wrong
+/// person entirely and sends the reader looking for a rating their line manager
+/// is not being asked for.
+///
+/// Keyed off [stageIsRelationshipGated] rather than off the flow by name, so
+/// the label follows whoever actually holds the seat.
+@visibleForTesting
+String reviewerShortLabelFor(KraReviewer reviewer, ReviewFlow flow) =>
+    _seatIsManagements(reviewer, flow) ? 'Management' : reviewer.shortLabel;
+
+/// The same seat, in the ultra-compact form the per-month cell has room for.
+@visibleForTesting
+String reviewerCellTagFor(KraReviewer reviewer, ReviewFlow flow) =>
+    _seatIsManagements(reviewer, flow) ? 'Mgmt' : reviewer.cellTag;
+
+bool _seatIsManagements(KraReviewer reviewer, ReviewFlow flow) =>
+    reviewer == KraReviewer.reportingManager &&
+    !stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow);
+
+/// Whether MANAGEMENT may enter a per-KRA score in the Mgmt column for [row].
+///
+/// The two flows mean different things by that column:
+///
+///  * [ReviewFlow.standard] — management holds no Review seat of its own. The
+///    Mgmt column is the sign-off's OVERRIDE: on rework it may correct any
+///    KRA's score, whoever rated it. So every row is open, exactly as before.
+///
+///  * [ReviewFlow.adminOnly] — management is a RATER, of the KRAs left over
+///    once HR and Accounts have taken theirs. Its column is therefore its own
+///    seat, not authority over everyone else's: only HR scores the HR KRA, only
+///    Accounts scores the Accounts KRA. Without this, management got an
+///    editable Mgmt cell on every row and could overwrite both.
+///
+/// A row with no assigned reviewer counts as management's, matching
+/// [defaultReviewerFor] — the remainder includes the never-assigned.
+///
+/// This is a CLIENT restriction and cannot be enforced server-side as it
+/// stands: "Save & Lock" legitimately writes a MANAGEMENT_REVIEW score for
+/// every KRA (copying each Review score in so the incentive has something to
+/// settle to), and the API cannot tell that bulk settle apart from a manual
+/// per-cell override — both are the same `save-scores` call. Refusing the
+/// stage per row would break the sign-off itself.
+@visibleForTesting
+bool managementMayScoreRow(MonthlyKraRow row, ReviewFlow flow) {
+  if (stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow)) {
+    return true;
+  }
+  final assigned = row.reviewStage ?? ReviewStage.reportingManagerRating;
+  return assigned == ReviewStage.reportingManagerRating;
+}
+
+/// KRA names whose ASSIGNED reviewer is a seat [flow] does not use.
+///
+/// These are stranded: no role in the flow may score them, and the server would
+/// silently discard a score entered against any other seat (see the per-KRA
+/// reviewer guard quoted in `_applyReviewerMap`). The only real fix is to
+/// reassign the KRA, so the sheet names them rather than pretending.
+///
+/// Always empty on [ReviewFlow.standard] — that pipeline uses every seat — so
+/// nothing about the original flow changes.
+///
+/// Returns names, not rows: the same KRA recurs in all three months of the
+/// quarter and the reader only needs to be told once.
+@visibleForTesting
+List<String> kraNamesWithoutRaterInFlow(
+  List<MonthlyReview?> reviews,
+  ReviewFlow flow,
+) {
+  final names = <String>[];
+  final seen = <String>{};
+  for (final review in reviews) {
+    if (review == null) continue;
+    for (final row in review.rows) {
+      final reviewer = row.reviewerGroup;
+      // Unassigned: the server's per-KRA guard passes any stage for a row whose
+      // reviewer_group is NULL, so there is nothing stranded to report.
+      if (reviewer == null) {
+        continue;
+      }
+      if (stageIsInFlow(stageForReviewer(reviewer), flow)) continue;
+      if (seen.add(kraNameKey(row.name))) names.add(row.name);
+    }
+  }
+  return names;
+}
+
+/// Whether [m] cannot be rated yet as of [now] — because it has not ENDED.
+///
+/// This replaced `isFutureMonth`, whose name was the bug. It tested "has this
+/// month not STARTED", which lets the CURRENT calendar month through: on
+/// 9 September the September Self cell was open, editable, and
+/// `saveStageScores` persisted a rating for a month with twenty days still to
+/// run. The name read as already-satisfied to anyone scanning it, which is how
+/// it survived several passes over this same file.
+///
+/// Delegates to [ReviewPeriod.isRatableOn] so there is exactly one definition
+/// of "ratable" and this cannot drift from the banner, the card or the picker.
+/// Renamed from `isNotYetRatableMonth`, which only ever asked about the
+/// FUTURE. It now covers both directions — a month that has not started
+/// AND one whose window has closed — so the old name would have been a
+/// second lie in the same place (the first was "not STARTED", which let
+/// the live month through).
+bool isMonthClosedForRating(ReviewPeriod m, DateTime now) =>
+    !m.isOpenForRatingOn(now);
 
 /// Whether one cell is OPEN for entry yet — independently of WHO is looking.
 ///
 /// The edit gates answer "are you the right person?". This answers "is there
 /// anything to do yet?", and both must hold. Two rules:
 ///
-///   * A month that has not started has nothing to rate. The sheet always shows
-///     a whole quarter, so on 29 August it renders September — and September
-///     was offering reviewers a Rate button for work nobody had done.
+///   * A month that has not ENDED has nothing to rate. The sheet always shows
+///     a whole quarter, so through August it renders September — and September
+///     was offering a live, writable Self cell for a month still in progress.
+///     "Not started" was the old test, and it let the current month through.
 ///   * Everything downstream of the self-rating needs that self-rating to
 ///     exist, PER KRA. A reviewer rating first inverts the pipeline: their
 ///     score is meant to moderate the employee's, and the reporting manager is
@@ -3829,9 +4593,20 @@ bool isCellOpenForEntry({
   required MonthlyKraRow row,
   required ReviewPeriod month,
   required DateTime now,
+  ReviewFlow flow = ReviewFlow.standard,
 }) {
-  if (isFutureMonth(month, now)) return false;
+  if (isMonthClosedForRating(month, now)) return false;
   if (stage == ReviewStage.selfRating) return true;
+
+  // The self-first ordering only means anything in a flow that HAS a
+  // self-rating. Under a flow without one there is no score to wait for and
+  // none will ever arrive, so keeping the prerequisite closed every cell in
+  // the sheet for every rater — HR, Accounts and management included. That
+  // was not a narrow bug: the entire pipeline was unusable.
+  //
+  // Defaults to standard, so every existing caller and test is unaffected.
+  if (!stageIsInFlow(ReviewStage.selfRating, flow)) return true;
+
   return row.scoreFor(ReviewStage.selfRating)?.value != null;
 }
 
@@ -3844,7 +4619,7 @@ ReviewPeriod? _currentMonthNeedingSelfRating(
     List<ReviewPeriod> months, List<MonthlyReview?> reviews, DateTime now) {
   for (var i = 0; i < months.length && i < reviews.length; i++) {
     final month = months[i];
-    if (!_isCurrentMonth(month, now)) continue;
+    if (!_isOpenReviewMonth(month, now)) continue;
     final review = reviews[i];
     if (review == null) return month; // not generated yet — still outstanding
     final rated = review.rows
@@ -3854,5 +4629,11 @@ ReviewPeriod? _currentMonthNeedingSelfRating(
   return null;
 }
 
-bool _isCurrentMonth(ReviewPeriod m, DateTime now) =>
-    m.year == now.year && m.month == now.month;
+/// Whether [m] is the month whose rating window is open as of [now].
+///
+/// NOT "is this today's calendar month". Today's month has not ended, so
+/// nothing in it can be rated yet; the month that matters to a rater is the
+/// previous one. Used both to highlight the live column in the header and to
+/// find the month still owing a self-rating.
+bool _isOpenReviewMonth(ReviewPeriod m, DateTime now) =>
+    m.key == ReviewPeriod.openForRating(now).key;

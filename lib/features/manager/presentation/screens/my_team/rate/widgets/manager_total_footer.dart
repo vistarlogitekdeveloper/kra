@@ -25,6 +25,11 @@ class ManagerTotalFooter extends ConsumerWidget {
   /// nudge them visually without a blocking dialog.
   final String? incompleteHint;
 
+  /// Overrides the default "incomplete scores" explanation when the button is
+  /// disabled for a different reason — e.g. the quarter has not ended yet,
+  /// which the manager cannot fix by rating harder.
+  final String? disabledReasonOverride;
+
   const ManagerTotalFooter({
     super.key,
     required this.weightedTotalPct,
@@ -35,6 +40,7 @@ class ManagerTotalFooter extends ConsumerWidget {
     required this.onPrimary,
     this.isSubmitting = false,
     this.incompleteHint,
+    this.disabledReasonOverride,
   });
 
   @override
@@ -46,7 +52,9 @@ class ManagerTotalFooter extends ConsumerWidget {
     final canTap = isPrimaryEnabled && !isSubmitting && isOnline;
     final disabledReason = !isOnline
         ? AppStrings.selfRateOfflineTooltip
-        : (!isPrimaryEnabled ? AppStrings.managerRateIncompleteScores : null);
+        : (!isPrimaryEnabled
+            ? (disabledReasonOverride ?? AppStrings.managerRateIncompleteScores)
+            : null);
 
     final button = ElevatedButton(
       onPressed: canTap ? onPrimary : null,

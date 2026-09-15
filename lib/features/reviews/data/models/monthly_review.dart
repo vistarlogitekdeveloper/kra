@@ -15,6 +15,77 @@ class ReviewPeriod {
 
   factory ReviewPeriod.fromDate(DateTime d) => ReviewPeriod(d.year, d.month);
 
+  /// The month whose rating window is open on [now] — the PREVIOUS calendar
+  /// month, never the current one.
+  ///
+  /// A month is rated once it has finished: through September you rate August.
+  /// The deadline schedule already assumed this and is what makes it provable
+  /// rather than a preference — [MonthlyDeadlines] puts self-rating on the
+  /// **10th**, so treating the current month as the one under review meant
+  /// asking someone on 10 September to have finished rating a September that
+  /// still had twenty days left to run.
+  ///
+  /// Every "which month are we rating?" decision must come through here.
+  /// Before this existed the answer was derived independently in five places —
+  /// the backend's `findCurrentMonth`, the employee dashboard's fallback, the
+  /// month picker, the sheet's due-month banner and the cell gate — and they
+  /// did not agree.
+  factory ReviewPeriod.openForRating(DateTime now) =>
+      ReviewPeriod.fromDate(now).previous;
+
+  /// The month before this one, rolling the year back at January.
+  ReviewPeriod get previous =>
+      month == 1 ? ReviewPeriod(year - 1, 12) : ReviewPeriod(year, month - 1);
+
+  /// The month after this one, rolling the year forward at December.
+  ReviewPeriod get next =>
+      month == 12 ? ReviewPeriod(year + 1, 1) : ReviewPeriod(year, month + 1);
+
+  /// Calendar order, so months can be compared without unpacking them.
+  /// Negative when this month is earlier than [other].
+  int compareTo(ReviewPeriod other) =>
+      year != other.year ? year - other.year : month - other.month;
+
+  bool operator <=(ReviewPeriod other) => compareTo(other) <= 0;
+  bool operator >(ReviewPeriod other) => compareTo(other) > 0;
+
+  /// Whether this month may be rated as of [now] — i.e. it has ended.
+  ///
+  /// True for the open review month and anything older; false for the current
+  /// calendar month and anything ahead of it.
+  bool isRatableOn(DateTime now) => this <= ReviewPeriod.openForRating(now);
+
+  /// Whether this is THE month whose window is open on [now] — the only
+  /// month a rating may be ENTERED for.
+  ///
+  /// Deliberately narrower than [isRatableOn], which is also true for every
+  /// month BEFORE the open one. Both questions are legitimate and they are
+  /// not the same one:
+  ///
+  ///   * "has this month ended"  → totals, and whether a submit is due.
+  ///   * "is this month open"    → whether a cell may be typed into.
+  ///
+  /// Using the first as an edit gate is what left September's rater free to
+  /// go back and rewrite July, long after that window closed.
+  ///
+  /// Compares [key] rather than the objects: ReviewPeriod does not override
+  /// `==`, and its own doc says the key is what equality goes through.
+  bool isOpenForRatingOn(DateTime now) =>
+      key == ReviewPeriod.openForRating(now).key;
+
+  /// This month, pulled back to [ReviewPeriod.openForRating] if it has not
+  /// ended yet.
+  ///
+  /// For taking a month from a source that might name one too recent — the
+  /// server's `currentMonth` picks the cycle month matching TODAY, which is a
+  /// month nobody can rate. Clamping is one-directional on purpose: an OLDER
+  /// month is left alone, because a cycle running behind or a backfilled month
+  /// genuinely is the one owing work, and overriding that would hide it.
+  ReviewPeriod clampToRatable(DateTime now) {
+    final open = ReviewPeriod.openForRating(now);
+    return this > open ? open : this;
+  }
+
   /// Stable key, e.g. "2026-06". Used for equality + map keys.
   String get key => '$year-${month.toString().padLeft(2, '0')}';
 
@@ -37,6 +108,13 @@ class ReviewPeriod {
   /// e.g. "June 2026".
   String get label => '${(month >= 1 && month <= 12) ? _names[month] : ''} '
       '$year';
+
+  /// "Jul-26" — the same shape the backend uses for `monthLabel`, so a label
+  /// derived on the client is visually indistinguishable from one the server
+  /// sent. Used where the two can appear in the same place.
+  String get compactLabel =>
+      "${(month >= 1 && month <= 12) ? _names[month].substring(0, 3) : ''}"
+      "-${year.toString().substring(2)}";
 
   /// Compact "Jul '26" — a 3-letter month + 2-digit year for tight table
   /// headers and month chips.
@@ -205,10 +283,10 @@ class MonthlyReview {
     double weighted = 0;
     double totalWeight = 0;
     for (final row in rows) {
-      final s = row.scoreFor(stage);
-      if (s == null || s.value == null || row.maxScore <= 0) continue;
+      final value = row.scoreFor(stage)?.value;
+      if (value == null || row.maxScore <= 0) continue;
       totalWeight += row.weightagePercent;
-      weighted += (s.value! / row.maxScore) * row.weightagePercent;
+      weighted += (value / row.maxScore) * row.weightagePercent;
     }
     if (totalWeight <= 0) return 0;
     return (weighted * 100 / totalWeight).clamp(0, 100).toDouble();
@@ -225,15 +303,18 @@ class MonthlyReview {
     if (row.maxScore <= 0) return null;
     final assigned = row.reviewStage;
     if (assigned != null) {
-      final s = row.scoreFor(assigned);
-      if (s?.value == null) return null;
-      return (s!.value! / row.maxScore) * 100;
+      // Bound to a local so the null check promotes it — `s?.value` cannot
+      // be promoted through the null-aware access, which is the only reason
+      // the previous form needed two bang operators.
+      final value = row.scoreFor(assigned)?.value;
+      if (value == null) return null;
+      return (value / row.maxScore) * 100;
     }
     // Legacy fallback: average whichever of the three raters scored the row.
     final present = <double>[];
     for (final stage in ReviewStage.reviewRaters) {
-      final s = row.scoreFor(stage);
-      if (s?.value != null) present.add((s!.value! / row.maxScore) * 100);
+      final value = row.scoreFor(stage)?.value;
+      if (value != null) present.add((value / row.maxScore) * 100);
     }
     if (present.isEmpty) return null;
     return present.reduce((a, b) => a + b) / present.length;

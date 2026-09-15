@@ -81,8 +81,7 @@ void main() {
     test('reads reviewerGroup from any of the tolerated keys', () {
       expect(
           MonthlyKraRow.fromJson(
-                  {'id': 'a', 'name': 'A', 'reviewerGroup': 'HR'})
-              .reviewerGroup,
+              {'id': 'a', 'name': 'A', 'reviewerGroup': 'HR'}).reviewerGroup,
           KraReviewer.hr);
       expect(
           MonthlyKraRow.fromJson(
@@ -91,8 +90,7 @@ void main() {
           KraReviewer.accounts);
       expect(
           MonthlyKraRow.fromJson(
-                  {'id': 'a', 'name': 'A', 'scoreSource': 'MANAGER'})
-              .reviewerGroup,
+              {'id': 'a', 'name': 'A', 'scoreSource': 'MANAGER'}).reviewerGroup,
           KraReviewer.reportingManager);
     });
 

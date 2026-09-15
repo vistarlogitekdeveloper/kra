@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../../core/api/error_text.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/network/connectivity_service.dart';
@@ -135,7 +136,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         body: async.when(
           loading: () => const _Loading(),
           error: (e, _) => _Error(
-            message: e.toString(),
+            message: userFacingError(e),
             onRetry: () => ref.invalidate(myProfileProvider),
           ),
           data: (profile) {

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/org_scope_provider.dart';
 
 import '../../../../core/api/api_error.dart';
 import '../../../../core/api/dio_client.dart';
@@ -7,6 +8,11 @@ import '../../data/repositories/api_my_profile_repository.dart';
 import '../../data/repositories/my_profile_repository.dart';
 
 final myProfileRepositoryProvider = Provider<MyProfileRepository>((ref) {
+  // Org-scoped: recreated whenever the caller switches organisation, which
+  // invalidates every provider that watches this repository. Without it,
+  // cached lists from the previous tenant would be served under the new
+  // tenant's name. See core/providers/org_scope_provider.dart.
+  ref.watch(currentOrgIdProvider);
   return ApiMyProfileRepository(dio: ref.read(dioProvider));
 });
 

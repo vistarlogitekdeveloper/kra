@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../observability/app_logger.dart';
 
 /// Wraps `flutter_secure_storage` with typed helpers for the auth domain.
 ///
@@ -22,7 +23,15 @@ class SecureStorageService {
   SecureStorageService([FlutterSecureStorage? storage])
       : _storage = storage ??
             const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+              // `encryptedSharedPreferences: true` used to be passed here and
+              // no longer exists. It is not a capability that was lost: 11.x
+              // made the strong path the DEFAULT — AES-GCM for the data with
+              // RSA-OAEP key wrapping in the Android KeyStore — so the plain
+              // default is now at least as strong as the old opt-in flag.
+              // Biometric gating is a separate opt-in
+              // (`AndroidOptions.biometric()`), deliberately not used: a
+              // background token refresh must not raise a fingerprint prompt.
+              aOptions: AndroidOptions(),
               iOptions: IOSOptions(
                 accessibility: KeychainAccessibility.first_unlock,
               ),
@@ -51,7 +60,7 @@ class SecureStorageService {
       return await _storage.read(key: key);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('SecureStorage: read("$key") failed: $e');
+        AppLog.w('storage', 'read("$key") failed', error: e);
       }
       return null;
     }

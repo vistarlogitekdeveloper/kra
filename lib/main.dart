@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/bootstrap.dart';
 import 'core/constants/app_strings.dart';
 import 'core/router/app_router.dart';
-import 'core/widgets/keyboard_scroll_scope.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/widgets/keyboard_scroll_scope.dart';
 import 'core/widgets/shimmer_skeletons.dart';
 import 'features/auth/presentation/providers/app_boot_provider.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: VistarApp()));
-}
+void main() => bootstrap(() => const ProviderScope(child: VistarApp()));
 
 class VistarApp extends ConsumerWidget {
   const VistarApp({super.key});
@@ -26,24 +24,38 @@ class VistarApp extends ConsumerWidget {
     final mode = ref.watch(themeModeProvider);
     final theme = AppTheme.themeFor(resolveBrightness(mode));
 
-    // While the boot future is in flight we render a brand-tinted
-    // shimmer splash inside a minimal MaterialApp. Once boot resolves
-    // (regardless of whether a session was found), we hand off to the
-    // real router-driven MaterialApp. This avoids any flash of the
-    // login screen for already-logged-in users.
-    return boot.when(
-      loading: () => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: theme,
-        title: AppStrings.appName,
-        home: const FullScreenLoadingSkeleton(),
-      ),
-      error: (_, __) => _buildRouterApp(ref, theme),
-      data: (_) => _buildRouterApp(ref, theme),
-    );
+    // Exhaustive pattern match rather than `.when()`: AsyncValue is sealed, so
+    // the compiler proves every state is handled and a future state cannot be
+    // silently dropped into a default branch.
+    //
+    // While the boot future is in flight we render a brand-tinted shimmer
+    // splash inside a minimal MaterialApp. Once boot resolves — whether or not
+    // a session was found — we hand off to the real router-driven app. That
+    // avoids any flash of the login screen for an already-signed-in user.
+    //
+    // AsyncError falls through to the router deliberately: a failed boot means
+    // "no session restored", which the router already handles by showing login.
+    return switch (boot) {
+      AsyncLoading() => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: theme,
+          title: AppStrings.appName,
+          home: const FullScreenLoadingSkeleton(),
+        ),
+      _ => _RouterApp(theme: theme),
+    };
   }
+}
 
-  Widget _buildRouterApp(WidgetRef ref, ThemeData theme) {
+/// The router-driven app, as a widget CLASS rather than a `Widget _build…()`
+/// method so Flutter can prune rebuilds of this subtree on its own.
+class _RouterApp extends ConsumerWidget {
+  const _RouterApp({required this.theme});
+
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: AppStrings.appName,
