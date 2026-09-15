@@ -169,7 +169,12 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-
+    // One month is open, so the sheet still advertises Self editing — but
+    // August is open AND still empty, so the banner names it rather than
+    // giving the generic line. (Under the old November clock no month in
+    // this quarter was open, so nothing was ever "due".)
+    expect(find.textContaining('Rate your Aug'), findsOneWidget,
+        reason: 'the banner should name the open, unrated month');
     // Exactly two pencils: the banner's, plus August's Self cell. July's
     // locked cell and September's absent review contribute none.
     expect(find.byIcon(Icons.edit_rounded), findsNWidgets(2));
