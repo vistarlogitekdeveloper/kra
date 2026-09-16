@@ -9,12 +9,20 @@ void main() {
     test('resolves every non-terminal stage to its fixed day of month', () {
       expect(MonthlyDeadlines.forStage(ReviewStage.selfRating, ref),
           DateTime(2026, 6, 10));
-
+      // Account & HR (both raters) fall due on the 12th, the reporting manager
+      // on the 13th — they no longer share a date.
+      expect(
+          MonthlyDeadlines.forStage(ReviewStage.accountHrRating, ref),
+          DateTime(2026, 6, 12));
+      expect(
+          MonthlyDeadlines.forStage(ReviewStage.financeRating, ref),
+          DateTime(2026, 6, 12));
       expect(
         MonthlyDeadlines.forStage(ReviewStage.reportingManagerRating, ref),
         DateTime(2026, 6, 13),
       );
-
+      expect(
+          MonthlyDeadlines.forStage(ReviewStage.managementReview, ref),
           DateTime(2026, 6, 15));
       expect(MonthlyDeadlines.forStage(ReviewStage.incentivePayout, ref),
           DateTime(2026, 6, 20));
@@ -71,6 +79,68 @@ void main() {
       expect(
         MonthlyDeadlines.daysRemaining(deadline, DateTime(2026, 6, 9, 23, 59)),
         1,
+      );
+    });
+  });
+
+  group('MonthlyDeadlines review-period cutoffs', () {
+    test('anchors deadlines to the month after the rated month', () {
+      expect(
+        MonthlyDeadlines.forReviewMonth(
+          ReviewStage.selfRating,
+          2026,
+          8,
+        ),
+        DateTime(2026, 9, 10),
+      );
+      expect(
+        MonthlyDeadlines.forReviewMonth(
+          ReviewStage.incentivePayout,
+          2026,
+          12,
+        ),
+        DateTime(2027, 1, 20),
+      );
+    });
+
+    test('keeps the deadline day open and closes after it', () {
+      expect(
+        MonthlyDeadlines.isStagePastDeadline(
+          ReviewStage.accountHrRating,
+          2026,
+          8,
+          DateTime(2026, 9, 12),
+        ),
+        isFalse,
+      );
+      expect(
+        MonthlyDeadlines.isStagePastDeadline(
+          ReviewStage.accountHrRating,
+          2026,
+          8,
+          DateTime(2026, 9, 13),
+        ),
+        isTrue,
+      );
+    });
+
+    test('terminal reviews have no cutoff', () {
+      expect(
+        MonthlyDeadlines.forReviewMonth(
+          ReviewStage.completed,
+          2026,
+          8,
+        ),
+        isNull,
+      );
+      expect(
+        MonthlyDeadlines.isStagePastDeadline(
+          ReviewStage.completed,
+          2026,
+          8,
+          DateTime(2099, 1, 1),
+        ),
+        isFalse,
       );
     });
   });

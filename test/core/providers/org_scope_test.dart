@@ -117,10 +117,22 @@ void main() {
   group('coverage', () {
     test('every repository provider is org-scoped, except auth', () {
       // Source-level, because a missed provider is invisible until someone
-      // notices another company's data on screen. auth is the one exemption:
-      // currentOrgIdProvider watches authStateProvider, which is built from
-      // authRepositoryProvider, so scoping it there would close a cycle.
-      const exempt = 'auth_providers.dart';
+      // notices another company's data on screen.
+      //
+      // Two exemptions, and both must stay justified by the data NOT being
+      // tenant-scoped — never by "it was inconvenient to wire up":
+      //   * auth — currentOrgIdProvider watches authStateProvider, which is
+      //     built from authRepositoryProvider, so scoping it there would close
+      //     a cycle.
+      //   * the deadline schedule — GET /config/deadlines is unauthenticated
+      //     and org-agnostic. It returns the day numbers THIS BACKEND resolved
+      //     from its own env vars, identical for every tenant on the instance,
+      //     and carries no tenant data at all. Re-fetching on an org switch
+      //     would imply a per-organisation schedule that does not exist.
+      const exempt = <String>{
+        'auth_providers.dart',
+        'deadline_schedule_providers.dart',
+      };
       final missing = <String>[];
       var checked = 0;
 
@@ -129,7 +141,7 @@ void main() {
         if (entity is! File) continue;
         final path = entity.path.replaceAll(r'\', '/');
         if (!path.endsWith('_providers.dart')) continue;
-        if (path.endsWith(exempt)) continue;
+        if (exempt.any(path.endsWith)) continue;
 
         final src = entity.readAsStringSync();
         if (!RegExp(r'final\s+\w*RepositoryProvider\s*=').hasMatch(src)) {

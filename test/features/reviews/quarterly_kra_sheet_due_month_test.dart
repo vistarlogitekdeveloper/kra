@@ -73,7 +73,14 @@ void main() {
         child: MaterialApp(home: Scaffold(body: child)),
       );
 
-
+  // The scope line now carries the stage deadline. Derived, not restated, so
+  // these tests keep passing when the published schedule changes.
+  final due = AppStrings.dueByEachMonth(ReviewStage.selfRating.deadlineDay!);
+  final genericHint = 'You can edit the Self ratings on this sheet.$due';
+  // "closed", not "current": the month that is due is the one that has
+  // FINISHED — these fixtures sit in September and expect August.
+  final augustHint = "Rate your Aug '26 Self column — that month has closed "
+      'and it is still empty.$due';
 
   testWidgets(
       'an earlier month rated but the current one empty → the hint '
