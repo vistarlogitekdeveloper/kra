@@ -31,6 +31,39 @@ class MonthlyDeadlines {
   static DateTime forDay(int day, [DateTime? reference]) =>
       _forMonth(day, reference);
 
+  /// The deadline for a review of [ratedYear]-[ratedMonth].
+  ///
+  /// Reviews are performed in the month after the work was rated, so a
+  /// September review is due in October. Keeping that calculation here avoids
+  /// each screen interpreting the stage schedule differently.
+  static DateTime? forReviewMonth(
+    ReviewStage stage,
+    int ratedYear,
+    int ratedMonth,
+  ) {
+    final day = stage.deadlineDay;
+    if (day == null) return null;
+    final reviewMonth = ratedMonth == 12
+        ? DateTime(ratedYear + 1, 1)
+        : DateTime(ratedYear, ratedMonth + 1);
+    return DateTime(reviewMonth.year, reviewMonth.month, day);
+  }
+
+  /// Whether [stage] can still be edited for the rated month today.
+  ///
+  /// The deadline day itself remains available; editing closes at midnight
+  /// after that day.
+  static bool isStagePastDeadline(
+    ReviewStage stage,
+    int ratedYear,
+    int ratedMonth, [
+    DateTime? today,
+  ]) {
+    final deadline = forReviewMonth(stage, ratedYear, ratedMonth);
+    if (deadline == null) return false;
+    return isOverdue(deadline, today);
+  }
+
   static DateTime _forMonth(int day, DateTime? reference) {
     final r = reference ?? DateTime.now();
     return DateTime(r.year, r.month, day);
