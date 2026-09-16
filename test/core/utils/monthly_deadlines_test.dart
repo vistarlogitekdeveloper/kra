@@ -83,6 +83,68 @@ void main() {
     });
   });
 
+  group('MonthlyDeadlines review-period cutoffs', () {
+    test('anchors deadlines to the month after the rated month', () {
+      expect(
+        MonthlyDeadlines.forReviewMonth(
+          ReviewStage.selfRating,
+          2026,
+          8,
+        ),
+        DateTime(2026, 9, 10),
+      );
+      expect(
+        MonthlyDeadlines.forReviewMonth(
+          ReviewStage.incentivePayout,
+          2026,
+          12,
+        ),
+        DateTime(2027, 1, 20),
+      );
+    });
+
+    test('keeps the deadline day open and closes after it', () {
+      expect(
+        MonthlyDeadlines.isStagePastDeadline(
+          ReviewStage.accountHrRating,
+          2026,
+          8,
+          DateTime(2026, 9, 12),
+        ),
+        isFalse,
+      );
+      expect(
+        MonthlyDeadlines.isStagePastDeadline(
+          ReviewStage.accountHrRating,
+          2026,
+          8,
+          DateTime(2026, 9, 13),
+        ),
+        isTrue,
+      );
+    });
+
+    test('terminal reviews have no cutoff', () {
+      expect(
+        MonthlyDeadlines.forReviewMonth(
+          ReviewStage.completed,
+          2026,
+          8,
+        ),
+        isNull,
+      );
+      expect(
+        MonthlyDeadlines.isStagePastDeadline(
+          ReviewStage.completed,
+          2026,
+          8,
+          DateTime(2099, 1, 1),
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('MonthlyDeadlines.isOverdue', () {
     test('flips strictly after the deadline day', () {
       final deadline = DateTime(2026, 6, 13);

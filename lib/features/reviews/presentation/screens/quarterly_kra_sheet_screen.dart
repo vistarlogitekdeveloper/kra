@@ -10,6 +10,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_gradients.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/enums/kra_reviewer.dart';
+import '../../../../core/utils/monthly_deadlines.dart';
 import '../../../../core/utils/proof_file_saver.dart';
 import '../../../../core/widgets/adaptive_leading.dart';
 import '../../../../core/widgets/shimmer_box.dart';
@@ -244,6 +245,7 @@ class _QuarterlyKraSheetScreenState
   // per-review — never per-sheet.
   bool _canEditSelf(MonthlyReview r, ReviewScope? scope) {
     if (scope == null || r.isComplete) return false;
+    if (_stageDeadlinePassed(r, ReviewStage.selfRating)) return false;
     // A month that has not ENDED cannot be rated by anyone, including its own
     // employee. Enforced here as well as in isCellOpenForEntry because this
     // gate feeds `_submittableReviews`, and that is a far worse failure than an
@@ -275,6 +277,9 @@ class _QuarterlyKraSheetScreenState
   // Still excludes the employee themselves and anyone else's manager.
   bool _canEditManager(MonthlyReview r, ReviewScope? scope) {
     if (scope == null || r.isComplete) return false;
+    if (_stageDeadlinePassed(r, ReviewStage.reportingManagerRating)) {
+      return false;
+    }
     final flow = scope.reviewFlow;
     if (!stageIsInFlow(ReviewStage.reportingManagerRating, flow)) return false;
     // Under a flow that has taken rating out of the reporting line, this seat
@@ -292,9 +297,11 @@ class _QuarterlyKraSheetScreenState
   // The three Review-cycle raters are entered in parallel. Two are gated by
   // ROLE (HR, Accounts); the reporting-manager one stays a RELATIONSHIP (above).
   bool _canEditHr(MonthlyReview r, ReviewScope? scope) =>
-      canRateReviewStage(ReviewStage.accountHrRating, scope, r);
+      canRateReviewStage(ReviewStage.accountHrRating, scope, r) &&
+      !_stageDeadlinePassed(r, ReviewStage.accountHrRating);
   bool _canEditFinance(MonthlyReview r, ReviewScope? scope) =>
-      canRateReviewStage(ReviewStage.financeRating, scope, r);
+      canRateReviewStage(ReviewStage.financeRating, scope, r) &&
+      !_stageDeadlinePassed(r, ReviewStage.financeRating);
 
   // Management review (cycle 3) — HR either approves the Review average or, on
   // rework, overrides it per KRA. Done by HR_ADMIN / ADMIN.
@@ -316,7 +323,17 @@ class _QuarterlyKraSheetScreenState
           ReviewStage.managementReview, scope.reviewFlow, scope.effectiveRoles);
 
   bool _canEditManagement(MonthlyReview r, ReviewScope? scope) =>
-      _hasManagementRole(scope) && !r.isComplete;
+      _hasManagementRole(scope) &&
+      !r.isComplete &&
+      !_stageDeadlinePassed(r, ReviewStage.managementReview);
+
+  bool _stageDeadlinePassed(MonthlyReview review, ReviewStage stage) =>
+      MonthlyDeadlines.isStagePastDeadline(
+        stage,
+        review.period.year,
+        review.period.month,
+        _now,
+      );
 
   Future<void> _editCell({
     required MonthlyReview review,
@@ -4654,6 +4671,10 @@ bool isCellOpenForEntry({
   ReviewFlow flow = ReviewFlow.standard,
 }) {
   if (isMonthClosedForRating(month, now)) return false;
+  if (MonthlyDeadlines.isStagePastDeadline(
+      stage, month.year, month.month, now)) {
+    return false;
+  }
   if (stage == ReviewStage.selfRating) return true;
 
   // The self-first ordering only means anything in a flow that HAS a
