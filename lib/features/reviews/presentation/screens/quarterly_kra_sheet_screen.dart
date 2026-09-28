@@ -4653,7 +4653,23 @@ bool isCellOpenForEntry({
   required DateTime now,
   ReviewFlow flow = ReviewFlow.standard,
 }) {
-  if (isMonthClosedForRating(month, now)) return false;
+  // Management sign-off is NOT bound to the one-month entry window.
+  //
+  // The window protects the scores that feed the result: rating August must
+  // not reopen July. Sign-off enters no such score — it approves what is
+  // already there, and it is the last gate before payout. Binding it to the
+  // same window means any review whose window closes unsigned can never be
+  // completed by anyone, ever. July is in exactly that state: its window shut
+  // on 31 August with management still to act, and nothing could reopen it.
+  //
+  // It still requires the month to have ENDED, so nothing is signed off while
+  // it is still running. The narrower rule stays in force for every other
+  // stage, which is where the "do not rewrite July" concern actually lives.
+  if (stage == ReviewStage.managementReview) {
+    if (!month.isRatableOn(now)) return false;
+  } else if (isMonthClosedForRating(month, now)) {
+    return false;
+  }
   if (stage == ReviewStage.selfRating) return true;
 
   // The self-first ordering only means anything in a flow that HAS a
