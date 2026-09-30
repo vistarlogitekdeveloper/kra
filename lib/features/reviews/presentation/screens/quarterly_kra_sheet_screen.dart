@@ -268,7 +268,21 @@ class _QuarterlyKraSheetScreenState
     // whose window has closed. A return is an explicit, audited grant of
     // permission from the one person entitled to give it, which is exactly
     // what the blanket window rule cannot express.
-    if (!r.period.isOpenForRatingOn(_now) && !r.selfRatingReturned) {
+    // Otherwise: the OPEN month, a month handed back for rework, or a month
+    // this employee has not finished rating.
+    //
+    // That last case is the one that matters at scale. The window rule was
+    // written to stop September's rater going back and REWRITING July, and
+    // filling a blank is not rewriting: a KRA that already carries a self
+    // score stays shut (see isCellOpenForEntry), so a closed month can be
+    // completed but never revised. Without it, every employee whose July or
+    // August self-rating was left unfinished when the window shut is locked
+    // out of their own sheet permanently, with nothing in the app able to
+    // reopen it — and the score they never entered counts as a zero against
+    // their incentive.
+    if (!r.period.isOpenForRatingOn(_now) &&
+        !r.selfRatingReturned &&
+        !_hasUnratedSelfKra(r)) {
       return false;
     }
     // Some organisations run a pipeline with no self-rating at all. Checked
@@ -277,6 +291,15 @@ class _QuarterlyKraSheetScreenState
     if (!stageIsInFlow(ReviewStage.selfRating, scope.reviewFlow)) return false;
     return scope.userId == r.employeeId;
   }
+
+  /// Whether any KRA on [r] is still missing its self score.
+  ///
+  /// Reads the actual scores, never the stage cursor. The cursor is unreliable
+  /// on this data — reviews sit at MANAGEMENT_REVIEW, and some at COMPLETED,
+  /// with no self score behind them at all — so a gate keyed on status would
+  /// call an empty sheet finished.
+  static bool _hasUnratedSelfKra(MonthlyReview r) =>
+      r.rows.any((row) => row.scoreFor(ReviewStage.selfRating)?.value == null);
 
   // Manager rating: editable ONLY by this employee's own reporting manager.
   //
@@ -4691,8 +4714,14 @@ bool isCellOpenForEntry({
   //     always already closed by the time anyone reads the notice.
   //
   // Both still require the month to have ENDED.
+  // An unrated KRA stays open to its owner after the window closes, so a
+  // half-finished month can be completed. PER KRA and keyed on the actual
+  // score: the ones already rated stay shut, which is what keeps this a way
+  // to finish a month rather than a way to revise one.
+  final selfBackfill = stage == ReviewStage.selfRating &&
+      row.scoreFor(ReviewStage.selfRating)?.value == null;
   final reachesBack = stage == ReviewStage.managementReview ||
-      (stage == ReviewStage.selfRating && returnedForRework);
+      (stage == ReviewStage.selfRating && (returnedForRework || selfBackfill));
   if (reachesBack) {
     if (!month.isRatableOn(now)) return false;
   } else if (isMonthClosedForRating(month, now)) {
