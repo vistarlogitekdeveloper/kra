@@ -109,7 +109,7 @@ void main() {
         august,
       ]) {
         expect(open(ReviewStage.managementReview, month), isTrue,
-            reason: '${month.shortLabel}');
+            reason: month.shortLabel);
       }
     });
   });

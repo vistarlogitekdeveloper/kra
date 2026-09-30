@@ -161,20 +161,24 @@ void main() {
     );
   });
 
-  test('a CLOSED past month is shut to everyone, self-rating included', () {
-    // This test used to assert the opposite of its last two lines, and it
-    // was right to at the time: the rule was about ORDER, not the calendar,
-    // so July stayed open for a late entry and a self-rated July stayed
-    // open to its reviewer.
+  test('a CLOSED past month is shut to its REVIEWERS', () {
+    // Once August's window opened, July's closed for every reviewer — the
+    // rule is the calendar, not the order, and a self-rated July is still
+    // out of window for the manager.
     //
-    // Both are now false. Once August's window opened, July's closed — for
-    // the employee as well as every reviewer. That is the requested
-    // behaviour, and it has a consequence worth stating in a test rather
-    // than discovering in production: a month nobody rated in time can no
-    // longer be rated at all. HR reopening it is the only route back.
+    // The employee is the documented exception, and this test used to record
+    // the reason as a cost: 'a month nobody rated in time can no longer be
+    // rated at all. HR reopening it is the only route back.' No such reopen
+    // was ever built, so that was not a cost, it was a dead end — across the
+    // roster, with the unentered scores counting as zero against the
+    // incentive. An UNRATED KRA now stays open to its owner; a rated one does
+    // not, so a closed month can be finished but never revised. See
+    // self_rating_backfill_test.dart.
     expect(open(ReviewStage.reportingManagerRating, row(), july), isFalse);
-    expect(open(ReviewStage.selfRating, row(), july), isFalse,
-        reason: 'a late self-entry for July is no longer possible');
+    expect(open(ReviewStage.selfRating, row(), july), isTrue,
+        reason: 'an unfinished July is still theirs to complete');
+    expect(open(ReviewStage.selfRating, row(selfValue: 60), july), isFalse,
+        reason: 'but a July they DID rate is settled');
     expect(
       open(ReviewStage.reportingManagerRating, row(selfValue: 60), july),
       isFalse,
