@@ -255,9 +255,22 @@ class _QuarterlyKraSheetScreenState
     // The gate is still needed after the cell fix, because scores written for
     // the live month BEFORE that fix shipped are already in the database and
     // the submit loop would go on offering them.
-    // The OPEN month only — not every month that has ended. Rating August
-    // must not reopen July.
-    if (!r.period.isOpenForRatingOn(_now)) return false;
+    // A month still running is closed to everyone, always — that is what the
+    // paragraph above protects, and a returned rating must not defeat it.
+    if (!r.period.isRatableOn(_now)) return false;
+    // Otherwise the OPEN month only — rating August must not reopen July —
+    // UNLESS the manager handed this month back for rework.
+    //
+    // Without that exception the send-back is a dead letter: the employee is
+    // shown "your rating was returned, please revise it" over a sheet they
+    // cannot type into, because the month whose rating is being questioned is
+    // by definition one that has already been submitted and, soon after, one
+    // whose window has closed. A return is an explicit, audited grant of
+    // permission from the one person entitled to give it, which is exactly
+    // what the blanket window rule cannot express.
+    if (!r.period.isOpenForRatingOn(_now) && !r.selfRatingReturned) {
+      return false;
+    }
     // Some organisations run a pipeline with no self-rating at all. Checked
     // before identity: under that flow it is not that someone ELSE rates the
     // employee, it is that the stage does not exist.
@@ -2792,6 +2805,7 @@ class _GridState extends State<_Grid> {
       month: widget.months[monthIdx],
       now: widget.now,
       flow: widget.reviewFlow,
+      returnedForRework: widget.reviews[monthIdx]?.selfRatingReturned ?? false,
     );
   }
 
@@ -4652,6 +4666,10 @@ bool isCellOpenForEntry({
   required ReviewPeriod month,
   required DateTime now,
   ReviewFlow flow = ReviewFlow.standard,
+
+  /// Whether the reporting manager has handed this month's self-rating back.
+  /// Reopens a closed month for the SELF stage only — see the window note.
+  bool returnedForRework = false,
 }) {
   // Management sign-off is NOT bound to the one-month entry window.
   //
@@ -4665,7 +4683,17 @@ bool isCellOpenForEntry({
   // It still requires the month to have ENDED, so nothing is signed off while
   // it is still running. The narrower rule stays in force for every other
   // stage, which is where the "do not rewrite July" concern actually lives.
-  if (stage == ReviewStage.managementReview) {
+  // Two stages legitimately reach back past the open month:
+  //
+  //   * management sign-off, for the reason above;
+  //   * a self-rating the manager has RETURNED — the send-back is an explicit,
+  //     audited request to redo that month, and the month being questioned has
+  //     always already closed by the time anyone reads the notice.
+  //
+  // Both still require the month to have ENDED.
+  final reachesBack = stage == ReviewStage.managementReview ||
+      (stage == ReviewStage.selfRating && returnedForRework);
+  if (reachesBack) {
     if (!month.isRatableOn(now)) return false;
   } else if (isMonthClosedForRating(month, now)) {
     return false;
