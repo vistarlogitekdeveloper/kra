@@ -17,6 +17,7 @@ import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
+import '../../data/models/rating_reopen.dart';
 import '../../../../core/enums/review_flow.dart';
 import '../../data/models/review_flow.dart';
 import '../../data/models/review_stage.dart';
@@ -560,30 +561,35 @@ class _QuarterlyKraSheetScreenState
     setState(() => _saving = true);
     try {
       final repo = ref.read(monthlyReviewRepositoryProvider);
-      for (final review in targets) {
+      final submitted = await submitEachSkippingMoved(
+        targets,
         // approved: true is what separates this from the rework send-back,
         // which posts the same stage with approved: false.
-        await repo.submitStage(
+        (review) => repo.submitStage(
           review.id,
           ReviewStage.reportingManagerRating,
           approved: true,
           actorId: scope.userId,
           actorName: scope.userName,
-        );
-      }
+        ),
+      );
       ref.invalidate(quarterlySheetProvider);
       // The manager's team list badges review state from the summary.
       ref.invalidate(monthlyReviewListProvider);
-      if (mounted) await _showManagerSubmittedDialog();
+      if (!mounted) return;
+      if (submitted == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.mgrSubmitAlreadyMoved)),
+        );
+      } else {
+        await _showManagerSubmittedDialog();
+      }
     } catch (e) {
       if (mounted) {
-        final conflict = e is ApiError && e.statusCode == 409;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(conflict
-                ? AppStrings.mgrSubmitAlreadyMoved
-                : '${AppStrings.mgrSubmitFailed} '
-                    '${e is ApiError ? e.message : e}'),
+            content: Text('${AppStrings.mgrSubmitFailed} '
+                '${e is ApiError ? e.message : e}'),
           ),
         );
       }
@@ -1271,6 +1277,32 @@ bool managerCanSubmitReview(
     r.managerId == managerUserId &&
     managerRatedKraCount(r) > 0 &&
     r.recordFor(ReviewStage.reportingManagerRating) == null;
+
+/// Runs [submit] for each of [targets] in turn and returns how many went
+/// through.
+///
+/// A 409 means the server has already moved THAT month past the stage being
+/// submitted, which says nothing about the others, so the month is skipped
+/// rather than ending the loop. Any other error stops it and is rethrown.
+/// Without this, a reporting manager catching up on a reopened July whose
+/// review had already moved on could not submit August or September in the
+/// same go — the first 409 abandoned the rest.
+@visibleForTesting
+Future<int> submitEachSkippingMoved(
+  List<MonthlyReview> targets,
+  Future<void> Function(MonthlyReview review) submit,
+) async {
+  var submitted = 0;
+  for (final review in targets) {
+    try {
+      await submit(review);
+      submitted++;
+    } on ApiError catch (e) {
+      if (e.statusCode != 409) rethrow;
+    }
+  }
+  return submitted;
+}
 
 /// Builds the quarterly-sheet body from plain data (no providers/auth) so
 /// widget tests can exercise its layout in isolation — e.g. assert the grid
@@ -2829,6 +2861,8 @@ class _GridState extends State<_Grid> {
       now: widget.now,
       flow: widget.reviewFlow,
       returnedForRework: widget.reviews[monthIdx]?.selfRatingReturned ?? false,
+      reopenedForBackfill:
+          RatingReopen.allowsBackfill(widget.months[monthIdx], widget.now),
     );
   }
 
@@ -2930,9 +2964,12 @@ class _GridState extends State<_Grid> {
 
     // Not open yet — so the reviewer owes nothing and must not be shown as
     // holding it up. A future month shows nothing at all; a started month
-    // still waiting on the employee says so.
+    // still waiting on the employee says so, and a month reopened for pending
+    // ratings counts as started.
     if (!open) {
-      if (isMonthClosedForRating(widget.months[monthIdx], widget.now)) {
+      final month = widget.months[monthIdx];
+      if (isMonthClosedForRating(month, widget.now) &&
+          !RatingReopen.allowsBackfill(month, widget.now)) {
         return Text(_fmt(null),
             style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -4693,6 +4730,11 @@ bool isCellOpenForEntry({
   /// Whether the reporting manager has handed this month's self-rating back.
   /// Reopens a closed month for the SELF stage only — see the window note.
   bool returnedForRework = false,
+
+  /// Whether [month] has been reopened so pending ratings can be filled in —
+  /// see [RatingReopen]. Opens a BLANK reviewer cell past the window; one that
+  /// already carries a score stays shut.
+  bool reopenedForBackfill = false,
 }) {
   // Management sign-off is NOT bound to the one-month entry window.
   //
@@ -4720,8 +4762,16 @@ bool isCellOpenForEntry({
   // to finish a month rather than a way to revise one.
   final selfBackfill = stage == ReviewStage.selfRating &&
       row.scoreFor(ReviewStage.selfRating)?.value == null;
+  // The same rule for the three reviewers, but only in a month that has been
+  // explicitly reopened: their pending ratings can be entered, the ones
+  // already given cannot be changed. The self-first check below still applies.
+  final reviewerBackfill = reopenedForBackfill &&
+      stage.isReviewRater &&
+      row.scoreFor(stage)?.value == null;
   final reachesBack = stage == ReviewStage.managementReview ||
-      (stage == ReviewStage.selfRating && (returnedForRework || selfBackfill));
+      (stage == ReviewStage.selfRating &&
+          (returnedForRework || selfBackfill)) ||
+      reviewerBackfill;
   if (reachesBack) {
     if (!month.isRatableOn(now)) return false;
   } else if (isMonthClosedForRating(month, now)) {

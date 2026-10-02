@@ -408,6 +408,17 @@ Patch: [`docs/install_review_month_shift.mjs`](docs/install_review_month_shift.m
 verified 2/6 → 6/6 including the January rollover. The client **clamps** whatever
 the server sends, so the screens are correct without it.
 
+**Temporary, from 2026-10-02: July and August 2026 are reopened for pending
+ratings.** `RatingReopen.granted` in
+[`rating_reopen.dart`](lib/features/reviews/data/models/rating_reopen.dart),
+adopted in `appBootProvider`, opens those months' **blank** reporting-manager,
+HR and Accounts cells past the window. Only pending ones: a cell that already
+has a score stays shut, and self-first, the manager ceiling, COMPLETED and
+management's lock all still apply. The window is client-only — the server's
+`saveScores` has no month check. To close the reopen, empty `granted`. It
+stays empty in tests unless a test adopts it, so the window tests keep pinning
+the base rule.
+
 ## The KRA sheet's COLUMNS are flow-shaped, not just its gates
 
 The flow decides which stages exist, so it also decides which columns exist. On

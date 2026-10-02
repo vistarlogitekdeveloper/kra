@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/jwt_claims.dart';
 import '../../../../core/providers/org_scope_provider.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../reviews/data/models/rating_reopen.dart';
 import '../../../reviews/data/models/review_stage.dart';
 import '../../../reviews/presentation/providers/deadline_schedule_providers.dart';
 import '../../data/models/user.dart';
@@ -30,6 +31,9 @@ final appBootProvider = FutureProvider<void>((ref) async {
   ref.read(deadlineScheduleRepositoryProvider).fetch().then((days) {
     if (days != null) DeadlineSchedule.adopt(days);
   });
+
+  // Reopen the months granted for pending ratings before any sheet renders.
+  RatingReopen.adopt(RatingReopen.granted);
 
   final storage = ref.read(secureStorageProvider);
   final hasSession = await storage.hasSession();
