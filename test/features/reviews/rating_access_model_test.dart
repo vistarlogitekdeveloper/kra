@@ -124,6 +124,36 @@ void main() {
     });
   });
 
+  group('RatingAccessMonth server clock', () {
+    test("every stage's window is read against the server's time", () {
+      // The device is a day behind the server: on the device it is still
+      // 10 Sep 20:00 IST (inside the self deadline), on the server it is the
+      // 11th. The card must say closed, as the server will.
+      final m = RatingAccessMonth.fromJson(
+        {
+          ...month([stage('SELF_RATING')]),
+          'serverNow': '2026-09-11T14:30:00.000Z',
+        },
+        receivedAt: DateTime.utc(2026, 9, 10, 14, 30),
+      );
+      final self = m?.stageFor(ReviewStage.selfRating);
+      expect(m?.clockSkew, const Duration(days: 1));
+      expect(self?.window.isOpenAt(DateTime.utc(2026, 9, 10, 14, 30)), isFalse);
+    });
+
+    test('no serverNow, no correction', () {
+      final m = RatingAccessMonth.fromJson(month([stage('SELF_RATING')]),
+          receivedAt: DateTime.utc(2026, 9, 10, 14, 30));
+      expect(m?.clockSkew, Duration.zero);
+      expect(
+          m
+              ?.stageFor(ReviewStage.selfRating)
+              ?.window
+              .isOpenAt(DateTime.utc(2026, 9, 10, 14, 30)),
+          isTrue);
+    });
+  });
+
   group('RatingAccessMonth.fromJson', () {
     test('reads the contract payload', () {
       final parsed = RatingAccessMonth.fromJson(month([

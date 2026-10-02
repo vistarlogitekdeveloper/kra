@@ -159,6 +159,23 @@ class RatingAccessOverride {
       updatedByName: JsonParse.parseString(json['updatedByName']),
     );
   }
+
+  /// Whether an OPEN override's end has passed at [now]. An override with no
+  /// end, or a CLOSED one, never ends on its own.
+  bool hasEndedAt(DateTime now) {
+    final until = openUntil;
+    return mode == RatingAccessMode.open && until != null && now.isAfter(until);
+  }
+
+  /// Sort order for lists: the most recently changed first, undated last.
+  static int newestFirst(RatingAccessOverride a, RatingAccessOverride b) {
+    final at = a.updatedAt;
+    final bt = b.updatedAt;
+    if (at == null && bt == null) return 0;
+    if (at == null) return 1;
+    if (bt == null) return -1;
+    return bt.compareTo(at);
+  }
 }
 
 /// One stage of a month view: the window the server resolved for it, and the
@@ -192,11 +209,15 @@ class RatingAccessStage {
   /// opening instant cannot be evaluated, and guessing one would be guessing
   /// whether people may rate. A malformed override, or one filed under a
   /// different stage, is dropped and the stage kept.
-  static RatingAccessStage? fromJson(Object? raw, {ReviewPeriod? period}) {
+  static RatingAccessStage? fromJson(
+    Object? raw, {
+    ReviewPeriod? period,
+    Duration clockSkew = Duration.zero,
+  }) {
     final json = JsonParse.parseMap(raw);
     if (json == null) return null;
     final stage = ratingStageFromWire(json['stage']);
-    final window = RatingWindow.fromJson(json['window']);
+    final window = RatingWindow.fromJson(json['window'], clockSkew: clockSkew);
     if (stage == null || window == null) return null;
     final parsed =
         RatingAccessOverride.fromJson(json['override'], fallbackPeriod: period);
@@ -260,12 +281,22 @@ class RatingAccessMonth {
     if (json == null) return null;
     final period = ratingPeriodOfJson(json) ?? fallbackPeriod;
     if (period == null) return null;
+    final serverNow = JsonParse.parseDate(json['serverNow']);
+    // Every window is read against the server's time, so a device whose clock
+    // is off shows the same open/closed answer the server will enforce.
+    final clockSkew = (serverNow == null || receivedAt == null)
+        ? Duration.zero
+        : serverNow.difference(receivedAt);
 
     final byStage = <ReviewStage, RatingAccessStage>{};
     final rawStages = json['stages'];
     if (rawStages is List) {
       for (final entry in rawStages) {
-        final parsed = RatingAccessStage.fromJson(entry, period: period);
+        final parsed = RatingAccessStage.fromJson(
+          entry,
+          period: period,
+          clockSkew: clockSkew,
+        );
         // First entry wins, so a duplicated stage cannot flip a card.
         if (parsed != null) byStage.putIfAbsent(parsed.stage, () => parsed);
       }
@@ -273,7 +304,6 @@ class RatingAccessMonth {
     if (byStage.isEmpty) return null;
 
     final name = JsonParse.parseString(json['organizationName'])?.trim();
-    final serverNow = JsonParse.parseDate(json['serverNow']);
     return RatingAccessMonth(
       organizationId: JsonParse.parseString(json['organizationId']) ??
           fallbackOrganizationId ??
@@ -284,9 +314,7 @@ class RatingAccessMonth {
       stages: byStage.values.toList()
         ..sort((a, b) => a.stage.pipelineIndex - b.stage.pipelineIndex),
       serverNow: serverNow,
-      clockSkew: (serverNow == null || receivedAt == null)
-          ? Duration.zero
-          : serverNow.difference(receivedAt),
+      clockSkew: clockSkew,
     );
   }
 

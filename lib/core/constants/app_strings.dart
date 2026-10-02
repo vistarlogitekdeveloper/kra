@@ -750,6 +750,12 @@ class AppStrings {
       'Rating access is not available on this server yet. The API needs the '
       'rating-access endpoints deployed.';
   static const String ratingAccessLoadFailed = 'Could not load rating access';
+  static const String ratingAccessOrgNotFound =
+      'This organisation was not found. It may have been removed or the link '
+      'is wrong.';
+  static String ratingAccessNothingToExtend(String date) =>
+      'Every stage is already open until $date by its own deadline — nothing '
+      'to reopen.';
   static const String ratingAccessNoStages =
       'This month has no rating stages to show.';
   static const String ratingAccessWorking = 'Updating rating access';

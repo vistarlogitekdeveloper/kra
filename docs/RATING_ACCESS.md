@@ -364,8 +364,11 @@ reopened until / reopened, no end date / closed by the administrator / reopen
 expired), Open until… (date picker; first date = today in IST; the picked y/m/d is
 sent as-is, never via `toUtc()`; dates on or before the stage's deadline are
 disabled or flagged) / Close now / Use deadline, bulk "Open all stages until…" and
-"Use deadline for all" as sequential calls that stop and report on failure, and
-the organisation's history (newest first). Loading, error (+ retry; 404
+"Use deadline for all" as sequential calls that stop and report on failure (bulk
+open skips stages whose own deadline already covers the chosen date), and the
+organisation's current overrides including expired ones (newest first). The
+server's full change history (`GET …/history`, every SET and CLEARED with its
+actor) is not yet shown on this screen — see §6. Loading, error (+ retry; 404
 `RES_001` = not on the server yet, `RES_ORG_NOT_FOUND` = organisation not found),
 empty history, content. Mode choice with `SegmentedButton` (no deprecated
 `RadioListTile.groupValue`). After every change, invalidate the review caches so a
@@ -389,6 +392,14 @@ error string (fixed in this build).
 
 ## 6. Out of scope (follow-ups)
 
+- The super-admin screen lists current overrides; the full change history
+  (`GET …/history`, kra.rating_access_events) is served and tested but has no
+  screen yet. Until it does, query it directly or via the API.
+- The multi-month loops (self submit, manager submit, send-back, lock, reopen)
+  refresh the sheet on a "closed" refusal and show the server's message, but
+  stop at the first refused month rather than skipping it and finishing the
+  rest. The app only offers months whose windows are open, so this only bites
+  when a window closes while the sheet is open.
 - Reminder emails ignore overrides.
 - Dashboards' "needs your action" and the employee home banner ignore windows.
 - The legacy cycle pipeline and its screens.

@@ -81,13 +81,50 @@ void main() {
     });
 
     test(
-        'not flagged once the pipeline has moved on again — the return is then '
-        'history, not a pending action', () {
+        'not flagged once the employee has resubmitted — the return is then '
+        "history, and it is the manager's turn", () {
       final r = reviewAt(
         ReviewStage.reportingManagerRating,
+        records: {
+          ReviewStage.reportingManagerRating: record(returned: true),
+          ReviewStage.selfRating: StageRecord(
+            actorId: 'emp1',
+            actorName: 'Asha',
+            submittedAt: DateTime.utc(2026, 8, 12),
+          ),
+        },
+      );
+      expect(r.selfRatingReturned, isFalse);
+      expect(r.managerReworkDue, isTrue);
+    });
+
+    test(
+        'still flagged when only the CURSOR moved — another rater saved, the '
+        'employee has not resubmitted', () {
+      // The server auto-advances the cursor on every save, so a rule keyed on
+      // it ended the rework at the first unrelated save. Records decide.
+      final r = reviewAt(
+        ReviewStage.accountHrRating,
+        records: {
+          ReviewStage.reportingManagerRating: record(returned: true),
+          ReviewStage.selfRating: StageRecord(
+            actorId: 'emp1',
+            actorName: 'Asha',
+            submittedAt: DateTime.utc(2026, 8, 5),
+          ),
+        },
+      );
+      expect(r.selfRatingReturned, isTrue);
+      expect(r.managerReworkDue, isFalse);
+    });
+
+    test('a paid (completed) review is never in rework', () {
+      final r = reviewAt(
+        ReviewStage.completed,
         records: {ReviewStage.reportingManagerRating: record(returned: true)},
       );
       expect(r.selfRatingReturned, isFalse);
+      expect(r.managerReworkDue, isFalse);
     });
 
     test('a forward submission is never reported as a return', () {

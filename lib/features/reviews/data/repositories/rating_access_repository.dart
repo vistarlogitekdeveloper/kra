@@ -157,6 +157,7 @@ class ApiRatingAccessRepository implements RatingAccessRepository {
       unwrapObject(response),
       fallbackOrganizationId: organizationId,
       fallbackPeriod: period,
+      receivedAt: DateTime.now(),
     );
     if (month != null) return month;
     throw const ApiError(

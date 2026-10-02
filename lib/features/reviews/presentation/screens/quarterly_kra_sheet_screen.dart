@@ -311,7 +311,10 @@ class _QuarterlyKraSheetScreenState
     if (stage == ReviewStage.reportingManagerRating) {
       final selfValue =
           _currentScore(review, rowId, ReviewStage.selfRating)?.value;
-      if (selfValue == null) {
+      if (selfValue != null) {
+        capPct = (selfValue / maxScore * 100).clamp(0, 100).toDouble();
+        capNote = '${AppStrings.sheetCapPrefix} ${capPct.round()}%';
+      } else if (_stageWindowOpen(review, ReviewStage.selfRating, _now)) {
         // Nothing to moderate yet. Rating first would let the manager set the
         // ceiling for the employee's own rating, which inverts the order.
         if (mounted) {
@@ -321,8 +324,9 @@ class _QuarterlyKraSheetScreenState
         }
         return;
       }
-      capPct = (selfValue / maxScore * 100).clamp(0, 100).toDouble();
-      capNote = '${AppStrings.sheetCapPrefix} ${capPct.round()}%';
+      // Otherwise the SELF window has closed with this KRA unrated: the score
+      // can no longer arrive, so there is no ceiling, and the server's own
+      // ceiling skips such rows the same way (docs/RATING_ACCESS.md §2).
     }
 
     // Accessible rating entry: a slider + one-tap presets in a bottom sheet.
@@ -436,7 +440,10 @@ class _QuarterlyKraSheetScreenState
         for (final r in reviews.whereType<MonthlyReview>())
           if (_canEditSelf(r, scope) &&
               _hasSelfScore(r) &&
-              r.recordFor(ReviewStage.selfRating) == null)
+              // Never submitted — or submitted, then sent back and not yet
+              // resubmitted, which is exactly when a resubmit is owed.
+              (r.recordFor(ReviewStage.selfRating) == null ||
+                  r.selfRatingReturned))
             r,
       ];
 
@@ -1161,8 +1168,15 @@ class _QuarterlyKraSheetScreenState
             // Management commits the whole column at once (copy Review → Mgmt
             // for anything they didn't change) and locks the incentive to it,
             // or reopens a locked review to revise it.
-            onLockManagement:
-                canSignOff ? () => _lockManagementReview(signOff) : null,
+            // Lock only what is not locked yet: saving management scores on a
+            // locked month is refused by the server, and that refusal used to
+            // stop the whole quarter's lock at the first locked month.
+            onLockManagement: canSignOff
+                ? () => _lockManagementReview([
+                      for (final r in signOff)
+                        if (!r.isManagementLocked) r,
+                    ])
+                : null,
             onReopenManagement:
                 canSignOff ? () => _reopenManagement(signOff) : null,
             // The reporting manager can hand a self-rating back when it looks
@@ -1414,7 +1428,7 @@ String _reopenedLine(DateTime? closesAt, List<String> months) {
   return closesAt == null
       ? AppStrings.quarterlyReopenedNoEnd(list)
       : AppStrings.quarterlyReopenedUntil(
-          list, EmployeeFormatters.date(closesAt.toLocal()));
+          list, EmployeeFormatters.date(RatingWindow.toIst(closesAt)));
 }
 
 /// What the sheet calls [stage] everywhere else: a Review rater by its
@@ -1496,7 +1510,10 @@ bool managerCanSubmitReview(
     (r.managerId ?? '').isNotEmpty &&
     r.managerId == managerUserId &&
     managerRatedKraCount(r) > 0 &&
-    r.recordFor(ReviewStage.reportingManagerRating) == null &&
+    // Not yet submitted — or the employee has resubmitted a self-rating this
+    // manager sent back, and it is the manager's turn to approve again.
+    (r.recordFor(ReviewStage.reportingManagerRating) == null ||
+        r.managerReworkDue) &&
     // The submit is a REPORTING_MANAGER_RATING write, which the server refuses
     // outside that stage's window — so it is not offered there. No window (an
     // older backend) leaves the rule above exactly as it was.
@@ -1803,21 +1820,27 @@ class _Sheet extends StatelessWidget {
     // month present and claim only what at least one of them allows.
     final present = reviews.whereType<MonthlyReview>().toList();
     bool inAnyMonth(bool Function(MonthlyReview) can) => present.any(can);
+    // Resolved once, so the banner, the grid and the notices below all judge
+    // the windows at the same instant.
+    final now = clock ?? DateTime.now();
 
+    // Who you are AND whether that stage is open in the month: with server
+    // windows, HR after the 12th still holds the seat but has nothing to tap,
+    // and "You can rate the KRAs assigned to HR" would be a promise the cells
+    // break. (No windows — an older backend — reads as open here, as before.)
+    bool canIn(bool Function(MonthlyReview) can, ReviewStage stage) =>
+        inAnyMonth((r) => can(r) && _stageWindowOpen(r, stage, now));
     final canSelf = inAnyMonth(canEditSelf);
-    final canMgr = inAnyMonth(canEditManager);
-    final canHr = inAnyMonth(canEditHr);
-    final canFin = inAnyMonth(canEditFinance);
-    final canMgmt = inAnyMonth(canEditManagement);
+    final canMgr = canIn(canEditManager, ReviewStage.reportingManagerRating);
+    final canHr = canIn(canEditHr, ReviewStage.accountHrRating);
+    final canFin = canIn(canEditFinance, ReviewStage.financeRating);
+    final canMgmt = canIn(canEditManagement, ReviewStage.managementReview);
     final canEditAny = canSelf || canMgr || canHr || canFin || canMgmt;
 
     // "Locked" and "not yours to edit" are different answers and deserve
     // different words — a finished quarter is nobody's to edit.
     final allComplete =
         present.isNotEmpty && present.every((r) => r.isComplete);
-    // Resolved once, so the banner, the grid and the notices below all judge
-    // the windows at the same instant.
-    final now = clock ?? DateTime.now();
     // Name the month that is actually outstanding rather than saying "this
     // sheet". The sheet covers a quarter, so a generic hint lets someone fill in
     // the wrong month, believe they are finished, and still be chased as overdue.
@@ -3157,6 +3180,7 @@ class _GridState extends State<_Grid> {
       // months of a quarter close independently. When present it replaces
       // the two reach-backs above.
       window: review?.windowFor(stage),
+      selfWindow: review?.windowFor(ReviewStage.selfRating),
     );
   }
 
@@ -5054,10 +5078,18 @@ bool isCellOpenForEntry({
   ///
   /// Null — an older backend — keeps the rule below exactly as it was.
   RatingWindow? window,
+
+  /// The same month's SELF window. Self-first waits for a self score only
+  /// while it can still arrive: once SELF has closed, a KRA the employee left
+  /// blank is rated without one — otherwise nobody could ever rate it and it
+  /// would drop out of the weighted total, rewarding the blank. The server's
+  /// manager ceiling skips such rows the same way.
+  RatingWindow? selfWindow,
 }) {
   if (window != null) {
     if (!_windowOpen(window, month, now)) return false;
-    return _selfFirstAllows(stage, row, flow);
+    if (_selfFirstAllows(stage, row, flow)) return true;
+    return selfWindow != null && !_windowOpen(selfWindow, month, now);
   }
   // Management sign-off is NOT bound to the one-month entry window.
   //

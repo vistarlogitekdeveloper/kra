@@ -217,9 +217,16 @@ class MonthlyReview {
     this.ratingWindows,
   });
 
-  /// The server's window for [stage], or null when it sent none — in which case
-  /// the caller falls back to the rule that predates rating access.
-  RatingWindow? windowFor(ReviewStage stage) => ratingWindows?[stage];
+  /// The server's window for [stage]. Null only when the review carries no
+  /// `ratingAccess` at all (an older backend) — the caller then keeps the
+  /// rule that predates rating access. A stage missing from a block that IS
+  /// present reads as closed ([RatingWindow.missing]), never as the old rule.
+  RatingWindow? windowFor(ReviewStage stage) {
+    final windows = ratingWindows;
+    // Payout and the terminal stage are never gated, so they have no window.
+    if (windows == null || !stage.isRatingStage) return null;
+    return windows[stage] ?? RatingWindow.missing;
+  }
 
   // ── Incentive convenience (delegates to [incentive]) ──────────────────
   double get eligibleAmount => incentive.eligibleAmount;
@@ -240,13 +247,33 @@ class MonthlyReview {
     return (r != null && r.returned) ? r : null;
   }
 
-  /// True when [stage] was sent back for rework and is waiting to be redone.
+  /// True while a self-rating the reporting manager sent back is waiting for
+  /// the employee: the manager's record is a send-back, and the employee has
+  /// not resubmitted since.
   ///
-  /// Only meaningful while the pipeline is actually sitting on the stage the work
-  /// was returned TO — once it moves on again, the record is history.
-  bool get selfRatingReturned =>
-      currentStage == ReviewStage.selfRating &&
-      returnedRecordFor(ReviewStage.reportingManagerRating) != null;
+  /// Read from the stage records, NEVER the cursor. The server moves
+  /// `currentStage` on every save (it advances to the furthest scored stage),
+  /// so a rule keyed on it lasted one save: the employee's first rework edit,
+  /// or HR rating its own KRA meanwhile, ended the rework. The server resolves
+  /// the same definition (rating-access.service.js reworkState).
+  bool get selfRatingReturned {
+    if (isComplete) return false;
+    final rm = returnedRecordFor(ReviewStage.reportingManagerRating);
+    if (rm == null) return false;
+    final self = recordFor(ReviewStage.selfRating);
+    return self == null || self.submittedAt.isBefore(rm.submittedAt);
+  }
+
+  /// True once the employee has resubmitted a returned self-rating and the
+  /// reporting manager has not approved it again — the manager's turn. The
+  /// manager's approve rewrites their record as not returned, which ends it.
+  bool get managerReworkDue {
+    if (isComplete) return false;
+    final rm = returnedRecordFor(ReviewStage.reportingManagerRating);
+    if (rm == null) return false;
+    final self = recordFor(ReviewStage.selfRating);
+    return self != null && self.submittedAt.isAfter(rm.submittedAt);
+  }
 
   /// Derived coarse status of [stage] on this review.
   StageStatus statusOf(ReviewStage stage) {
@@ -518,7 +545,15 @@ class MonthlyReview {
           .toList(),
       incentive: incentive,
       managementLockedAt: JsonParse.parseDate(json['managementLockedAt']),
-      ratingWindows: RatingWindow.parseMap(json['ratingAccess']),
+      // serverNow arrives beside the windows; the gap between it and this
+      // device's clock corrects every window check for a clock that is off.
+      ratingWindows: RatingWindow.parseMap(
+        json['ratingAccess'],
+        clockSkew: RatingWindow.skewOf(
+          JsonParse.parseDate(json['serverNow']),
+          DateTime.now(),
+        ),
+      ),
     );
   }
 

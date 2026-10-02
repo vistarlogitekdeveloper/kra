@@ -57,20 +57,38 @@ class RatingWindow {
   /// The stage's own deadline, for copy. Null when the server did not send it.
   final DateTime? deadlineAt;
 
+  /// How far the server's clock was ahead of this device's when the window
+  /// arrived (`serverNow` minus the device's clock). [isOpenAt] adds it to
+  /// the device time it is given, so a phone whose clock is off neither
+  /// offers a cell the server will refuse nor hides one it would accept.
+  final Duration clockSkew;
+
   const RatingWindow({
     required this.source,
     required this.closed,
     required this.opensAt,
     this.closesAt,
     this.deadlineAt,
+    this.clockSkew = Duration.zero,
   });
 
-  /// Whether a rating may be entered at [now]. Both ends are inclusive, as on
-  /// the server.
+  /// A stage the server's `ratingAccess` block left out. Treated as CLOSED,
+  /// never as "use the old rule": the server always sends all five stages, so
+  /// a missing one means something is already wrong, and falling back to the
+  /// looser client rules would offer cells the server refuses.
+  static final RatingWindow missing = RatingWindow(
+    source: RatingWindowSource.closed,
+    closed: true,
+    opensAt: DateTime.utc(1970),
+  );
+
+  /// Whether a rating may be entered at [now] (this device's clock). Both
+  /// ends are inclusive, as on the server.
   bool isOpenAt(DateTime now) {
-    if (closed || now.isBefore(opensAt)) return false;
+    final t = now.add(clockSkew);
+    if (closed || t.isBefore(opensAt)) return false;
     final end = closesAt;
-    return end == null || !now.isAfter(end);
+    return end == null || !t.isAfter(end);
   }
 
   /// Whether a super admin has reopened this stage and it is still open at
@@ -81,7 +99,10 @@ class RatingWindow {
   /// One window, or null when [raw] is not a map with a parsable `opensAt` —
   /// a window with no opening instant cannot be evaluated, and guessing one
   /// would be guessing whether people may rate.
-  static RatingWindow? fromJson(Object? raw) {
+  static RatingWindow? fromJson(
+    Object? raw, {
+    Duration clockSkew = Duration.zero,
+  }) {
     final json = JsonParse.parseMap(raw);
     if (json == null) return null;
     final opensAt = JsonParse.parseDate(json['opensAt']);
@@ -92,17 +113,34 @@ class RatingWindow {
       opensAt: opensAt,
       closesAt: JsonParse.parseDate(json['closesAt']),
       deadlineAt: JsonParse.parseDate(json['deadlineAt']),
+      clockSkew: clockSkew,
     );
   }
 
+  /// [instant] as a wall-clock time in IST (UTC+05:30, no DST) — the business
+  /// timezone every window is defined in. Format the result for display; a
+  /// device elsewhere would otherwise show a 23:59 IST deadline as the next
+  /// (or previous) calendar day.
+  static DateTime toIst(DateTime instant) =>
+      instant.toUtc().add(const Duration(hours: 5, minutes: 30));
+
+  /// [serverNow] minus [receivedAt], or zero when the server sent no clock.
+  static Duration skewOf(DateTime? serverNow, DateTime receivedAt) =>
+      serverNow == null ? Duration.zero : serverNow.difference(receivedAt);
+
   /// The `ratingAccess` block of a review, keyed by EXACT stage wire name.
   ///
-  /// Null when the block is absent or not a map — the backend predates rating
-  /// access, and every gate keeps its previous rule. Never routed through
-  /// `ReviewStage.fromApi`, which files an unknown name under SELF_RATING and
-  /// would open or close the wrong stage. Unknown stages, non-rating stages and
-  /// malformed entries are skipped; an empty result is treated as absent.
-  static Map<ReviewStage, RatingWindow>? parseMap(Object? raw) {
+  /// Null ONLY when the block is absent or not a map — the backend predates
+  /// rating access, and every gate keeps its previous rule. A block that is
+  /// present but partly unusable stays present: the stages it lacks read as
+  /// [missing] (closed) through `MonthlyReview.windowFor`. Never routed
+  /// through `ReviewStage.fromApi`, which files an unknown name under
+  /// SELF_RATING and would open or close the wrong stage. Unknown stages,
+  /// non-rating stages and malformed entries are skipped.
+  static Map<ReviewStage, RatingWindow>? parseMap(
+    Object? raw, {
+    Duration clockSkew = Duration.zero,
+  }) {
     if (raw is! Map) return null;
     final byWireName = {
       for (final stage in ReviewStage.values) stage.toApiString(): stage,
@@ -111,10 +149,10 @@ class RatingWindow {
     raw.forEach((key, value) {
       final stage = byWireName[key.toString().trim().toUpperCase()];
       if (stage == null || !stage.isRatingStage) return;
-      final window = RatingWindow.fromJson(value);
+      final window = RatingWindow.fromJson(value, clockSkew: clockSkew);
       if (window != null) windows[stage] = window;
     });
-    return windows.isEmpty ? null : windows;
+    return windows;
   }
 
   Map<String, dynamic> toJson() => {
@@ -132,9 +170,10 @@ class RatingWindow {
       other.closed == closed &&
       other.opensAt == opensAt &&
       other.closesAt == closesAt &&
-      other.deadlineAt == deadlineAt;
+      other.deadlineAt == deadlineAt &&
+      other.clockSkew == clockSkew;
 
   @override
   int get hashCode =>
-      Object.hash(source, closed, opensAt, closesAt, deadlineAt);
+      Object.hash(source, closed, opensAt, closesAt, deadlineAt, clockSkew);
 }

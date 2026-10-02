@@ -179,11 +179,64 @@ void main() {
       expect(map?.keys, [ReviewStage.financeRating]);
     });
 
-    test('absent, not a map, or nothing usable means "no server windows"', () {
+    test('only an absent block means "no server windows"', () {
       expect(RatingWindow.parseMap(null), isNull);
       expect(RatingWindow.parseMap('open'), isNull);
-      expect(RatingWindow.parseMap(const <String, Object?>{}), isNull);
-      expect(RatingWindow.parseMap({'SELF_RATING': 'open'}), isNull);
+    });
+
+    test('a present but unusable block stays present (its stages read closed)',
+        () {
+      // Falling back to the old client rules here would offer cells the
+      // server — which DID send the block — will refuse.
+      expect(RatingWindow.parseMap(const <String, Object?>{}), isEmpty);
+      expect(RatingWindow.parseMap({'SELF_RATING': 'open'}), isEmpty);
+    });
+
+    test('carries the clock skew into every window', () {
+      final map = RatingWindow.parseMap(
+        {'SELF_RATING': entry('DEADLINE')},
+        clockSkew: const Duration(days: 1),
+      );
+      expect(map?[ReviewStage.selfRating]?.clockSkew, const Duration(days: 1));
+    });
+  });
+
+  group('clock skew', () {
+    test('a device a day behind the server still sees the window as closed',
+        () {
+      // Server time is the device's + 1 day. On the device it is 10 Sep 20:00
+      // IST (still inside); on the server it is 11 Sep — closed.
+      final w = RatingWindow(
+          source: RatingWindowSource.deadline,
+          closed: false,
+          opensAt: opensAt,
+          closesAt: deadlineAt,
+          deadlineAt: deadlineAt,
+          clockSkew: const Duration(days: 1));
+      expect(w.isOpenAt(DateTime.utc(2026, 9, 10, 14, 30)), isFalse);
+    });
+
+    test('a device ahead of the server still sees the window as open', () {
+      final w = RatingWindow(
+          source: RatingWindowSource.deadline,
+          closed: false,
+          opensAt: opensAt,
+          closesAt: deadlineAt,
+          deadlineAt: deadlineAt,
+          clockSkew: const Duration(hours: -3));
+      // Device says 11 Sep 01:00 IST; the server says 10 Sep 22:00 — open.
+      expect(w.isOpenAt(DateTime.utc(2026, 9, 10, 19, 30)), isTrue);
+    });
+
+    test('skewOf is server minus device, zero without a server clock', () {
+      final device = DateTime.utc(2026, 10, 2, 6);
+      expect(RatingWindow.skewOf(DateTime.utc(2026, 10, 2, 9), device),
+          const Duration(hours: 3));
+      expect(RatingWindow.skewOf(null, device), Duration.zero);
+    });
+
+    test('a missing stage reads as closed', () {
+      expect(RatingWindow.missing.isOpenAt(DateTime.utc(2026, 9, 5)), isFalse);
     });
   });
 }

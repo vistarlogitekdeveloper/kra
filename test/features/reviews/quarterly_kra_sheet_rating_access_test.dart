@@ -163,7 +163,30 @@ void main() {
   });
 
   group('a cell that is not open says why', () {
-    testWidgets('open window, no self score yet: the Self tag', (tester) async {
+    testWidgets(
+        'open window, self-rating still open and not yet given: the Self tag',
+        (tester) async {
+      await pump(
+          tester,
+          [
+            review(july, self: null, overrides: {
+              ReviewStage.selfRating: reopened(july, oct31),
+              ReviewStage.reportingManagerRating: reopened(july, oct31),
+            }),
+            null,
+            null,
+          ],
+          manager: true);
+      expect(find.text('Self'), findsOneWidget);
+      expect(find.text('Rate'), findsNothing,
+          reason: 'the employee can still rate, so they rate first');
+    });
+
+    testWidgets(
+        'open window, self-rating closed with the KRA blank: the reviewer rates '
+        'it without waiting', (tester) async {
+      // The self score can no longer arrive. Waiting for it would leave the KRA
+      // unratable for the month and drop it out of the weighted total.
       await pump(
           tester,
           [
@@ -174,9 +197,8 @@ void main() {
             null,
           ],
           manager: true);
-      expect(find.text('Self'), findsOneWidget);
-      expect(find.text('Rate'), findsNothing,
-          reason: 'the employee still rates first');
+      expect(find.text('Rate'), findsOneWidget);
+      expect(find.text('Self'), findsNothing);
     });
 
     testWidgets('shut window: the bare dash, not a wait for the employee',

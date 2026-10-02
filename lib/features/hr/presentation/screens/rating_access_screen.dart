@@ -9,6 +9,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../reviews/data/models/monthly_review.dart';
 import '../../../reviews/data/models/rating_access.dart';
+import '../../../reviews/data/models/rating_window.dart';
 import '../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../../reviews/presentation/providers/rating_access_providers.dart';
 import '../providers/organization_providers.dart';
@@ -120,9 +121,11 @@ class _RatingAccessScreenState extends ConsumerState<RatingAccessScreen> {
         ),
       );
 
+  /// Today on the IST calendar — the server reads an end date as the end of
+  /// that day in IST, so "today" has to mean the same day it does.
   DateTime _today() {
-    final now = ref.read(ratingAccessClockProvider)();
-    return DateTime(now.year, now.month, now.day);
+    final ist = RatingWindow.toIst(ref.read(ratingAccessClockProvider)());
+    return DateTime(ist.year, ist.month, ist.day);
   }
 
   Future<void> _openUntil(
@@ -131,13 +134,15 @@ class _RatingAccessScreenState extends ConsumerState<RatingAccessScreen> {
     RatingAccessStage entry,
   ) async {
     final label = ratingAccessStageLabel(entry.stage, month.reviewFlow);
-    final today = _today();
+    // Days on or before the stage's own deadline would change nothing, so the
+    // picker starts after it.
+    final first = ratingAccessFirstOpenDay(entry.window.deadlineAt, _today());
     final request = await RatingAccessOpenSheet.show(
       context,
       title: AppStrings.ratingAccessOpenTitle(label),
       subtitle: period.label,
-      today: today,
-      initialDay: ratingAccessDefaultOpenDay(entry.window.closesAt, today),
+      today: first,
+      initialDay: ratingAccessDefaultOpenDay(entry.window.closesAt, first),
     );
     if (request == null || !mounted) return;
     final lastDay = request.lastDay;
@@ -222,11 +227,27 @@ class _RatingAccessScreenState extends ConsumerState<RatingAccessScreen> {
     );
     if (request == null || !mounted) return;
     final lastDay = request.lastDay;
+    // A stage whose own deadline already runs to the chosen day needs no
+    // reopen (the server would refuse one), so it is left on its deadline.
+    final targets = [
+      for (final entry in month.stagesInFlow)
+        if (lastDay == null ||
+            entry.window.deadlineAt == null ||
+            ratingAccessIstDay(entry.window.deadlineAt ?? DateTime(0))
+                .isBefore(lastDay))
+          entry.stage,
+    ];
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppStrings.ratingAccessNothingToExtend(
+              ratingAccessDate(lastDay ?? DateTime(0))))));
+      return;
+    }
     await _run(
       (actions) => actions.openAll(
         widget.organizationId,
         period,
-        stages,
+        targets,
         openUntilDate: lastDay == null ? null : ratingAccessDateParam(lastDay),
         reason: request.reason,
       ),

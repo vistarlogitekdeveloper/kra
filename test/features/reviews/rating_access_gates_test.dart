@@ -622,4 +622,107 @@ void main() {
       expect(managementSignOffReviews(quarter, now), isEmpty);
     });
   });
+
+  group('self-first waits only while the self-rating can still arrive', () {
+    // 2 Oct 2026. August's reviewers reopened to 31 Oct; its SELF window closed
+    // on 10 Sep unless it is reopened too.
+    bool reviewerOpen({required RatingWindow selfWindow, double? self}) =>
+        isCellOpenForEntry(
+          stage: ReviewStage.reportingManagerRating,
+          row: row(self: self),
+          month: august,
+          now: now,
+          window: opened(august, ReviewStage.reportingManagerRating),
+          selfWindow: selfWindow,
+        );
+
+    test('SELF closed and the KRA blank: the reviewer rates it', () {
+      expect(reviewerOpen(selfWindow: window(august, ReviewStage.selfRating)),
+          isTrue);
+    });
+
+    test('SELF still open and the KRA blank: the reviewer waits', () {
+      expect(reviewerOpen(selfWindow: opened(august, ReviewStage.selfRating)),
+          isFalse);
+      expect(reviewerOpen(selfWindow: returned(august)), isFalse,
+          reason: 'a returned self-rating is on its way back');
+    });
+
+    test('a KRA that has its self score opens either way', () {
+      expect(
+          reviewerOpen(
+              selfWindow: opened(august, ReviewStage.selfRating), self: 8),
+          isTrue);
+    });
+
+    test("the reviewer's own window still decides first", () {
+      expect(
+          isCellOpenForEntry(
+            stage: ReviewStage.reportingManagerRating,
+            row: row(),
+            month: august,
+            now: now,
+            window: window(august, ReviewStage.reportingManagerRating),
+            selfWindow: window(august, ReviewStage.selfRating),
+          ),
+          isFalse);
+    });
+  });
+
+  group('the rework loop on the client', () {
+    StageRecord rec(String actor, DateTime at, {bool returned = false}) =>
+        StageRecord(
+            actorId: actor,
+            actorName: actor,
+            submittedAt: at,
+            returned: returned);
+
+    MonthlyReview reviewWith(Map<ReviewStage, StageRecord> records) =>
+        MonthlyReview(
+          id: 'r-aug',
+          employeeId: 'emp1',
+          employeeName: 'Asha',
+          managerId: 'mgr1',
+          period: august,
+          currentStage: ReviewStage.accountHrRating,
+          stageRecords: records,
+          rows: [row(self: 8, ratedBy: ReviewStage.reportingManagerRating)],
+          ratingWindows: windows(august, {
+            ReviewStage.reportingManagerRating: window(
+                august, ReviewStage.reportingManagerRating,
+                source: RatingWindowSource.returned, noEnd: true),
+          }),
+        );
+
+    test(
+        'after the employee resubmits, the manager may submit again although '
+        'their earlier record exists', () {
+      final r = reviewWith({
+        ReviewStage.reportingManagerRating:
+            rec('mgr1', DateTime.utc(2026, 9, 12), returned: true),
+        ReviewStage.selfRating: rec('emp1', DateTime.utc(2026, 9, 14)),
+      });
+      expect(r.managerReworkDue, isTrue);
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isTrue);
+    });
+
+    test('while the employee is still reworking, the manager waits', () {
+      final r = reviewWith({
+        ReviewStage.reportingManagerRating:
+            rec('mgr1', DateTime.utc(2026, 9, 12), returned: true),
+        ReviewStage.selfRating: rec('emp1', DateTime.utc(2026, 9, 8)),
+      });
+      expect(r.selfRatingReturned, isTrue);
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isFalse);
+    });
+
+    test('an approved review is not offered again', () {
+      final r = reviewWith({
+        ReviewStage.reportingManagerRating:
+            rec('mgr1', DateTime.utc(2026, 9, 16)),
+        ReviewStage.selfRating: rec('emp1', DateTime.utc(2026, 9, 14)),
+      });
+      expect(managerCanSubmitReview(r, 'mgr1', now: now), isFalse);
+    });
+  });
 }

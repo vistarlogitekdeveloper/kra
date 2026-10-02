@@ -26,6 +26,32 @@ void main() {
       expect(ratingAccessDate(DateTime.utc(2026, 9, 10, 12)), '10 Sep 2026');
     });
 
+    test('instants are dated on the IST calendar, whatever the device zone',
+        () {
+      // 10 Sep 23:59:59.999 IST is still the 10th; 20:00 UTC on the 10th is
+      // already 1:30 on the 11th in IST.
+      expect(ratingAccessDate(DateTime.utc(2026, 9, 10, 18, 29, 59, 999)),
+          '10 Sep 2026');
+      expect(ratingAccessDate(DateTime.utc(2026, 9, 10, 20)), '11 Sep 2026');
+      expect(ratingAccessIstDay(DateTime.utc(2026, 9, 10, 20)),
+          DateTime(2026, 9, 11));
+    });
+
+    test('the picker starts after the stage deadline, never before today', () {
+      final today = DateTime(2026, 10, 2);
+      // August's self deadline (10 Sep) is long past: start today.
+      expect(
+          ratingAccessFirstOpenDay(
+              DateTime.utc(2026, 9, 10, 18, 29, 59, 999), today),
+          today);
+      // October's self deadline is 10 Nov: a reopen must end after it.
+      expect(
+          ratingAccessFirstOpenDay(
+              DateTime.utc(2026, 11, 10, 18, 29, 59, 999), today),
+          DateTime(2026, 11, 11));
+      expect(ratingAccessFirstOpenDay(null, today), today);
+    });
+
     test('an open-until day goes out as YYYY-MM-DD', () {
       expect(ratingAccessDateParam(DateTime(2026, 10, 1)), '2026-10-01');
     });
@@ -266,6 +292,17 @@ void main() {
   });
 
   group('errors', () {
+    test('an unknown organisation is named as such, not as "not deployed"', () {
+      expect(
+        ratingAccessErrorText(const ApiError(
+            type: ApiErrorType.notFound,
+            code: 'RES_ORG_NOT_FOUND',
+            message: 'Organization not found',
+            statusCode: 404)),
+        AppStrings.ratingAccessOrgNotFound,
+      );
+    });
+
     test('a 404 or RES_001 says the endpoints are not deployed', () {
       expect(
         ratingAccessErrorText(const ApiError(

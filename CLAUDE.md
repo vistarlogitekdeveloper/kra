@@ -427,7 +427,19 @@ access. The server enforces the answer on every rating write (403
   backfill, management sign-off of any ended month, `RatingReopen`) are not
   consulted. They survive only as the fallback for a backend that sends no
   `ratingAccess` — so a new app on an old server keeps the old rules.
-- The rework return is folded into the SELF window by the server (`RETURNED`).
+- A send-back is folded into the windows by the server (`RETURNED`): SELF while
+  the employee owes the rework, the reporting-manager seat once they have
+  resubmitted and until the manager approves. Both are read from the **stage
+  records, never the cursor** — `currentStage` moves on every save, so a rule
+  keyed on it lasted exactly one save. `MonthlyReview.selfRatingReturned` /
+  `managerReworkDue` use the same definition.
+- Self-first lasts only while the self score can still arrive: once the SELF
+  window has closed, a KRA the employee left blank is rated without it (the
+  server's manager ceiling skips such rows too). Otherwise it could never be
+  rated and would drop out of the weighted total.
+- A stage missing from a review's `ratingAccess` block reads as CLOSED, never as
+  "use the old rule"; only a review with no block at all keeps the old rules.
+  `serverNow` corrects every window check for a device clock that is off.
 - `ratingAccess` must survive `copyWith`: `_applyReviewerMap` runs it on every
   load, and dropping it silently puts every gate back on the old rule while the
   server enforces the new one.

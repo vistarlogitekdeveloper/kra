@@ -56,9 +56,28 @@ RatingAccessPhase ratingAccessPhase(RatingWindow window, DateTime now) {
       : RatingAccessPhase.deadlineClosed;
 }
 
-/// An instant as the app writes dates, `d MMM yyyy`, on the device's calendar.
+/// An instant as the app writes dates, `d MMM yyyy`, on the IST calendar —
+/// the timezone every window is defined in, so a 23:59 IST deadline never
+/// reads as the next day on a device elsewhere.
 String ratingAccessDate(DateTime instant) =>
-    HrFormatters.date(instant.toLocal());
+    HrFormatters.date(RatingWindow.toIst(instant));
+
+/// The IST calendar day of [instant], as a date with no time.
+DateTime ratingAccessIstDay(DateTime instant) {
+  final ist = RatingWindow.toIst(instant);
+  return DateTime(ist.year, ist.month, ist.day);
+}
+
+/// The first day worth picking for a stage whose own deadline is
+/// [deadlineAt]: the day after it, or [today] when that is later. A reopen
+/// ending on or before the deadline changes nothing, and the server refuses
+/// it (docs/RATING_ACCESS.md §3.5).
+DateTime ratingAccessFirstOpenDay(DateTime? deadlineAt, DateTime today) {
+  if (deadlineAt == null) return today;
+  final afterDeadline =
+      ratingAccessIstDay(deadlineAt).add(const Duration(days: 1));
+  return afterDeadline.isAfter(today) ? afterDeadline : today;
+}
 
 /// [day] as the `YYYY-MM-DD` the server reads as the END of that day, IST.
 String ratingAccessDateParam(DateTime day) => _dateParam.format(day);
@@ -70,9 +89,8 @@ DateTime ratingAccessLastOpenDay(DateTime today) =>
 /// The day the open sheet starts on: the stage's current end when it is still
 /// ahead, otherwise [today] — always within what the date picker allows.
 DateTime ratingAccessDefaultOpenDay(DateTime? currentEnd, DateTime today) {
-  final end = currentEnd?.toLocal();
-  if (end == null) return today;
-  final endDay = DateTime(end.year, end.month, end.day);
+  if (currentEnd == null) return today;
+  final endDay = ratingAccessIstDay(currentEnd);
   if (endDay.isBefore(today)) return today;
   final last = ratingAccessLastOpenDay(today);
   return endDay.isAfter(last) ? last : endDay;
@@ -89,9 +107,13 @@ List<ReviewPeriod> ratingAccessChipPeriods(
   return [...available, selected]..sort((a, b) => b.compareTo(a));
 }
 
-/// A failure as the user reads it. A 404 or RES_001 means the endpoints are
-/// not deployed yet — a known state, not a fault worth "not found".
+/// A failure as the user reads it. The server names an unknown organisation
+/// with its own code (RES_ORG_NOT_FOUND); any other 404 / RES_001 means the
+/// endpoints are not deployed yet — a known state, not a fault.
 String ratingAccessErrorText(Object error) {
+  if (error is ApiError && error.code == 'RES_ORG_NOT_FOUND') {
+    return AppStrings.ratingAccessOrgNotFound;
+  }
   if (error is ApiError &&
       (error.statusCode == 404 || error.code == 'RES_001')) {
     return AppStrings.ratingAccessApiMissing;
