@@ -309,9 +309,11 @@ the super admin's own organisation).
 
 ### 4.2 Gates — server windows when present, legacy rule when absent
 
-`ratingWindows == null` (older backend): every gate keeps today's behaviour, and
-the legacy `RatingReopen` grant additionally ends at 2026-10-31T18:29:59.999Z (the
-seed's end). When present, the window decides "when" and the reach-backs are not
+`ratingWindows == null` (older backend): every gate keeps today's behaviour,
+except that the client's `RatingReopen` grant mirrors the server seed — July and
+August 2026 are open like the review month at EVERY stage, rate and edit
+(ratings already given, reasons and attachments included), ending at
+2026-10-31T18:29:59.999Z, the seed's end. When present, the window decides "when" and the reach-backs are not
 consulted:
 
 - `isCellOpenForEntry(..., window, selfWindow)`: `window.isOpenAt(now)` (no

@@ -22,20 +22,18 @@ void main() {
 
   test('still open on the last instant', () {
     final last = DateTime.utc(2026, 10, 31, 18, 29, 59, 999);
-    expect(RatingReopen.allowsBackfill(july, last), isTrue);
-    expect(RatingReopen.allowsBackfill(august, last), isTrue);
+    expect(RatingReopen.isReopened(july, last), isTrue);
+    expect(RatingReopen.isReopened(august, last), isTrue);
   });
 
   test('closed from 1 Nov 2026 00:00 IST', () {
     final midnight = DateTime.utc(2026, 10, 31, 18, 30);
-    expect(RatingReopen.allowsBackfill(july, midnight), isFalse);
-    expect(RatingReopen.allowsBackfill(august, midnight), isFalse);
-    expect(
-        RatingReopen.allowsBackfill(july, DateTime.utc(2027, 1, 5)), isFalse);
+    expect(RatingReopen.isReopened(july, midnight), isFalse);
+    expect(RatingReopen.isReopened(august, midnight), isFalse);
+    expect(RatingReopen.isReopened(july, DateTime.utc(2027, 1, 5)), isFalse);
   });
 
   test('unchanged before the end: open once the month has ended', () {
-    expect(
-        RatingReopen.allowsBackfill(july, DateTime.utc(2026, 10, 2)), isTrue);
+    expect(RatingReopen.isReopened(july, DateTime.utc(2026, 10, 2)), isTrue);
   });
 }

@@ -1294,7 +1294,12 @@ bool canEditSelfRating(MonthlyReview r, ReviewScope? scope, DateTime now) {
     // out of their own sheet permanently, with nothing in the app able to
     // reopen it — and the score they never entered counts as a zero against
     // their incentive.
+    //
+    // And a month reopened for rating (RatingReopen: July and August 2026,
+    // rate AND edit) is open exactly like the review month — every self score,
+    // reason and attachment in it can be corrected, not only the blanks.
     if (!r.period.isOpenForRatingOn(now) &&
+        !RatingReopen.isReopened(r.period, now) &&
         !r.selfRatingReturned &&
         !_hasUnratedSelfKra(r)) {
       return false;
@@ -3174,8 +3179,7 @@ class _GridState extends State<_Grid> {
       now: widget.now,
       flow: widget.reviewFlow,
       returnedForRework: review?.selfRatingReturned ?? false,
-      reopenedForBackfill:
-          RatingReopen.allowsBackfill(widget.months[monthIdx], widget.now),
+      reopened: RatingReopen.isReopened(widget.months[monthIdx], widget.now),
       // THIS month's window for the stage, from its own review — the three
       // months of a quarter close independently. When present it replaces
       // the two reach-backs above.
@@ -3294,7 +3298,7 @@ class _GridState extends State<_Grid> {
       final shut = window != null
           ? !_windowOpen(window, month, widget.now)
           : isMonthClosedForRating(month, widget.now) &&
-              !RatingReopen.allowsBackfill(month, widget.now);
+              !RatingReopen.isReopened(month, widget.now);
       if (shut) {
         return Text(_fmt(null),
             style: TextStyle(
@@ -5061,17 +5065,17 @@ bool isCellOpenForEntry({
   /// Reopens a closed month for the SELF stage only — see the window note.
   bool returnedForRework = false,
 
-  /// Whether [month] has been reopened so pending ratings can be filled in —
-  /// see [RatingReopen]. Opens a BLANK reviewer cell past the window; one that
-  /// already carries a score stays shut.
-  bool reopenedForBackfill = false,
+  /// Whether [month] has been reopened for rating — see [RatingReopen]. A
+  /// reopened month is open to every stage exactly like the review month:
+  /// rate AND edit, ratings already given included. Self-first still applies.
+  bool reopened = false,
 
   /// The server's window for [stage] in [month], when it sent one
   /// (docs/RATING_ACCESS.md §4.2).
   ///
   /// Non-null, it decides WHEN on its own: open iff the month has ended and
   /// the window is open, and none of the client's reach-backs below — nor
-  /// [returnedForRework] or [reopenedForBackfill] — are consulted. The server
+  /// [returnedForRework] or [reopened] — are consulted. The server
   /// has already folded the rework return into the SELF window and a reopen
   /// into an OPENED one, which is rate-and-edit: a rated cell is as open as a
   /// blank one. The self-first and flow rules still apply after it.
@@ -5115,18 +5119,19 @@ bool isCellOpenForEntry({
   // half-finished month can be completed. PER KRA and keyed on the actual
   // score: the ones already rated stay shut, which is what keeps this a way
   // to finish a month rather than a way to revise one.
+  //
+  // A REOPENED month (RatingReopen) is open like the review month itself, at
+  // every stage and for every KRA — rate and edit — so none of the narrower
+  // reach-backs below needs to apply. It still requires the month to have
+  // ended, and the self-first check after it still applies.
+  if (reopened) {
+    if (!month.isRatableOn(now)) return false;
+    return _selfFirstAllows(stage, row, flow);
+  }
   final selfBackfill = stage == ReviewStage.selfRating &&
       row.scoreFor(ReviewStage.selfRating)?.value == null;
-  // The same rule for the three reviewers, but only in a month that has been
-  // explicitly reopened: their pending ratings can be entered, the ones
-  // already given cannot be changed. The self-first check below still applies.
-  final reviewerBackfill = reopenedForBackfill &&
-      stage.isReviewRater &&
-      row.scoreFor(stage)?.value == null;
   final reachesBack = stage == ReviewStage.managementReview ||
-      (stage == ReviewStage.selfRating &&
-          (returnedForRework || selfBackfill)) ||
-      reviewerBackfill;
+      (stage == ReviewStage.selfRating && (returnedForRework || selfBackfill));
   if (reachesBack) {
     if (!month.isRatableOn(now)) return false;
   } else if (isMonthClosedForRating(month, now)) {

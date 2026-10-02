@@ -105,7 +105,7 @@ void main() {
       MonthlyKraRow? r,
       ReviewFlow flow = ReviewFlow.standard,
       bool returnedForRework = false,
-      bool reopenedForBackfill = false,
+      bool reopened = false,
     }) =>
         isCellOpenForEntry(
           stage: stage,
@@ -114,7 +114,7 @@ void main() {
           now: now,
           flow: flow,
           returnedForRework: returnedForRework,
-          reopenedForBackfill: reopenedForBackfill,
+          reopened: reopened,
           window: w,
         );
 
@@ -137,7 +137,7 @@ void main() {
       expect(
           open(ReviewStage.reportingManagerRating, august,
               window(august, ReviewStage.reportingManagerRating),
-              reopenedForBackfill: true),
+              reopened: true),
           isFalse,
           reason: 'RatingReopen is not consulted');
       expect(
@@ -243,7 +243,7 @@ void main() {
           month: month,
           now: now,
           returnedForRework: returned,
-          reopenedForBackfill: reopened,
+          reopened: reopened,
         );
 
     test('every reach-back still reaches back', () {
@@ -287,7 +287,7 @@ void main() {
                   month: m,
                   now: now,
                   returnedForRework: wasReturned,
-                  reopenedForBackfill: wasReopened,
+                  reopened: wasReopened,
                   window: null,
                 ),
                 legacy(s, m, r, returned: wasReturned, reopened: wasReopened),

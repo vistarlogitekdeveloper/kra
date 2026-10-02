@@ -426,7 +426,9 @@ access. The server enforces the answer on every rating write (403
   for a stage, that window is the whole answer; the old reach-backs (blank-self
   backfill, management sign-off of any ended month, `RatingReopen`) are not
   consulted. They survive only as the fallback for a backend that sends no
-  `ratingAccess` — so a new app on an old server keeps the old rules.
+  `ratingAccess` — so a new app on an old server keeps the old rules, except
+  that `RatingReopen` there mirrors the server seed: July and August 2026 are
+  rate-and-edit at every stage (reasons and attachments included) until 31 Oct.
 - A send-back is folded into the windows by the server (`RETURNED`): SELF while
   the employee owes the rework, the reporting-manager seat once they have
   resubmitted and until the manager approves. Both are read from the **stage
