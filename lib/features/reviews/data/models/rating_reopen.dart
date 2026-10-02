@@ -31,6 +31,15 @@ class RatingReopen {
   /// remove a key to close that month again.
   static const Set<String> granted = {'2026-07', '2026-08'};
 
+  /// The grant ends with the server's pre-open of the same months: migration
+  /// 169 opens July and August 2026 until 31 Oct 2026, end of day IST. This
+  /// client-side grant only matters on a backend that predates rating access
+  /// (docs/RATING_ACCESS.md §4.2), and it must not outlive the server's —
+  /// otherwise a new app on a lagging backend would keep those months open
+  /// after the date the product owner agreed.
+  static final DateTime grantEndsAt =
+      DateTime.utc(2026, 10, 31, 18, 29, 59, 999);
+
   static Set<String> _months = const {};
 
   /// Reopens [monthKeys] for backfill.
@@ -43,7 +52,10 @@ class RatingReopen {
   /// Whether [month]'s blank cells are open to their raters on [now].
   ///
   /// Only once the month has ENDED, so a listed month that is still running
-  /// stays shut: a mistyped key must not open the live month.
+  /// stays shut: a mistyped key must not open the live month. And only until
+  /// [grantEndsAt].
   static bool allowsBackfill(ReviewPeriod month, DateTime now) =>
-      _months.contains(month.key) && month.isRatableOn(now);
+      _months.contains(month.key) &&
+      month.isRatableOn(now) &&
+      !now.isAfter(grantEndsAt);
 }

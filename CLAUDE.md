@@ -218,6 +218,9 @@ draws one Review column per month at that seat. Two roles never rate the same KR
   step). Patch scripts for it live in [`docs/`](docs/) and are dry-runnable.
 - The client and server keep **separate** tables of who may rate which stage, and they
   drift. See [`docs/RATING_ROLE_DIVERGENCE.md`](docs/RATING_ROLE_DIVERGENCE.md).
+- WHEN a stage may be rated is not a client table at all: the server resolves it per
+  review (`ratingAccess`) and enforces it. See
+  [`docs/RATING_ACCESS.md`](docs/RATING_ACCESS.md) and the section below.
 
 ## B3. Brand
 
@@ -408,16 +411,33 @@ Patch: [`docs/install_review_month_shift.mjs`](docs/install_review_month_shift.m
 verified 2/6 → 6/6 including the January rollover. The client **clamps** whatever
 the server sends, so the screens are correct without it.
 
-**Temporary, from 2026-10-02: July and August 2026 are reopened for pending
-ratings.** `RatingReopen.granted` in
-[`rating_reopen.dart`](lib/features/reviews/data/models/rating_reopen.dart),
-adopted in `appBootProvider`, opens those months' **blank** reporting-manager,
-HR and Accounts cells past the window. Only pending ones: a cell that already
-has a score stays shut, and self-first, the manager ceiling, COMPLETED and
-management's lock all still apply. The window is client-only — the server's
-`saveScores` has no month check. To close the reopen, empty `granted`. It
-stays empty in tests unless a test adopts it, so the window tests keep pinning
-the base rule.
+## WHEN a stage may be rated is decided by the SERVER (rating access)
+
+Contract: [`docs/RATING_ACCESS.md`](docs/RATING_ACCESS.md). Each stage of a month
+closes at its own deadline in the month after it (self 10th, HR & Accounts 12th,
+reporting manager 13th, management 15th, all IST), and a SUPER_ADMIN can override
+any organisation × stage × month — open it until a date or with no end (rate AND
+edit), close it, or put it back on the deadline — from Organizations → Rating
+access. The server enforces the answer on every rating write (403
+`AUTHZ_RATING_CLOSED`) and ships it on each review as `ratingAccess`, parsed into
+`MonthlyReview.ratingWindows`.
+
+- **Never re-derive the window on the client.** When a review carries a window
+  for a stage, that window is the whole answer; the old reach-backs (blank-self
+  backfill, management sign-off of any ended month, `RatingReopen`) are not
+  consulted. They survive only as the fallback for a backend that sends no
+  `ratingAccess` — so a new app on an old server keeps the old rules.
+- The rework return is folded into the SELF window by the server (`RETURNED`).
+- `ratingAccess` must survive `copyWith`: `_applyReviewerMap` runs it on every
+  load, and dropping it silently puts every gate back on the old rule while the
+  server enforces the new one.
+- A "closed" refusal is 403 with its own code, deliberately not 409: the sheet
+  reads 409 as "this month moved on", and the manager's multi-month submit skips
+  409s silently.
+- July and August 2026 ship pre-opened for every organisation and stage until
+  31 Oct 2026 (migration 169's seed), replacing the client-side `RatingReopen`
+  grant of 4bc2c28 — which also means ratings already given in those months can
+  be changed until then, as the product owner confirmed.
 
 ## The KRA sheet's COLUMNS are flow-shaped, not just its gates
 

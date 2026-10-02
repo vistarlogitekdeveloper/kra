@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_error.dart';
+import '../../../../core/api/error_text.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_gradients.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -18,6 +19,7 @@ import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
 import '../../data/models/rating_reopen.dart';
+import '../../data/models/rating_window.dart';
 import '../../../../core/enums/review_flow.dart';
 import '../../data/models/review_flow.dart';
 import '../../data/models/review_stage.dart';
@@ -234,73 +236,9 @@ class _QuarterlyKraSheetScreenState
   }
 
   // Self rating: editable ONLY by the employee themselves (their own sheet).
-  // Admins, HR and managers can view it but not change someone's self score.
-  //
-  // Every gate below ALSO requires the month's review to still be open. That
-  // check is not cosmetic: the backend rejects a save against a finished
-  // review with 409 RES_002 ("Review is completed; scores are locked."). A
-  // gate that only asks "who are you?" renders an edit affordance on a locked
-  // month, opens the rating sheet, and fails only *after* the user has picked
-  // a value. Each month in the quarter locks independently, so the check is
-  // per-review — never per-sheet.
-  bool _canEditSelf(MonthlyReview r, ReviewScope? scope) {
-    if (scope == null || r.isComplete) return false;
-    // A month that has not ENDED cannot be rated by anyone, including its own
-    // employee. Enforced here as well as in isCellOpenForEntry because this
-    // gate feeds `_submittableReviews`, and that is a far worse failure than an
-    // open cell: with a score already present for the live month, the "Submit
-    // self-rating" bar appeared, its dialog named that month, and confirming
-    // advanced an unfinished month to the reporting-manager stage and notified
-    // the manager and HR. Irreversible from the employee's side.
-    //
-    // The gate is still needed after the cell fix, because scores written for
-    // the live month BEFORE that fix shipped are already in the database and
-    // the submit loop would go on offering them.
-    // A month still running is closed to everyone, always — that is what the
-    // paragraph above protects, and a returned rating must not defeat it.
-    if (!r.period.isRatableOn(_now)) return false;
-    // Otherwise the OPEN month only — rating August must not reopen July —
-    // UNLESS the manager handed this month back for rework.
-    //
-    // Without that exception the send-back is a dead letter: the employee is
-    // shown "your rating was returned, please revise it" over a sheet they
-    // cannot type into, because the month whose rating is being questioned is
-    // by definition one that has already been submitted and, soon after, one
-    // whose window has closed. A return is an explicit, audited grant of
-    // permission from the one person entitled to give it, which is exactly
-    // what the blanket window rule cannot express.
-    // Otherwise: the OPEN month, a month handed back for rework, or a month
-    // this employee has not finished rating.
-    //
-    // That last case is the one that matters at scale. The window rule was
-    // written to stop September's rater going back and REWRITING July, and
-    // filling a blank is not rewriting: a KRA that already carries a self
-    // score stays shut (see isCellOpenForEntry), so a closed month can be
-    // completed but never revised. Without it, every employee whose July or
-    // August self-rating was left unfinished when the window shut is locked
-    // out of their own sheet permanently, with nothing in the app able to
-    // reopen it — and the score they never entered counts as a zero against
-    // their incentive.
-    if (!r.period.isOpenForRatingOn(_now) &&
-        !r.selfRatingReturned &&
-        !_hasUnratedSelfKra(r)) {
-      return false;
-    }
-    // Some organisations run a pipeline with no self-rating at all. Checked
-    // before identity: under that flow it is not that someone ELSE rates the
-    // employee, it is that the stage does not exist.
-    if (!stageIsInFlow(ReviewStage.selfRating, scope.reviewFlow)) return false;
-    return scope.userId == r.employeeId;
-  }
-
-  /// Whether any KRA on [r] is still missing its self score.
-  ///
-  /// Reads the actual scores, never the stage cursor. The cursor is unreliable
-  /// on this data — reviews sit at MANAGEMENT_REVIEW, and some at COMPLETED,
-  /// with no self score behind them at all — so a gate keyed on status would
-  /// call an empty sheet finished.
-  static bool _hasUnratedSelfKra(MonthlyReview r) =>
-      r.rows.any((row) => row.scoreFor(ReviewStage.selfRating)?.value == null);
+  // The rule lives in [canEditSelfRating] so it can be tested directly.
+  bool _canEditSelf(MonthlyReview r, ReviewScope? scope) =>
+      canEditSelfRating(r, scope, _now);
 
   // Manager rating: editable ONLY by this employee's own reporting manager.
   //
@@ -429,8 +367,12 @@ class _QuarterlyKraSheetScreenState
     } catch (e) {
       // A 409 means our copy of the review is stale — the month locked while
       // this sheet was open. Re-read it so the edit affordances disappear
-      // instead of inviting the same doomed save again.
-      if (e is ApiError && e.statusCode == 409) {
+      // instead of inviting the same doomed save again. A rating-closed 403
+      // says the same of our copy of its windows: the deadline passed, or a
+      // super admin closed the stage, while the sheet was open.
+      if (mounted &&
+          e is ApiError &&
+          (e.statusCode == 409 || e.isRatingClosed)) {
         ref.invalidate(quarterlySheetProvider);
       }
       if (mounted) {
@@ -454,6 +396,22 @@ class _QuarterlyKraSheetScreenState
   String _saveErrorText(Object e,
           [String fallback = 'Could not save. Please try again.']) =>
       e is ApiError ? e.combinedMessage : fallback;
+
+  /// Re-reads the sheet when [e] is the server refusing a write because the
+  /// stage's rating window is shut ([ApiError.isRatingClosed]), and says
+  /// whether it was.
+  ///
+  /// The refusal means our copy of the windows is stale, so the affordance
+  /// that invited the write would otherwise stay up and invite it again. The
+  /// caller still shows the server's message — via [_saveErrorText] — which
+  /// names the stage, the month and when it closed.
+  bool _refreshIfRatingClosed(Object e) {
+    if (e is! ApiError || !e.isRatingClosed) return false;
+    // `ref` throws once the sheet is gone, and there is nothing left to
+    // refresh; the next sheet opened reads the server afresh anyway.
+    if (mounted) ref.invalidate(quarterlySheetProvider);
+    return true;
+  }
 
   /// Months in this quarter whose self-rating this viewer may SUBMIT.
   ///
@@ -585,11 +543,16 @@ class _QuarterlyKraSheetScreenState
         await _showManagerSubmittedDialog();
       }
     } catch (e) {
+      // A closed window stops the loop (submitEachSkippingMoved skips only
+      // 409s) and is shown verbatim: it already names the month and the date.
+      final closed = _refreshIfRatingClosed(e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppStrings.mgrSubmitFailed} '
-                '${e is ApiError ? e.message : e}'),
+            content: Text(closed
+                ? _saveErrorText(e)
+                : '${AppStrings.mgrSubmitFailed} '
+                    '${e is ApiError ? e.message : e}'),
           ),
         );
       }
@@ -679,6 +642,11 @@ class _QuarterlyKraSheetScreenState
       ref.invalidate(monthlyReviewListProvider);
       if (mounted) await _showSubmittedDialog();
     } catch (e) {
+      // A closed window is a 403, never the 409 below: the review has NOT
+      // moved on, the month's self-rating window shut. Telling the employee it
+      // went to their manager would be false, so the server's own sentence is
+      // shown instead.
+      final closed = _refreshIfRatingClosed(e);
       if (mounted) {
         // A 409 here means the server has moved this review past Self-Rating —
         // either someone else advanced it, or the deployment still auto-advances
@@ -687,10 +655,12 @@ class _QuarterlyKraSheetScreenState
         final conflict = e is ApiError && e.statusCode == 409;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(conflict
-                ? AppStrings.selfSubmitAlreadyMoved
-                : '${AppStrings.selfSubmitFailed} '
-                    '${e is ApiError ? e.message : e}'),
+            content: Text(closed
+                ? _saveErrorText(e)
+                : conflict
+                    ? AppStrings.selfSubmitAlreadyMoved
+                    : '${AppStrings.selfSubmitFailed} '
+                        '${e is ApiError ? e.message : e}'),
           ),
         );
       }
@@ -749,7 +719,10 @@ class _QuarterlyKraSheetScreenState
             ReviewStage.selfRating, scope?.reviewFlow ?? ReviewFlow.standard))
           for (final r in reviews.whereType<MonthlyReview>())
             if (r.currentStage == ReviewStage.reportingManagerRating &&
-                _canEditManager(r, scope))
+                _canEditManager(r, scope) &&
+                // The manager's window must be open, and the employee's must
+                // not be force-closed — see [sendBackWindowsAllow].
+                sendBackWindowsAllow(r, _now))
               r,
       ];
 
@@ -803,9 +776,12 @@ class _QuarterlyKraSheetScreenState
         );
       }
     } catch (e) {
+      _refreshIfRatingClosed(e);
       if (mounted) {
+        // Never `'$e'`: on an ApiError that is its debug form. A closed window
+        // reads as the server wrote it, naming the month and the date.
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not send back: $e')));
+            .showSnackBar(SnackBar(content: Text(userFacingError(e))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -909,6 +885,7 @@ class _QuarterlyKraSheetScreenState
                 'Management review saved and locked — incentive settled to it.')));
       }
     } catch (e) {
+      _refreshIfRatingClosed(e);
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_saveErrorText(e))));
@@ -934,6 +911,7 @@ class _QuarterlyKraSheetScreenState
             content: Text('Management review reopened — you can edit again.')));
       }
     } catch (e) {
+      _refreshIfRatingClosed(e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
@@ -1074,6 +1052,7 @@ class _QuarterlyKraSheetScreenState
       }
       ref.invalidate(quarterlySheetProvider);
     } catch (e) {
+      _refreshIfRatingClosed(e);
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_saveErrorText(e))));
@@ -1144,7 +1123,15 @@ class _QuarterlyKraSheetScreenState
                   r, reviewerMap, scope?.reviewFlow ?? ReviewFlow.standard),
           ];
           final canManage = _hasManagementRole(scope);
+          // The months the sign-off may act on: every month present on an
+          // older backend, and only those whose management window is open
+          // once the server sends windows. None means no lock bar at all.
+          final signOff = managementSignOffReviews(mappedReviews, _now);
+          final canSignOff = canManage && signOff.isNotEmpty;
           return _Sheet(
+            // The same "now" the gates above use, so a pinned clock reaches
+            // the grid's cell gates too instead of stopping at the screen.
+            clock: widget.clock,
             months: data.months,
             reviews: mappedReviews,
             flow: scope?.reviewFlow ?? ReviewFlow.standard,
@@ -1175,9 +1162,9 @@ class _QuarterlyKraSheetScreenState
             // for anything they didn't change) and locks the incentive to it,
             // or reopens a locked review to revise it.
             onLockManagement:
-                canManage ? () => _lockManagementReview(mappedReviews) : null,
+                canSignOff ? () => _lockManagementReview(signOff) : null,
             onReopenManagement:
-                canManage ? () => _reopenManagement(mappedReviews) : null,
+                canSignOff ? () => _reopenManagement(signOff) : null,
             // The reporting manager can hand a self-rating back when it looks
             // wrong. Null unless they actually have a month to return.
             onSendBackForRework: _reworkAction(mappedReviews, scope),
@@ -1208,6 +1195,239 @@ class _QuarterlyKraSheetScreenState
 
 extension _Let<T> on T {
   R let<R>(R Function(T) f) => f(this);
+}
+
+// ── Rating windows ───────────────────────────────────────────────────────────
+//
+// When the server sends a review's `ratingAccess` (docs/RATING_ACCESS.md), its
+// window for a stage decides WHEN that stage may be written, and the client's
+// own reach-backs — the blank self-rating backfill, management sign-off of any
+// ended month, RatingReopen, the rework return — are not consulted: the server
+// has already folded the rework return into the SELF window and the reopen
+// into an OPENED one, and it refuses any write its window does not allow.
+// A review without windows comes from an older backend and keeps every rule
+// exactly as it was.
+
+/// THE "when" test once a window is present: the month has ENDED and the
+/// stage's window is open at [now]. Every window-aware gate goes through here,
+/// so none of them can disagree about what "open" means.
+bool _windowOpen(RatingWindow window, ReviewPeriod month, DateTime now) =>
+    month.isRatableOn(now) && window.isOpenAt(now);
+
+/// Whether [r]'s window for [stage] is open at [now] — true when the server
+/// sent none, which leaves the caller's own rule to decide on its own.
+bool _stageWindowOpen(MonthlyReview r, ReviewStage stage, DateTime now) {
+  final window = r.windowFor(stage);
+  return window == null || _windowOpen(window, r.period, now);
+}
+
+/// Whether [scope] may enter or change the self-rating on [r] at [now].
+///
+/// Editable ONLY by the employee themselves (their own sheet). Admins, HR and
+/// managers can view it but not change someone's self score.
+///
+/// Every gate on this sheet ALSO requires the month's review to still be open.
+/// That check is not cosmetic: the backend rejects a save against a finished
+/// review with 409 RES_002 ("Review is completed; scores are locked."). A gate
+/// that only asks "who are you?" renders an edit affordance on a locked month,
+/// opens the rating sheet, and fails only *after* the user has picked a value.
+/// Each month in the quarter locks independently, so the check is per-review —
+/// never per-sheet.
+@visibleForTesting
+bool canEditSelfRating(MonthlyReview r, ReviewScope? scope, DateTime now) {
+  if (scope == null || r.isComplete) return false;
+  final window = r.windowFor(ReviewStage.selfRating);
+  if (window != null) {
+    // The server's SELF window replaces every check below: a rework return
+    // arrives as a RETURNED window with no end, a super-admin reopen as an
+    // OPENED one. The month must still have ENDED — nothing about a month
+    // opens while it is running, and a window never says otherwise.
+    if (!_windowOpen(window, r.period, now)) return false;
+  } else {
+    // A month that has not ENDED cannot be rated by anyone, including its own
+    // employee. Enforced here as well as in isCellOpenForEntry because this
+    // gate feeds `_submittableReviews`, and that is a far worse failure than an
+    // open cell: with a score already present for the live month, the "Submit
+    // self-rating" bar appeared, its dialog named that month, and confirming
+    // advanced an unfinished month to the reporting-manager stage and notified
+    // the manager and HR. Irreversible from the employee's side.
+    //
+    // The gate is still needed after the cell fix, because scores written for
+    // the live month BEFORE that fix shipped are already in the database and
+    // the submit loop would go on offering them.
+    // A month still running is closed to everyone, always — that is what the
+    // paragraph above protects, and a returned rating must not defeat it.
+    if (!r.period.isRatableOn(now)) return false;
+    // Otherwise the OPEN month only — rating August must not reopen July —
+    // UNLESS the manager handed this month back for rework.
+    //
+    // Without that exception the send-back is a dead letter: the employee is
+    // shown "your rating was returned, please revise it" over a sheet they
+    // cannot type into, because the month whose rating is being questioned is
+    // by definition one that has already been submitted and, soon after, one
+    // whose window has closed. A return is an explicit, audited grant of
+    // permission from the one person entitled to give it, which is exactly
+    // what the blanket window rule cannot express.
+    // Otherwise: the OPEN month, a month handed back for rework, or a month
+    // this employee has not finished rating.
+    //
+    // That last case is the one that matters at scale. The window rule was
+    // written to stop September's rater going back and REWRITING July, and
+    // filling a blank is not rewriting: a KRA that already carries a self
+    // score stays shut (see isCellOpenForEntry), so a closed month can be
+    // completed but never revised. Without it, every employee whose July or
+    // August self-rating was left unfinished when the window shut is locked
+    // out of their own sheet permanently, with nothing in the app able to
+    // reopen it — and the score they never entered counts as a zero against
+    // their incentive.
+    if (!r.period.isOpenForRatingOn(now) &&
+        !r.selfRatingReturned &&
+        !_hasUnratedSelfKra(r)) {
+      return false;
+    }
+  }
+  // Some organisations run a pipeline with no self-rating at all. Checked
+  // before identity: under that flow it is not that someone ELSE rates the
+  // employee, it is that the stage does not exist.
+  if (!stageIsInFlow(ReviewStage.selfRating, scope.reviewFlow)) return false;
+  return scope.userId == r.employeeId;
+}
+
+/// Whether any KRA on [r] is still missing its self score.
+///
+/// Reads the actual scores, never the stage cursor. The cursor is unreliable
+/// on this data — reviews sit at MANAGEMENT_REVIEW, and some at COMPLETED,
+/// with no self score behind them at all — so a gate keyed on status would
+/// call an empty sheet finished.
+bool _hasUnratedSelfKra(MonthlyReview r) =>
+    r.rows.any((row) => row.scoreFor(ReviewStage.selfRating)?.value == null);
+
+/// Whether [r]'s rating windows let its self-rating be sent back at [now].
+///
+/// The send-back is a REPORTING_MANAGER_RATING submit (`approved: false`), so
+/// the server holds it to that stage's window. It also refuses one while the
+/// SELF window is force-CLOSED for the month: the return would land the review
+/// on a stage nobody can act on and strand it (docs/RATING_ACCESS.md §3.3). A
+/// self window that merely passed its deadline does not block it — the return
+/// itself reopens it, as a RETURNED window with no end.
+///
+/// True when the review carries no windows, which leaves the send-back exactly
+/// as it was. Who may send back, and when the cursor allows it, is decided by
+/// the caller.
+@visibleForTesting
+bool sendBackWindowsAllow(MonthlyReview r, DateTime now) =>
+    _stageWindowOpen(r, ReviewStage.reportingManagerRating, now) &&
+    !(r.windowFor(ReviewStage.selfRating)?.closed ?? false);
+
+/// The months in view that management's Save & Lock and Reopen act on at [now].
+///
+/// Both write the MANAGEMENT_REVIEW stage. The lock saves a score for every
+/// KRA, and the server holds unlocking to the same window, because unlocking a
+/// settled review that could not then be re-locked would strand it. So a month
+/// whose review carries a MANAGEMENT_REVIEW window qualifies only while it is
+/// open (docs/RATING_ACCESS.md §3.3); an empty result means the actions are not
+/// offered at all. A month without a window — an older backend — qualifies
+/// exactly as before, so there the actions still cover every month present.
+@visibleForTesting
+List<MonthlyReview> managementSignOffReviews(
+  List<MonthlyReview?> reviews,
+  DateTime now,
+) =>
+    [
+      for (final r in reviews.whereType<MonthlyReview>())
+        if (_stageWindowOpen(r, ReviewStage.managementReview, now)) r,
+    ];
+
+/// The sheet's "reopened for rating" notice: one line per distinct closing
+/// instant, or none when no review in view has a stage reopened at [now].
+///
+/// Only a super admin's reopen counts ([RatingWindow.isReopenedAt]) — an
+/// ordinary deadline needs no announcement, and a rework return has a notice
+/// of its own. Stages outside [flow] are ignored whatever the server sent, so
+/// an administrators-only sheet never mentions a self-rating it does not have,
+/// and so is a COMPLETED month, which stays locked whatever its window says.
+///
+/// Months are named in calendar order ("July 2026 and August 2026"). A month
+/// on which only SOME of the flow's rating stages are reopened until that
+/// instant names them — "August 2026 (HR)" — so a reopen of one seat does not
+/// read as a reopen of the whole month. The date is the closing day on the
+/// viewer's clock, in the app's 'd MMM yyyy'.
+@visibleForTesting
+List<String> reopenedNoticeLines(
+  List<MonthlyReview?> reviews,
+  ReviewFlow flow,
+  DateTime now,
+) {
+  final stages = [
+    for (final s in ReviewStage.values)
+      if (s.isRatingStage && stageIsInFlow(s, flow)) s,
+  ];
+  final inView = reviews
+      .whereType<MonthlyReview>()
+      .where((r) => !r.isComplete)
+      .toList()
+    ..sort((a, b) => a.period.compareTo(b.period));
+  // Closing instant → month → the stages reopened until then. Keyed in UTC
+  // so equal instants group together however they were parsed; null is a
+  // reopen with no end. Both levels keep insertion (calendar, pipeline) order.
+  final groups = <DateTime?, Map<ReviewPeriod, Set<ReviewStage>>>{};
+  for (final r in inView) {
+    for (final stage in stages) {
+      final window = r.windowFor(stage);
+      if (window == null || !window.isReopenedAt(now)) continue;
+      groups
+          .putIfAbsent(window.closesAt?.toUtc(), () => {})
+          .putIfAbsent(r.period, () => {})
+          .add(stage);
+    }
+  }
+  String entry(ReviewPeriod month, Set<ReviewStage> reopened) {
+    if (reopened.length == stages.length) return month.label;
+    final seats = reopened.map((s) => _reopenedStageLabel(s, flow)).join(', ');
+    return '${month.label} ($seats)';
+  }
+
+  final ordered = groups.entries.toList()
+    ..sort((a, b) => _compareClosings(a.key, b.key));
+  return [
+    for (final MapEntry(key: closesAt, value: months) in ordered)
+      _reopenedLine(closesAt, [
+        for (final MapEntry(key: month, value: reopened) in months.entries)
+          entry(month, reopened),
+      ]),
+  ];
+}
+
+/// Earliest closing first; a reopen with no end last.
+int _compareClosings(DateTime? a, DateTime? b) {
+  if (a == null) return b == null ? 0 : 1;
+  if (b == null) return -1;
+  return a.compareTo(b);
+}
+
+/// One notice line: [months] as a readable list, then when they close.
+String _reopenedLine(DateTime? closesAt, List<String> months) {
+  final list = months.length < 2
+      ? months.join()
+      : '${months.sublist(0, months.length - 1).join(', ')} '
+          'and ${months.last}';
+  return closesAt == null
+      ? AppStrings.quarterlyReopenedNoEnd(list)
+      : AppStrings.quarterlyReopenedUntil(
+          list, EmployeeFormatters.date(closesAt.toLocal()));
+}
+
+/// What the sheet calls [stage] everywhere else: a Review rater by its
+/// flow-aware seat label — so the moved reporting-manager seat reads
+/// "Management" under administrators-only, as on the legend and the KRA
+/// badges — and the self-rating and the sign-off by [ReviewStage.label].
+String _reopenedStageLabel(ReviewStage stage, ReviewFlow flow) {
+  for (final reviewer in KraReviewer.values) {
+    if (stageForReviewer(reviewer) == stage) {
+      return reviewerShortLabelFor(reviewer, flow);
+    }
+  }
+  return stage.label;
 }
 
 // ── The reporting manager's submit rule ──────────────────────────────────────
@@ -1276,7 +1496,11 @@ bool managerCanSubmitReview(
     (r.managerId ?? '').isNotEmpty &&
     r.managerId == managerUserId &&
     managerRatedKraCount(r) > 0 &&
-    r.recordFor(ReviewStage.reportingManagerRating) == null;
+    r.recordFor(ReviewStage.reportingManagerRating) == null &&
+    // The submit is a REPORTING_MANAGER_RATING write, which the server refuses
+    // outside that stage's window — so it is not offered there. No window (an
+    // older backend) leaves the rule above exactly as it was.
+    _stageWindowOpen(r, ReviewStage.reportingManagerRating, now);
 
 /// Runs [submit] for each of [targets] in turn and returns how many went
 /// through.
@@ -1591,11 +1815,19 @@ class _Sheet extends StatelessWidget {
     // different words — a finished quarter is nobody's to edit.
     final allComplete =
         present.isNotEmpty && present.every((r) => r.isComplete);
+    // Resolved once, so the banner, the grid and the notices below all judge
+    // the windows at the same instant.
+    final now = clock ?? DateTime.now();
     // Name the month that is actually outstanding rather than saying "this
     // sheet". The sheet covers a quarter, so a generic hint lets someone fill in
     // the wrong month, believe they are finished, and still be chased as overdue.
-    final dueMonth = _currentMonthNeedingSelfRating(
-        months, reviews, clock ?? DateTime.now());
+    final dueMonth = _currentMonthNeedingSelfRating(months, reviews, now);
+    // Months a super admin has reopened — empty on an older backend, and on
+    // every sheet without a reopen, which then renders exactly as before.
+    final reopened = reopenedNoticeLines(reviews, flow, now);
+    // The months management's lock bar acts on (see managementSignOffReviews):
+    // every month present on an older backend.
+    final signOff = managementSignOffReviews(reviews, now);
     // Whose stage this viewer owns, and therefore which deadline applies. A
     // flat if-chain rather than nested ternaries: each branch now carries a
     // stage as well as a sentence.
@@ -1744,6 +1976,10 @@ class _Sheet extends StatelessWidget {
               if (stranded.isEmpty) return const SizedBox.shrink();
               return _StrandedKraNotice(names: stranded);
             }(),
+            // Directly above the cells it explains. Without it a reopened July
+            // reads like a bug that made old cells editable — or goes unseen
+            // by the people who could now finish it.
+            if (reopened.isNotEmpty) _ReopenedNotice(lines: reopened),
             // Frame the table so its edge columns don't merge with the screen
             // edge — a bordered, rounded card (matching the header/payout cards)
             // with a little internal padding, and a horizontal margin that keeps
@@ -1761,7 +1997,7 @@ class _Sheet extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: _Grid(
-                  now: clock ?? DateTime.now(),
+                  now: now,
                   // The grid decides both cell openness and WHICH COLUMNS
                   // EXIST, so the flow has to reach it or it draws three
                   // Self columns nobody can ever fill.
@@ -1802,11 +2038,13 @@ class _Sheet extends StatelessWidget {
             if (onLockManagement != null) ...[
               const SizedBox(height: 14),
               _LockManagementBar(
-                // Locked once every month present this quarter is locked.
-                locked: reviews.whereType<MonthlyReview>().isNotEmpty &&
-                    reviews
-                        .whereType<MonthlyReview>()
-                        .every((r) => r.isManagementLocked),
+                // Locked once every month the bar acts on is locked — on an
+                // older backend, every month present this quarter. Judged
+                // over the same months the actions cover, or a locked July
+                // whose window is shut would hold the bar on "Save & Lock"
+                // for an open August that is already locked.
+                locked: signOff.isNotEmpty &&
+                    signOff.every((r) => r.isManagementLocked),
                 onSave: onLockManagement!,
                 onReopen: onReopenManagement,
               ),
@@ -2157,6 +2395,58 @@ class _StrandedKraNotice extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "These months were reopened for rating" — one compact line per deadline.
+///
+/// A super admin's reopen makes cells editable that the calendar says are
+/// shut, so without a word of explanation it looks like a bug — or, worse,
+/// nobody notices they can now finish the month. Each line comes from
+/// [reopenedNoticeLines]; the sheet builds this only when there is one, so a
+/// sheet without reopens is laid out exactly as before.
+class _ReopenedNotice extends StatelessWidget {
+  final List<String> lines;
+  const _ReopenedNotice({required this.lines});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in lines)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.lock_open_rounded,
+                      size: 14, color: AppColors.info),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      line,
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -2849,10 +3139,10 @@ class _GridState extends State<_Grid> {
   /// [isCellOpenForEntry]. Combined with the viewer gates, never instead of
   /// them.
   bool _open(int monthIdx, dynamic row, ReviewStage stage) {
+    final review = widget.reviews[monthIdx];
     // The MONTH's own row — the canonical one carries the first month's self
     // score, which would open August off the back of July's rating.
-    final monthRow =
-        _rowIn(widget.reviews[monthIdx], (row as MonthlyKraRow).id);
+    final monthRow = _rowIn(review, (row as MonthlyKraRow).id);
     if (monthRow == null) return false;
     return isCellOpenForEntry(
       stage: stage,
@@ -2860,9 +3150,13 @@ class _GridState extends State<_Grid> {
       month: widget.months[monthIdx],
       now: widget.now,
       flow: widget.reviewFlow,
-      returnedForRework: widget.reviews[monthIdx]?.selfRatingReturned ?? false,
+      returnedForRework: review?.selfRatingReturned ?? false,
       reopenedForBackfill:
           RatingReopen.allowsBackfill(widget.months[monthIdx], widget.now),
+      // THIS month's window for the stage, from its own review — the three
+      // months of a quarter close independently. When present it replaces
+      // the two reach-backs above.
+      window: review?.windowFor(stage),
     );
   }
 
@@ -2966,10 +3260,18 @@ class _GridState extends State<_Grid> {
     // holding it up. A future month shows nothing at all; a started month
     // still waiting on the employee says so, and a month reopened for pending
     // ratings counts as started.
+    //
+    // With a server window the same split comes from the window instead: shut
+    // (not ended, past its deadline, force-closed) is the bare dash, and open
+    // can only mean this KRA is still waiting on its self-rating.
     if (!open) {
       final month = widget.months[monthIdx];
-      if (isMonthClosedForRating(month, widget.now) &&
-          !RatingReopen.allowsBackfill(month, widget.now)) {
+      final window = review.windowFor(stage);
+      final shut = window != null
+          ? !_windowOpen(window, month, widget.now)
+          : isMonthClosedForRating(month, widget.now) &&
+              !RatingReopen.allowsBackfill(month, widget.now);
+      if (shut) {
         return Text(_fmt(null),
             style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -3178,7 +3480,11 @@ class _GridState extends State<_Grid> {
                   rs,
                   'Reviewer · ${reviewer?.shortLabel ?? ''}',
                   Icons.how_to_reg_rounded,
-                  _canEditReviewerStage(review, rs)),
+                  // The reason rides on this stage's score, so saving it is
+                  // a write the server holds to the stage's window. (The
+                  // employee tile is already window-aware via canEditSelf.)
+                  _canEditReviewerStage(review, rs) &&
+                      _stageWindowOpen(review, rs, widget.now)),
             ],
           ],
         ],
@@ -4735,7 +5041,24 @@ bool isCellOpenForEntry({
   /// see [RatingReopen]. Opens a BLANK reviewer cell past the window; one that
   /// already carries a score stays shut.
   bool reopenedForBackfill = false,
+
+  /// The server's window for [stage] in [month], when it sent one
+  /// (docs/RATING_ACCESS.md §4.2).
+  ///
+  /// Non-null, it decides WHEN on its own: open iff the month has ended and
+  /// the window is open, and none of the client's reach-backs below — nor
+  /// [returnedForRework] or [reopenedForBackfill] — are consulted. The server
+  /// has already folded the rework return into the SELF window and a reopen
+  /// into an OPENED one, which is rate-and-edit: a rated cell is as open as a
+  /// blank one. The self-first and flow rules still apply after it.
+  ///
+  /// Null — an older backend — keeps the rule below exactly as it was.
+  RatingWindow? window,
 }) {
+  if (window != null) {
+    if (!_windowOpen(window, month, now)) return false;
+    return _selfFirstAllows(stage, row, flow);
+  }
   // Management sign-off is NOT bound to the one-month entry window.
   //
   // The window protects the scores that feed the result: rating August must
@@ -4777,6 +5100,12 @@ bool isCellOpenForEntry({
   } else if (isMonthClosedForRating(month, now)) {
     return false;
   }
+  return _selfFirstAllows(stage, row, flow);
+}
+
+/// The ordering half of [isCellOpenForEntry], shared by both of its "when"
+/// rules: everything downstream of the self-rating waits for it, per KRA.
+bool _selfFirstAllows(ReviewStage stage, MonthlyKraRow row, ReviewFlow flow) {
   if (stage == ReviewStage.selfRating) return true;
 
   // The self-first ordering only means anything in a flow that HAS a
@@ -4803,6 +5132,9 @@ ReviewPeriod? _currentMonthNeedingSelfRating(
     if (!_isOpenReviewMonth(month, now)) continue;
     final review = reviews[i];
     if (review == null) return month; // not generated yet — still outstanding
+    // Once its server window has shut the month is missed, not due — naming
+    // it would send the employee to cells that no longer open.
+    if (!_stageWindowOpen(review, ReviewStage.selfRating, now)) return null;
     final rated = review.rows
         .any((r) => r.scoreFor(ReviewStage.selfRating)?.value != null);
     return rated ? null : month;

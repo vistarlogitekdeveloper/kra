@@ -54,6 +54,16 @@ class ApiConstants {
   /// every backend query scopes by the JWT's organizationId claim, never by a
   /// request parameter.
   static const String organizationsSwitch = '/organizations/switch';
+
+  // Rating access — SUPER_ADMIN only, organisation in the PATH, never the
+  // token claim (docs/RATING_ACCESS.md §3.5). Sub-paths as constructed by
+  // ApiRatingAccessRepository:
+  //   GET    $organizations/:orgId/$ratingAccess/$ratingAccessOverrides
+  //   GET    $organizations/:orgId/$ratingAccess/:period         (YYYY-MM)
+  //   PUT    $organizations/:orgId/$ratingAccess/:period/:stage
+  //   DELETE $organizations/:orgId/$ratingAccess/:period/:stage
+  static const String ratingAccess = 'rating-access';
+  static const String ratingAccessOverrides = 'overrides';
   static const String kraTemplates = '/kra-templates';
   static const String kraAssignments = '/kra-assignments';
   static const String kraAssignmentsBulk = '/kra-assignments/bulk';

@@ -2,6 +2,7 @@ import '../../../../core/api/json_parse.dart';
 import '../../../auth/data/models/user.dart';
 import 'incentive_snapshot.dart';
 import 'monthly_kra_row.dart';
+import 'rating_window.dart';
 import 'review_stage.dart';
 import 'stage_record.dart';
 import 'stage_status.dart';
@@ -191,6 +192,14 @@ class MonthlyReview {
   /// reopened. Null while the management review is still open.
   final DateTime? managementLockedAt;
 
+  /// When each rating stage of this month accepts entries, as the SERVER
+  /// resolved it (deadline, super-admin override, rework return — see
+  /// docs/RATING_ACCESS.md). The server refuses a write outside it.
+  ///
+  /// Null when the backend predates rating access: every gate then keeps its
+  /// previous rule. Read it through [windowFor].
+  final Map<ReviewStage, RatingWindow>? ratingWindows;
+
   const MonthlyReview({
     required this.id,
     required this.employeeId,
@@ -205,7 +214,12 @@ class MonthlyReview {
     this.rows = const [],
     this.incentive = const IncentiveSnapshot(),
     this.managementLockedAt,
+    this.ratingWindows,
   });
+
+  /// The server's window for [stage], or null when it sent none — in which case
+  /// the caller falls back to the rule that predates rating access.
+  RatingWindow? windowFor(ReviewStage stage) => ratingWindows?[stage];
 
   // ── Incentive convenience (delegates to [incentive]) ──────────────────
   double get eligibleAmount => incentive.eligibleAmount;
@@ -504,6 +518,7 @@ class MonthlyReview {
           .toList(),
       incentive: incentive,
       managementLockedAt: JsonParse.parseDate(json['managementLockedAt']),
+      ratingWindows: RatingWindow.parseMap(json['ratingAccess']),
     );
   }
 
@@ -522,6 +537,9 @@ class MonthlyReview {
         'rows': rows.map((r) => r.toJson()).toList(),
         'incentive': incentive.toJson(),
         'managementLockedAt': managementLockedAt?.toIso8601String(),
+        if (ratingWindows case final windows?)
+          'ratingAccess': windows
+              .map((stage, w) => MapEntry(stage.toApiString(), w.toJson())),
       };
 
   MonthlyReview copyWith({
@@ -539,6 +557,7 @@ class MonthlyReview {
     IncentiveSnapshot? incentive,
     DateTime? managementLockedAt,
     bool clearManagementLock = false,
+    Map<ReviewStage, RatingWindow>? ratingWindows,
   }) {
     return MonthlyReview(
       id: id ?? this.id,
@@ -556,6 +575,10 @@ class MonthlyReview {
       managementLockedAt: clearManagementLock
           ? null
           : (managementLockedAt ?? this.managementLockedAt),
+      // Carried by default: copyWith runs on every load (_applyReviewerMap in
+      // the sheet), and dropping the windows there would silently put every
+      // gate back on the old rule while the server enforces the new one.
+      ratingWindows: ratingWindows ?? this.ratingWindows,
     );
   }
 }
