@@ -1,42 +1,8 @@
--- ============================================================================
--- Copy an employee's CURRENT KRAs onto monthly reviews that kept an old set.
---
---   Symptom: one quarter of the KRA sheet lists different KRAs from the
---   quarters either side of it. Reported for VLPL1436: Apr–Jun and Oct–Dec
---   show the five Sr. GM EXIM KRAs that migration 115 seeded (New Business
---   Development & Customer Acquisition, Proposal & Commercial Management, …),
---   while Jul–Sep shows an operations set — Safety of the Facility, Inventory
---   accuracy, Invoice submission, …
---
---   Cause: a monthly review COPIES the employee's KRAs when it is generated
---   (snapshotRows in monthly-reviews.repository.js), so changing someone's
---   KRAs later does not reach a review that already exists. The backend heals
---   that only for a review with NO score at all (resyncRowsIfUntouched): "a
---   sheet that has been started is never rewritten underneath its reviewers".
---   Months rated against the old set kept it — and the sheet takes its KRA
---   list from the quarter's first month, so one stale month shows the whole
---   quarter wrong. The other quarters were copied after the change, or had no
---   score yet when it came.
---
---   Fix: copy the KRAs again from the employee's CURRENT source — the same
---   source and the same copy rules the backend uses — and restart those months
---   at self-rating, because what was submitted rated different KRAs. A score
---   is kept only on a KRA that is in both sets (same name, same max score);
---   every other score, with its reason and its attachment, is deleted. All of
---   it is saved first, as JSON, in kra.review_kra_resync_backup, and step 5
---   puts it back.
---
--- READ THE SELECTS FIRST. Step 3 is a DRY RUN until you set v_apply := true.
--- Run everything in ONE session (psql, pgAdmin, DBeaver): step 0 creates
--- session-only helpers, nothing in the database, that every later step reads.
--- docs/verify_resync_review_kras.cjs tests all of it on a throwaway server.
--- ============================================================================
+# Paste each PART separately into the Coolify terminal, in order.
+# After each part you must see "part N ok" before pasting the next one.
 
--- ── 0. Which employee, which months ────────────────────────────────────────
--- Change only these four values. Months are inclusive. reference_month is a
--- month you KNOW is right: step 3 refuses to run unless the employee's current
--- KRAs are exactly that month's, so a source that has changed again since
--- cannot be copied over three months by mistake. NULL skips that check.
+# ===== PART 1 of 5 - copy from here =====
+cat > /tmp/resync.sql <<'SQL_EOF'
 SET client_min_messages = warning;   -- a first run has nothing to drop; skip saying so
 DROP VIEW     IF EXISTS pg_temp.resync_source;
 DROP TABLE    IF EXISTS pg_temp.resync_target;
@@ -50,20 +16,14 @@ SELECT 'VLPL1436'::text  AS employee_code,
        DATE '2026-09-01' AS last_month,
        DATE '2026-10-01' AS reference_month;
 
--- Case and spacing do not make a different KRA.
 CREATE FUNCTION pg_temp.kra_key(text) RETURNS text
   LANGUAGE sql IMMUTABLE
   AS $$ SELECT lower(regexp_replace(btrim($1), '\s+', ' ', 'g')) $$;
 
--- One KRA as the comparisons see it: position, name, weight, max score.
 CREATE FUNCTION pg_temp.kra_sig(int, text, numeric, numeric) RETURNS text
   LANGUAGE sql IMMUTABLE
   AS $$ SELECT format('%s|%s|%s|%s', $1, pg_temp.kra_key($2), round($3, 2), round($4, 2)) $$;
 
--- What a review generated TODAY would copy, per employee — snapshotRows line
--- for line: the items of the employee's assignment in an ACTIVE cycle (newest
--- first), else their default template's items. Assignment items carry no
--- category or max score, so those are NULL and 100, as the backend writes them.
 CREATE TEMP VIEW resync_source AS
 WITH emp AS (
   SELECT e.id AS employee_id, e.default_template_id,
@@ -110,11 +70,6 @@ JOIN kra.kra_templates tpl ON tpl.id = ti.template_id
 WHERE NOT EXISTS (SELECT 1 FROM kra.kra_assignment_items x
                   WHERE x.assignment_id = emp.assignment_id);
 
--- ── 1. Who else? Reviews in the range whose KRAs are not the current ones ──
--- Same organisation as the employee in step 0, same months. scores_entered is
--- what a fix would put at risk; for anyone listed, run steps 2–3 with their
--- code. kras_now empty means they have no KRAs assigned at all — fix that in
--- the app instead.
 WITH p AS (SELECT * FROM pg_temp.resync_target),
 now_rows AS (
   SELECT s.employee_id,
@@ -152,19 +107,12 @@ LEFT JOIN now_kras n ON n.employee_id = r.employee_id
 WHERE r.sig IS DISTINCT FROM n.sig
 ORDER BY e.name, r.year, r.month;
 
--- ── 2a. The KRAs those months will get ─────────────────────────────────────
--- Check this is the set you expect — for VLPL1436, the five Sr. GM EXIM KRAs,
--- 50 / 30 / 10 / 5 / 5 %. If it is not, STOP and fix the employee's KRA
--- assignment in the app first: every future month is generated from it too.
 SELECT s.source, s.sort_order, s.name, s.weightage_percent, s.max_score, s.reviewer_group
 FROM pg_temp.resync_source s
 JOIN kra.employees e ON e.id = s.employee_id
 JOIN pg_temp.resync_target p ON p.employee_code = e.employee_code
 ORDER BY s.sort_order;
 
--- ── 2b. What those months hold now, and what happens to each score ─────────
--- fate: "kept" moves to the same KRA in the new set; "deleted" is removed
--- (and saved in the backup); empty means nobody has scored that KRA yet.
 WITH p AS (SELECT * FROM pg_temp.resync_target),
 emp AS (SELECT e.id FROM kra.employees e JOIN p ON e.employee_code = p.employee_code),
 now_kras AS (
@@ -199,6 +147,11 @@ SELECT to_char(make_date(r.year, r.month, 1), 'Mon YYYY') AS month,
                                        AND k.mx = round(r.max_score, 2)
                                        AND k.n = 1)
               THEN 'kept'
+SQL_EOF
+echo "part 1 ok"
+
+# ===== PART 2 of 5 - copy from here =====
+cat >> /tmp/resync.sql <<'SQL_EOF'
             ELSE 'deleted' END AS fate
 FROM rows_now r
 LEFT JOIN kra.monthly_row_scores sc ON sc.row_id = r.row_id
@@ -206,15 +159,6 @@ GROUP BY r.review_id, r.year, r.month, r.current_stage, r.row_id,
          r.display_order, r.name, r.weightage_percent, r.max_score, r.n
 ORDER BY r.year, r.month, r.display_order;
 
--- ── 3. The fix ──────────────────────────────────────────────────────────────
--- As written this is a DRY RUN: it makes every change, prints one line per
--- month, then rolls all of it back. Read the lines, then set v_apply := true
--- and run this block again to save it. It is all-or-nothing: any refusal
--- below leaves every month exactly as it was.
---
--- Refuses a month management has signed off (locked, at payout, completed or
--- paid) — its incentive rests on those scores. Leaves alone a month that
--- already has the current KRAs, so running it twice changes nothing.
 DO $resync$
 DECLARE
   v_apply CONSTANT boolean := false;   -- ◀ false: dry run, rolled back. true: saved.
@@ -327,7 +271,6 @@ BEGIN
 
       v_old_ids := ARRAY(SELECT rr.id FROM kra.monthly_review_rows rr WHERE rr.review_id = rev.id);
 
-      -- Save what is about to change.
       INSERT INTO kra.review_kra_resync_backup
              (id, review_id, organization_id, employee_id, year, month, source,
               old_review, old_rows, old_scores, old_stage_records)
@@ -341,7 +284,6 @@ BEGIN
                           FROM kra.monthly_stage_records sr WHERE sr.review_id = rev.id), '[]'))
       RETURNING id INTO v_backup_id;
 
-      -- The current KRAs, copied the way snapshotRows copies them.
       INSERT INTO kra.monthly_review_rows
              (id, review_id, name, category, weightage_percent, max_score,
               target, tracking_method, display_order, reviewer_group)
@@ -350,11 +292,15 @@ BEGIN
         FROM pg_temp.resync_source s
        WHERE s.employee_id = v_emp.id;
 
-      -- A score on a KRA that is in both sets moves to the new row.
       WITH prev AS (
         SELECT rr.id, pg_temp.kra_key(rr.name) AS k, round(rr.max_score, 2) AS mx,
                count(*) OVER (PARTITION BY pg_temp.kra_key(rr.name)) AS n
           FROM kra.monthly_review_rows rr
+SQL_EOF
+echo "part 2 ok"
+
+# ===== PART 3 of 5 - copy from here =====
+cat >> /tmp/resync.sql <<'SQL_EOF'
          WHERE rr.id = ANY (v_old_ids)
       ), fresh AS (
         SELECT rr.id, pg_temp.kra_key(rr.name) AS k, round(rr.max_score, 2) AS mx,
@@ -369,7 +315,6 @@ BEGIN
        WHERE prev.n = 1 AND sc.row_id = prev.id;
       GET DIAGNOSTICS v_kept = ROW_COUNT;
 
-      -- Every other score rates a KRA this month no longer has.
       SELECT string_agg(format('%s x%s', x.stage, x.n), ', ' ORDER BY x.stage),
              COALESCE(sum(x.reasons), 0), COALESCE(sum(x.files), 0)
         INTO v_deleted, v_reasons, v_files
@@ -388,7 +333,6 @@ BEGIN
       DELETE FROM kra.monthly_row_scores WHERE row_id = ANY (v_old_ids);
       DELETE FROM kra.monthly_review_rows WHERE id = ANY (v_old_ids);
 
-      -- What was submitted rated other KRAs, so the month starts again.
       SELECT string_agg(sr.stage, ', ' ORDER BY sr.submitted_at) INTO v_cleared
         FROM kra.monthly_stage_records sr WHERE sr.review_id = rev.id;
       DELETE FROM kra.monthly_stage_records WHERE review_id = rev.id;
@@ -422,14 +366,6 @@ BEGIN
 END
 $resync$;
 
--- ── 4. Confirm ─────────────────────────────────────────────────────────────
--- The range plus three months either side, so it can be compared with the
--- neighbouring quarters: every month should list the same KRAs, and the
--- re-copied ones should be back at SELF_RATING with no scores. Step 1 should
--- no longer list the employee.
---
--- Then the months need rating again, from self-rating on. Ask the employee to
--- pull to refresh — the app keeps the old sheet until it reloads.
 SELECT to_char(make_date(mr.year, mr.month, 1), 'Mon YYYY') AS month,
        mr.current_stage,
        count(rr.id) AS kras,
@@ -446,12 +382,6 @@ WHERE make_date(mr.year, mr.month, 1)
 GROUP BY mr.id, mr.year, mr.month, mr.current_stage
 ORDER BY mr.year, mr.month;
 
--- ── 5. Undo ────────────────────────────────────────────────────────────────
--- Off unless you set v_undo := true. Puts back, for the employee and months in
--- step 0, exactly what step 3 removed — KRA rows with their original ids,
--- scores, reasons, attachments, submissions and the stage — and deletes the
--- re-copied rows together with anything rated on them since. Each run steps
--- back one fix per month.
 DO $undo$
 DECLARE
   v_undo CONSTANT boolean := false;   -- ◀ true: restore the step 3 backups.
@@ -514,3 +444,57 @@ BEGIN
   RAISE NOTICE '%: % month(s) restored.', v_emp.employee_code, v_n;
 END
 $undo$;
+
+SQL_EOF
+echo "part 3 ok"
+
+# ===== PART 4 of 5 - copy from here =====
+cat > /tmp/resync.cjs <<'JS_EOF'
+// Runs /tmp/resync.sql with the backend's own DATABASE_URL and pg package.
+//   node /tmp/resync.cjs          dry run: changes nothing
+//   node /tmp/resync.cjs apply    saves the fix
+//   node /tmp/resync.cjs undo     restores the backup
+const fs = require('fs');
+const mode = process.argv[2] || 'dry';
+if (!['dry', 'apply', 'undo'].includes(mode)) { console.error('use: dry | apply | undo'); process.exit(2); }
+let pg;
+try { pg = require(require.resolve('pg', { paths: [process.cwd(), '/app', '/usr/src/app', '/opt/app'] })); }
+catch { console.error('pg not found: cd into the backend folder (the one with node_modules) and run again'); process.exit(2); }
+const url = process.env.DATABASE_URL;
+if (!url) { console.error('DATABASE_URL is not set in this container'); process.exit(2); }
+let sql = fs.readFileSync('/tmp/resync.sql', 'utf8');
+if (mode === 'apply') sql = sql.replace('v_apply CONSTANT boolean := false;', 'v_apply CONSTANT boolean := true;');
+if (mode === 'undo') sql = sql.replace('v_undo CONSTANT boolean := false;', 'v_undo CONSTANT boolean := true;');
+// Same SSL rule as src/config/db.js.
+const ssl = String(process.env.PGSSL || '').toLowerCase() === 'true' ||
+  /(supabase\.co|render\.com|amazonaws\.com|heroku\.com|neon\.tech|railway\.app)/i.test(url)
+  ? { rejectUnauthorized: false } : false;
+const TITLES = ['STEP 1 - other employees with the same problem (empty = none)',
+  'STEP 2a - the KRAs the months will get (must be the 5 Sr. GM EXIM KRAs)',
+  'STEP 2b - what each month holds now, and what happens to each score',
+  'STEP 4 - the months around the range, after this run'];
+(async () => {
+  const c = new pg.Client({ connectionString: url, ssl });
+  c.on('notice', (n) => {
+    if (n.severity === 'WARNING' || n.message.startsWith('Step 5 (undo) is off')) return;
+    console.log('>> ' + (n.message.startsWith('DRY RUN') ? 'DRY RUN - nothing was saved. To save it:  node /tmp/resync.cjs apply' : n.message));
+  });
+  await c.connect();
+  console.log('MODE: ' + mode.toUpperCase() + '\n');
+  try {
+    const res = [].concat(await c.query(sql)).filter((r) => r.command === 'SELECT' && r.fields.length > 0);
+    res.forEach((r, i) => {
+      console.log('\n' + (TITLES[i] || 'result') + ' (' + r.rows.length + ' rows)');
+      if (r.rows.length) console.table(r.rows);
+    });
+    console.log('\nDONE (' + mode + ')');
+  } catch (e) {
+    console.error('\nSTOPPED, nothing was changed: ' + e.message);
+    process.exitCode = 1;
+  } finally { await c.end(); }
+})();
+JS_EOF
+echo "part 4 ok"
+
+# ===== PART 5 of 5 - copy from here =====
+wc -l /tmp/resync.sql /tmp/resync.cjs && grep -c 'resync_target' /tmp/resync.sql && echo "all parts ok - now run:  node /tmp/resync.cjs"
