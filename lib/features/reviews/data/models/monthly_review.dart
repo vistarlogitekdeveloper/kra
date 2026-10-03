@@ -2,6 +2,7 @@ import '../../../../core/api/json_parse.dart';
 import '../../../auth/data/models/user.dart';
 import 'incentive_snapshot.dart';
 import 'monthly_kra_row.dart';
+import 'rating_window.dart';
 import 'review_stage.dart';
 import 'stage_record.dart';
 import 'stage_status.dart';
@@ -191,6 +192,14 @@ class MonthlyReview {
   /// reopened. Null while the management review is still open.
   final DateTime? managementLockedAt;
 
+  /// When each rating stage of this month accepts entries, as the SERVER
+  /// resolved it (deadline, super-admin override, rework return — see
+  /// docs/RATING_ACCESS.md). The server refuses a write outside it.
+  ///
+  /// Null when the backend predates rating access: every gate then keeps its
+  /// previous rule. Read it through [windowFor].
+  final Map<ReviewStage, RatingWindow>? ratingWindows;
+
   const MonthlyReview({
     required this.id,
     required this.employeeId,
@@ -205,7 +214,19 @@ class MonthlyReview {
     this.rows = const [],
     this.incentive = const IncentiveSnapshot(),
     this.managementLockedAt,
+    this.ratingWindows,
   });
+
+  /// The server's window for [stage]. Null only when the review carries no
+  /// `ratingAccess` at all (an older backend) — the caller then keeps the
+  /// rule that predates rating access. A stage missing from a block that IS
+  /// present reads as closed ([RatingWindow.missing]), never as the old rule.
+  RatingWindow? windowFor(ReviewStage stage) {
+    final windows = ratingWindows;
+    // Payout and the terminal stage are never gated, so they have no window.
+    if (windows == null || !stage.isRatingStage) return null;
+    return windows[stage] ?? RatingWindow.missing;
+  }
 
   // ── Incentive convenience (delegates to [incentive]) ──────────────────
   double get eligibleAmount => incentive.eligibleAmount;
@@ -226,13 +247,33 @@ class MonthlyReview {
     return (r != null && r.returned) ? r : null;
   }
 
-  /// True when [stage] was sent back for rework and is waiting to be redone.
+  /// True while a self-rating the reporting manager sent back is waiting for
+  /// the employee: the manager's record is a send-back, and the employee has
+  /// not resubmitted since.
   ///
-  /// Only meaningful while the pipeline is actually sitting on the stage the work
-  /// was returned TO — once it moves on again, the record is history.
-  bool get selfRatingReturned =>
-      currentStage == ReviewStage.selfRating &&
-      returnedRecordFor(ReviewStage.reportingManagerRating) != null;
+  /// Read from the stage records, NEVER the cursor. The server moves
+  /// `currentStage` on every save (it advances to the furthest scored stage),
+  /// so a rule keyed on it lasted one save: the employee's first rework edit,
+  /// or HR rating its own KRA meanwhile, ended the rework. The server resolves
+  /// the same definition (rating-access.service.js reworkState).
+  bool get selfRatingReturned {
+    if (isComplete) return false;
+    final rm = returnedRecordFor(ReviewStage.reportingManagerRating);
+    if (rm == null) return false;
+    final self = recordFor(ReviewStage.selfRating);
+    return self == null || self.submittedAt.isBefore(rm.submittedAt);
+  }
+
+  /// True once the employee has resubmitted a returned self-rating and the
+  /// reporting manager has not approved it again — the manager's turn. The
+  /// manager's approve rewrites their record as not returned, which ends it.
+  bool get managerReworkDue {
+    if (isComplete) return false;
+    final rm = returnedRecordFor(ReviewStage.reportingManagerRating);
+    if (rm == null) return false;
+    final self = recordFor(ReviewStage.selfRating);
+    return self != null && self.submittedAt.isAfter(rm.submittedAt);
+  }
 
   /// Derived coarse status of [stage] on this review.
   StageStatus statusOf(ReviewStage stage) {
@@ -504,6 +545,15 @@ class MonthlyReview {
           .toList(),
       incentive: incentive,
       managementLockedAt: JsonParse.parseDate(json['managementLockedAt']),
+      // serverNow arrives beside the windows; the gap between it and this
+      // device's clock corrects every window check for a clock that is off.
+      ratingWindows: RatingWindow.parseMap(
+        json['ratingAccess'],
+        clockSkew: RatingWindow.skewOf(
+          JsonParse.parseDate(json['serverNow']),
+          DateTime.now(),
+        ),
+      ),
     );
   }
 
@@ -522,6 +572,9 @@ class MonthlyReview {
         'rows': rows.map((r) => r.toJson()).toList(),
         'incentive': incentive.toJson(),
         'managementLockedAt': managementLockedAt?.toIso8601String(),
+        if (ratingWindows case final windows?)
+          'ratingAccess': windows
+              .map((stage, w) => MapEntry(stage.toApiString(), w.toJson())),
       };
 
   MonthlyReview copyWith({
@@ -539,6 +592,7 @@ class MonthlyReview {
     IncentiveSnapshot? incentive,
     DateTime? managementLockedAt,
     bool clearManagementLock = false,
+    Map<ReviewStage, RatingWindow>? ratingWindows,
   }) {
     return MonthlyReview(
       id: id ?? this.id,
@@ -556,6 +610,10 @@ class MonthlyReview {
       managementLockedAt: clearManagementLock
           ? null
           : (managementLockedAt ?? this.managementLockedAt),
+      // Carried by default: copyWith runs on every load (_applyReviewerMap in
+      // the sheet), and dropping the windows there would silently put every
+      // gate back on the old rule while the server enforces the new one.
+      ratingWindows: ratingWindows ?? this.ratingWindows,
     );
   }
 }

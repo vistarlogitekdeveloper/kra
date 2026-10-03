@@ -426,6 +426,7 @@ class _QuickActionsGrid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final superAdmin = ref.watch(canManageOrganizationsProvider);
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -473,13 +474,24 @@ class _QuickActionsGrid extends ConsumerWidget {
         ),
         // Tenant administration. Shown ONLY to the super admin — an HR admin
         // tapping it would reach a screen whose every call answers 403.
-        if (ref.watch(canManageOrganizationsProvider))
+        if (superAdmin)
           QuickActionButton(
             icon: Icons.domain_rounded,
             label: AppStrings.orgTitle,
             iconBg: AppColors.primaryPurple.withValues(alpha: 0.16),
             iconFg: AppColors.primaryPurple,
             onTap: () => context.push(AppRoutes.hrOrganizations),
+          ),
+        // Rating access for the organisation the session is acting in, read
+        // at tap time so a switch since this built is honoured.
+        if (superAdmin)
+          QuickActionButton(
+            icon: Icons.lock_clock_rounded,
+            label: AppStrings.ratingAccessTitle,
+            iconBg: AppColors.accentOrange.withValues(alpha: 0.12),
+            iconFg: AppColors.accentOrange,
+            onTap: () => context.push(AppRoutes.ratingAccessEntryFor(
+                ref.read(currentOrganizationIdProvider))),
           ),
       ],
     );

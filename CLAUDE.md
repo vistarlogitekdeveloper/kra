@@ -218,6 +218,9 @@ draws one Review column per month at that seat. Two roles never rate the same KR
   step). Patch scripts for it live in [`docs/`](docs/) and are dry-runnable.
 - The client and server keep **separate** tables of who may rate which stage, and they
   drift. See [`docs/RATING_ROLE_DIVERGENCE.md`](docs/RATING_ROLE_DIVERGENCE.md).
+- WHEN a stage may be rated is not a client table at all: the server resolves it per
+  review (`ratingAccess`) and enforces it. See
+  [`docs/RATING_ACCESS.md`](docs/RATING_ACCESS.md) and the section below.
 
 ## B3. Brand
 
@@ -408,16 +411,47 @@ Patch: [`docs/install_review_month_shift.mjs`](docs/install_review_month_shift.m
 verified 2/6 → 6/6 including the January rollover. The client **clamps** whatever
 the server sends, so the screens are correct without it.
 
-**Temporary, from 2026-10-02: July and August 2026 are reopened for pending
-ratings.** `RatingReopen.granted` in
-[`rating_reopen.dart`](lib/features/reviews/data/models/rating_reopen.dart),
-adopted in `appBootProvider`, opens those months' **blank** reporting-manager,
-HR and Accounts cells past the window. Only pending ones: a cell that already
-has a score stays shut, and self-first, the manager ceiling, COMPLETED and
-management's lock all still apply. The window is client-only — the server's
-`saveScores` has no month check. To close the reopen, empty `granted`. It
-stays empty in tests unless a test adopts it, so the window tests keep pinning
-the base rule.
+## WHEN a stage may be rated is decided by the SERVER (rating access)
+
+Contract: [`docs/RATING_ACCESS.md`](docs/RATING_ACCESS.md). Each stage of a month
+closes at its own deadline in the month after it (self 10th, HR & Accounts 12th,
+reporting manager 13th, management 15th, all IST), and a SUPER_ADMIN can override
+any organisation × stage × month — open it until a date or with no end (rate AND
+edit), close it, or put it back on the deadline — from Organizations → Rating
+access. The server enforces the answer on every rating write (403
+`AUTHZ_RATING_CLOSED`) and ships it on each review as `ratingAccess`, parsed into
+`MonthlyReview.ratingWindows`.
+
+- **Never re-derive the window on the client.** When a review carries a window
+  for a stage, that window is the whole answer; the old reach-backs (blank-self
+  backfill, management sign-off of any ended month, `RatingReopen`) are not
+  consulted. They survive only as the fallback for a backend that sends no
+  `ratingAccess` — so a new app on an old server keeps the old rules, except
+  that `RatingReopen` there mirrors the server seed: July and August 2026 are
+  rate-and-edit at every stage (reasons and attachments included) until 31 Oct.
+- A send-back is folded into the windows by the server (`RETURNED`): SELF while
+  the employee owes the rework, the reporting-manager seat once they have
+  resubmitted and until the manager approves. Both are read from the **stage
+  records, never the cursor** — `currentStage` moves on every save, so a rule
+  keyed on it lasted exactly one save. `MonthlyReview.selfRatingReturned` /
+  `managerReworkDue` use the same definition.
+- Self-first lasts only while the self score can still arrive: once the SELF
+  window has closed, a KRA the employee left blank is rated without it (the
+  server's manager ceiling skips such rows too). Otherwise it could never be
+  rated and would drop out of the weighted total.
+- A stage missing from a review's `ratingAccess` block reads as CLOSED, never as
+  "use the old rule"; only a review with no block at all keeps the old rules.
+  `serverNow` corrects every window check for a device clock that is off.
+- `ratingAccess` must survive `copyWith`: `_applyReviewerMap` runs it on every
+  load, and dropping it silently puts every gate back on the old rule while the
+  server enforces the new one.
+- A "closed" refusal is 403 with its own code, deliberately not 409: the sheet
+  reads 409 as "this month moved on", and the manager's multi-month submit skips
+  409s silently.
+- July and August 2026 ship pre-opened for every organisation and stage until
+  31 Oct 2026 (migration 169's seed), replacing the client-side `RatingReopen`
+  grant of 4bc2c28 — which also means ratings already given in those months can
+  be changed until then, as the product owner confirmed.
 
 ## The KRA sheet's COLUMNS are flow-shaped, not just its gates
 
@@ -487,6 +521,34 @@ rowid_test.dart` therefore asserts the invariant *no review is asked for a row
 id it does not contain*, and gives all three months different ids. Validated by
 reintroducing the bug: `Set:['r-aug asked for row-uuid-jul', 'r-sep asked for
 row-uuid-jul']`.
+
+## A month keeps the KRAs it was GENERATED with
+
+A review copies the employee's KRAs when it is created (`snapshotRows`: the
+assignment in an ACTIVE cycle, else the default template). A later KRA change
+reaches an existing month only through `resyncRowsIfUntouched`, which re-copies
+a review with **no score at all**, and only when an active-cycle assignment is
+newer than it — a default-template change is never healed. A month rated
+before the change therefore keeps the old set for good, and one quarter can mix
+sets: VLPL1436's Jul–Sep 2026 sheet showed an operations set after HR moved him
+to the Sr. GM EXIM template (migration 115), while Apr–Jun and Oct–Dec showed
+the new one.
+
+The fix is data, not client: [`docs/resync_review_kras.sql`](docs/resync_review_kras.sql)
+re-copies chosen months from the current source, keeps a score only where the
+KRA is in both sets, restarts the month at self-rating, refuses signed-off or
+paid months, backs up everything it removes, and can undo.
+[`docs/verify_resync_review_kras.cjs`](docs/verify_resync_review_kras.cjs)
+proves it on a throwaway Postgres it creates itself, with the backend's own
+repository generating the data — re-run it after any change to the snapshot
+or the review tables. Never make the CLIENT show a KRA set the review does not
+hold: scores are keyed to the review's own row ids (section above).
+
+**Open hazard:** in a mixed quarter `_rowIn` falls back to `displayOrder`
+before the name, so each canonical row binds to whatever KRA sits at the same
+position in the odd month out — a score typed under one KRA's name saves onto
+another. Not fixed; the guard would be to detect differing KRA sets across the
+quarter and refuse entry in the months that differ.
 
 ## Proof attachments: the cap lives in three places
 

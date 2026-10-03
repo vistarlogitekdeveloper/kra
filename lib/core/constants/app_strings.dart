@@ -78,6 +78,17 @@ class AppStrings {
   static const String quarterlyPayoutTitle = 'Quarter payout';
   static const String quarterlyPayoutAmount = 'Payout this quarter';
 
+  // Rating windows reopened by a super admin (docs/RATING_ACCESS.md). Without
+  // a notice, a reopened July just looks like a bug that made old cells
+  // editable — or, worse, nobody notices they can now finish it.
+  //
+  // [months] is already a readable list, e.g. "July 2026 and August 2026" or
+  // "July 2026 (Self-rating, HR)".
+  static String quarterlyReopenedUntil(String months, String date) =>
+      '$months reopened for rating until $date.';
+  static String quarterlyReopenedNoEnd(String months) =>
+      '$months reopened for rating by the administrator.';
+
   // Reporting-manager rating ceiling. A manager moderates a self-assessment
   // downward; they cannot rate above what the employee claimed for that KRA.
   static const String sheetCapPrefix = "Capped at the employee's self-rating:";
@@ -723,6 +734,166 @@ class AppStrings {
   static const String orgApiMissing =
       'Organization management is not available on this server yet. The API '
       'needs the /organizations endpoints deployed.';
+
+  // ── Rating access — super admin ───────────────────────────────────────────
+  // When each rating stage of a month accepts entries, per organization, and
+  // the super admin's overrides of that (docs/RATING_ACCESS.md §4.3).
+  static const String ratingAccessTitle = 'Rating access';
+  static const String ratingAccessIntro =
+      'Each stage closes at its own deadline in the month after the one being '
+      'rated. Open a stage to let its raters rate and edit past the deadline, '
+      'or close it early.';
+  static String ratingAccessRatedDuring(String month) => 'Rated during $month';
+  static const String ratingAccessLocked =
+      'Only a super admin can change rating access.';
+  static const String ratingAccessApiMissing =
+      'Rating access is not available on this server yet. The API needs the '
+      'rating-access endpoints deployed.';
+  static const String ratingAccessLoadFailed = 'Could not load rating access';
+  static const String ratingAccessOrgNotFound =
+      'This organisation was not found. It may have been removed or the link '
+      'is wrong.';
+  static String ratingAccessNothingToExtend(String date) =>
+      'Every stage is already open until $date by its own deadline — nothing '
+      'to reopen.';
+  static const String ratingAccessNoStages =
+      'This month has no rating stages to show.';
+  static const String ratingAccessWorking = 'Updating rating access';
+  static const String ratingAccessLoading = 'Loading rating access';
+
+  // Stages, named for the seat that rates them — the names the server uses in
+  // its refusals. Under administrators-only the reporting-manager seat is
+  // management, rating the KRAs that HR and Accounts do not.
+  static const String ratingAccessStageSelf = 'Self-rating';
+  static const String ratingAccessStageReportingManager =
+      'Reporting-manager rating';
+  static const String ratingAccessStageManagementRating = 'Management rating';
+  static const String ratingAccessStageHr = 'HR rating';
+  static const String ratingAccessStageAccounts = 'Accounts rating';
+  static const String ratingAccessStageManagementReview = 'Management review';
+  static const String ratingAccessSeatSelf =
+      'The employee rates their own KRAs.';
+  static const String ratingAccessSeatReportingManager =
+      'The reporting manager rates the KRAs assigned to them.';
+  static const String ratingAccessSeatManagementRating =
+      'Management rates the KRAs that HR and Accounts do not.';
+  static const String ratingAccessSeatHr = 'HR rates the KRAs assigned to HR.';
+  static const String ratingAccessSeatAccounts =
+      'Accounts rates the KRAs assigned to Accounts.';
+  static const String ratingAccessSeatManagementReview =
+      'Management signs off the month.';
+
+  // Status lines, derived only from the window the server resolved.
+  static String ratingAccessStatusDeadlineOpen(String date) =>
+      'Open until $date · deadline';
+  static String ratingAccessStatusDeadlineClosed(String date) =>
+      'Closed on $date · deadline';
+  static const String ratingAccessStatusOpenNoEnd = 'Open · no end date';
+  static String ratingAccessStatusOpens(String date) => 'Opens $date';
+  static String ratingAccessStatusOpensReopenedUntil(
+          String opens, String until) =>
+      'Opens $opens · reopened until $until';
+  static String ratingAccessStatusOpensReopenedNoEnd(String opens) =>
+      'Opens $opens · reopened, no end date';
+  static String ratingAccessStatusReopenedUntil(String date) =>
+      'Reopened until $date';
+  static const String ratingAccessStatusReopenedNoEnd =
+      'Reopened · no end date';
+  static String ratingAccessStatusReopenEnded(String date) =>
+      'Closed on $date · reopen ended';
+  static const String ratingAccessStatusClosedByAdmin = 'Closed by super admin';
+
+  // The override behind a status.
+  static String ratingAccessReason(String reason) => 'Reason: $reason';
+  static String ratingAccessUpdatedBy(String name, String date) =>
+      'by $name · $date';
+  static String ratingAccessUpdatedByName(String name) => 'by $name';
+  static String ratingAccessUpdatedOn(String date) => 'Updated $date';
+  static const String ratingAccessOverrideInert =
+      'This override ends on or before the deadline, so the deadline applies.';
+  static const String ratingAccessNotInFlow = 'Not in this flow';
+
+  // Actions.
+  static const String ratingAccessActionOpenUntil = 'Open until…';
+  static const String ratingAccessActionClose = 'Close now';
+  static const String ratingAccessActionUseDeadline = 'Use deadline';
+  static const String ratingAccessActionOpenAll = 'Open all stages until…';
+  static const String ratingAccessActionResetAll = 'Use deadline for all';
+
+  // The open sheet. Opening is rate AND edit, which is worth saying where the
+  // decision is made: ratings already given become changeable too.
+  static String ratingAccessOpenTitle(String stage) => 'Open $stage until…';
+  static String ratingAccessOpenAllSubtitle(String month, int count) =>
+      '$month · ${count == 1 ? '1 stage' : '$count stages'}';
+  static const String ratingAccessNoEndDate = 'No end date';
+  static const String ratingAccessNoEndDateHelp =
+      'Stays open until you close it or put it back on its deadline.';
+  static const String ratingAccessEndDateLabel = 'Open until the end of';
+  static const String ratingAccessPickDate = 'Last day open';
+  static const String ratingAccessReasonLabel = 'Reason (optional)';
+  static const String ratingAccessReasonHint =
+      'e.g. July ratings still pending';
+  static const String ratingAccessOpenHelp =
+      'Opening means rate and edit: ratings already given can be changed '
+      'until the stage closes. It closes at the end of the chosen day, India '
+      'time.';
+  static const String ratingAccessOpenConfirm = 'Open';
+
+  // Confirmations.
+  static String ratingAccessCloseTitle(String stage, String month) =>
+      'Close $stage for $month?';
+  static const String ratingAccessCloseMessage =
+      'Nobody can enter or change ratings at this stage until you open it '
+      'again, even before its deadline.';
+  static String ratingAccessUseDeadlineTitle(String stage) =>
+      'Put $stage back on its deadline?';
+  static String ratingAccessUseDeadlineMessage(String date) =>
+      'The override is removed and the stage follows its deadline, $date, '
+      'again. If that has passed, the stage closes.';
+  static const String ratingAccessUseDeadlineMessageNoDate =
+      'The override is removed and the stage follows its deadline again. If '
+      'that has passed, the stage closes.';
+  static const String ratingAccessResetAllTitle =
+      'Use the deadline for every stage?';
+  static String ratingAccessResetAllMessage(String month) =>
+      'Every override for $month is removed and each stage follows its own '
+      'deadline again. Stages whose deadline has passed close.';
+
+  // Results.
+  static String ratingAccessOpenedUntil(String stage, String date) =>
+      '$stage reopened until $date.';
+  static String ratingAccessOpenedNoEnd(String stage) =>
+      '$stage reopened with no end date.';
+  static String ratingAccessClosedDone(String stage) => '$stage closed.';
+  static String ratingAccessDeadlineRestored(String stage) =>
+      '$stage is back on its deadline.';
+  static String ratingAccessAllOpenedUntil(String date) =>
+      'All stages reopened until $date.';
+  static const String ratingAccessAllOpenedNoEnd =
+      'All stages reopened with no end date.';
+  static const String ratingAccessAllDeadlineRestored =
+      'Every stage is back on its deadline.';
+  static String ratingAccessSaveFailed(String reason) =>
+      'Could not update rating access. $reason';
+
+  // History.
+  static const String ratingAccessHistoryTitle = 'Override history';
+  static const String ratingAccessHistorySubtitle =
+      'Every override this organization holds, newest first. Tap one to open '
+      'its month.';
+  static const String ratingAccessHistoryEmptyTitle = 'No overrides yet';
+  static const String ratingAccessHistoryEmptyBody =
+      'Every stage follows its own deadline. Overrides you set appear here.';
+  static const String ratingAccessHistoryLoadFailed =
+      'Could not load the override history.';
+  static String ratingAccessHistoryRowTitle(String stage, String month) =>
+      '$stage · $month';
+  static String ratingAccessOverrideOpenUntil(String date) =>
+      'Open until $date';
+  static String ratingAccessOverrideOpenEnded(String date) =>
+      'Open until $date · ended';
+  static const String ratingAccessOverrideOpenNoEnd = 'Open · no end date';
+  static const String ratingAccessOverrideClosed = 'Closed';
 
   static const String locationsTitle = 'Locations';
   static const String locationsEmptyTitle = 'No locations yet';
