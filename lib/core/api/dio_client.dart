@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../storage/secure_storage_service.dart';
+import '../telemetry/telemetry.dart';
 import 'api_constants.dart';
 import 'api_logger_interceptor.dart';
 import 'auth_interceptor.dart';
@@ -39,6 +40,9 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(AuthInterceptor(storage, refresher));
   dio.interceptors.add(refresher);
   dio.interceptors.add(ApiLoggerInterceptor());
+  // Usage analytics: named actions and failed calls. Changes nothing about
+  // the request or its handling (core/telemetry/telemetry.dart).
+  dio.interceptors.add(TelemetryInterceptor());
 
   ref.onDispose(() => dio.close(force: true));
   return dio;
