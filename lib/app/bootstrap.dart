@@ -29,7 +29,14 @@ const _tag = 'bootstrap';
 /// `WidgetsFlutterBinding.ensureInitialized()` completes any work that could
 /// itself throw, and `runApp` is called inside the guarded zone rather than
 /// beside it.
-Future<void> bootstrap(Widget Function() builder) async {
+///
+/// [beforeRunApp], when given, runs inside the guarded zone after the
+/// handlers above are installed and before `runApp` (usage analytics, which
+/// chains its own error reporting to them).
+Future<void> bootstrap(
+  Widget Function() builder, {
+  Future<void> Function()? beforeRunApp,
+}) async {
   ErrorWidget.builder = (details) => _CrashFallback(details: details);
 
   FlutterError.onError = (details) {
@@ -54,6 +61,7 @@ Future<void> bootstrap(Widget Function() builder) async {
 
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    if (beforeRunApp != null) await beforeRunApp();
     runApp(builder());
   }, (error, stack) {
     AppLog.e(_tag, 'uncaught zone error', error: error, stackTrace: stack);

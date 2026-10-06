@@ -69,6 +69,14 @@ dependencies:
   # and `withData: true` is superseded by `PlatformFile.readAsBytes()`.
   file_picker: 12.2.0
 
+  # Usage analytics: the in-house event tracker (Platform Console > Analytics >
+  # Event tracker). Vendored, because the SDK repository is private and the
+  # Cloudflare build cannot fetch it (packages/vistar_event_tracker/VENDORED.md).
+  # Off unless the build gets ET_APP_ID + ET_WRITE_KEY
+  # (lib/core/telemetry/telemetry.dart).
+  vistar_event_tracker:
+    path: packages/vistar_event_tracker
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

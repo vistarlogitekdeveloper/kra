@@ -12,6 +12,7 @@ import '../../features/reviews/presentation/screens/admin_review_dashboard_scree
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/performance_incentive_sheet_screen.dart';
 import '../../features/reviews/presentation/screens/quarterly_kra_sheet_screen.dart';
+import '../telemetry/telemetry.dart';
 import '../widgets/route_error_screen.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
 import '../../features/employee/presentation/screens/history/my_reviews_history_screen.dart';
@@ -300,7 +301,7 @@ class AppRoutes {
 /// We do NOT redirect during AuthLoading — the existing route stays put
 /// while a login is in flight, so the login screen's spinner can render.
 final routerProvider = Provider<GoRouter>((ref) {
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: AppRoutes.login,
     refreshListenable: _AuthListenable(ref),
     // Friendly fallback for unmatched routes (e.g. a backend deep-link to
@@ -777,7 +778,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  return _withScreenViews(ref, router);
 });
+
+/// Reports each screen the router shows to usage analytics (by route
+/// pattern; see Telemetry.screen).
+GoRouter _withScreenViews(Ref ref, GoRouter router) {
+  if (!Telemetry.enabled) return router;
+  // The delegate, not the route-information provider: it also hears the
+  // location changes a redirect makes (sign-in landing on the dashboard).
+  void report() {
+    try {
+      Telemetry.screen(
+          router.routerDelegate.currentConfiguration.uri.toString());
+    } catch (_) {
+      // No configuration yet; the next change reports.
+    }
+  }
+
+  router.routerDelegate.addListener(report);
+  ref.onDispose(() => router.routerDelegate.removeListener(report));
+  // The listener only hears changes: report the starting screen too.
+  WidgetsBinding.instance.addPostFrameCallback((_) => report());
+  return router;
+}
 
 /// Bridges Riverpod auth state changes into GoRouter's refresh
 /// mechanism so the redirect rules re-run on login / logout / forced-logout.

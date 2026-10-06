@@ -51,6 +51,10 @@ final appBootProvider = FutureProvider<void>((ref) async {
     return;
   }
 
+  // Usage analytics (not awaited): a restored session is a sign-in, before
+  // the state change so the first screen is already theirs.
+  AuthNotifier.identifyForAnalytics(user);
+
   // Hydrate state synchronously so the router's redirect runs with
   // AuthAuthenticated on the very first build.
   ref.read(authStateProvider.notifier).hydrate(user);
