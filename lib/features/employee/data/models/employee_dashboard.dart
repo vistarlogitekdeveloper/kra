@@ -1,5 +1,4 @@
 import '../../../../core/api/json_parse.dart';
-import '../../../../core/utils/monthly_deadlines.dart';
 import 'enums.dart';
 
 /// Aggregated payload for the Employee home screen. One round-trip
@@ -30,23 +29,6 @@ class EmployeeDashboard {
   /// True iff the user has an active cycle right now. Drives the
   /// home screen's empty-state vs. populated-state branch.
   bool get hasActiveCycle => cycle != null;
-
-  /// Days from today to the self-rating deadline — the fixed
-  /// [MonthlyDeadlines.selfRatingDay] (the 10th) of the current calendar
-  /// month. Returns `null` when there is no active cycle (so the home
-  /// banner stays hidden between cycles). Negative values mean the
-  /// deadline has passed.
-  int? get selfRatingDaysRemaining {
-    if (cycle == null) return null;
-    return MonthlyDeadlines.daysRemaining(MonthlyDeadlines.selfRating());
-  }
-
-  /// Convenience for the deadline banner — "is the self-rating
-  /// deadline behind us?". Falls back to `false` when no deadline.
-  bool get isSelfRatingOverdue {
-    final days = selfRatingDaysRemaining;
-    return days != null && days < 0;
-  }
 
   factory EmployeeDashboard.fromJson(Map<String, dynamic> json) {
     return EmployeeDashboard(

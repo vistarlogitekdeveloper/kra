@@ -825,7 +825,6 @@ class AppStrings {
   static const String hrActionItemsTitle = 'Needs your attention';
   static const String hrAllCaughtUp = 'All caught up! 🎉';
   static const String hrHeatmapTitle = 'Location Heatmap';
-  static const String hrDeadlinesTitle = 'Upcoming Deadlines';
   static const String hrRecentActivityTitle = 'Recent Activity';
   static const String hrOverdue = 'OVERDUE';
 
@@ -885,59 +884,6 @@ class AppStrings {
   static const String homeIncentiveCaption =
       'Based on finalized reviews. Subject to change.';
   static const String homeIncentiveOf = 'of';
-
-  // ───── Deadline banner ─────
-  static const String deadlineSelfRatingClosesIn = 'Self-rating closes in';
-  static const String deadlineDay = 'day';
-  static const String deadlineDays = 'days';
-  static const String deadlineOverdue = 'Self-rating overdue — submit now';
-
-  /// Overdue wording that NAMES the month.
-  ///
-  /// The plain "Self-rating overdue" was read as "my self-rating", full stop —
-  /// so an employee who had rated an earlier month of the quarter saw it as a
-  /// bug rather than as a different month being due. The sheet covers three
-  /// months; the banner has to say which one it means.
-  static String deadlineOverdueFor(String monthLabel) =>
-      "$monthLabel self-rating is overdue — submit now";
-
-  /// Overdue, but the scores are already typed in and never submitted.
-  /// Saying "overdue" alone to someone who has filled the whole column reads
-  /// as the app losing their work.
-  static String deadlineUnsubmittedFor(String monthLabel) =>
-      "$monthLabel self-rating is filled in but not submitted — tap to submit";
-
-  /// Due-soon wording that names the month, for the same reason.
-  static String deadlineClosesInFor(String monthLabel, int days) =>
-      "$monthLabel self-rating closes in $days "
-      "${days == 1 ? deadlineDay : deadlineDays}";
-
-  /// "the 10th" / "the 12th" / "the 3rd" — an ordinal day for deadline copy.
-  ///
-  /// English ordinals, because the app is English-only today; the 11th-13th
-  /// exceptions are the ones a naive last-digit rule gets wrong.
-  static String ordinalDay(int day) {
-    final suffix = (day % 100 >= 11 && day % 100 <= 13)
-        ? 'th'
-        : switch (day % 10) { 1 => 'st', 2 => 'nd', 3 => 'rd', _ => 'th' };
-    return 'the $day$suffix';
-  }
-
-  /// The recurring due date for a stage, for copy that sits beside the action.
-  ///
-  /// Phrased per MONTH rather than as a date, because the quarterly sheet shows
-  /// three months at once and a single date would be wrong for two of them.
-  static String dueByEachMonth(int day) =>
-      ' Due by ${ordinalDay(day)} of each month.';
-
-  // ───── Monthly deadline notices ─────
-  //
-  // Dates are NOT written here. Every countdown resolves through
-  // ReviewStage.deadlineDay so the copy cannot drift from the schedule the
-  // app counts down to — this header claimed "self 7th / manager 10th" long
-  // after both had moved.
-  static const String deadlineSelfRatingTitle = 'Self-rating deadline';
-  static const String deadlineManagerRatingTitle = 'Manager rating deadline';
 
   // ───── Monthly reviews (new pipeline) ─────
   static const String monthlyReviewsTitleSelf = 'My Monthly Reviews';
@@ -1173,8 +1119,6 @@ class AppStrings {
   static const String managerDashboardTrendLowest = 'Lowest';
   static const String managerDashboardTrendCompletion = 'Completion rate';
   static const String managerDashboardActiveCycle = 'Active cycle';
-  static const String managerDashboardManagerDeadline =
-      'Manager review deadline';
   static const String managerDashboardNoReportsTitle =
       'You don\'t manage any team members';
   static const String managerDashboardNoReportsMessage =
@@ -1296,10 +1240,6 @@ class AppStrings {
   static const String managerRateConfirmMessage =
       'Once submitted, you cannot change scores unless you reopen within the deadline.';
   static const String managerRateOfflineTooltip = 'Internet required to submit';
-  static const String managerRateDeadlineWarning =
-      'Manager review deadline approaching';
-  static const String managerRateDeadlinePassed =
-      'Manager review deadline has passed';
   static const String managerRateSuccessTitle = 'Review submitted ✓';
   static const String managerRateSuccessSubtitle = 'Your rating is locked in.';
   static const String managerRateSuccessViewSubmission = 'View submission';
@@ -1315,8 +1255,6 @@ class AppStrings {
       'Ops or Finance hasn\'t filled in some scores yet.';
   static const String managerRateErrorMonthLocked =
       'One of the months in this review is locked.';
-  static const String managerRateErrorDeadlinePassed =
-      'Review deadline has passed.';
 
   // ───── Bulk approve ─────
   static const String bulkApproveTitle = 'Approve reviews';

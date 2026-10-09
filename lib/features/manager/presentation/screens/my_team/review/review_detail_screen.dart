@@ -7,7 +7,6 @@ import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/utils/name_format.dart';
 import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/router/app_router.dart';
-import '../../../../../../core/utils/monthly_deadlines.dart';
 import '../../../../../../core/widgets/shimmer_box.dart';
 import '../../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../../employee/data/models/enums.dart';
@@ -17,7 +16,6 @@ import '../../../../../employee/presentation/widgets/score_pill.dart';
 import '../../../../data/models/manager_review_detail.dart';
 import '../../../../data/models/review_row.dart';
 import '../../../providers/manager_review_providers.dart';
-import 'widgets/deadline_warning_card.dart';
 import 'widgets/permissions_banner.dart';
 import 'widgets/previous_reviews_strip.dart';
 
@@ -83,15 +81,6 @@ class _DetailBody extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 32),
       children: [
         _Header(review: review),
-        // The manager-rating deadline is the fixed 10th-of-month rule, not
-        // the backend's per-cycle date — override the days-remaining the
-        // warning card counts down to.
-        DeadlineWarningCard(
-          permissions: review.permissions.copyWith(
-            deadlineRemaining: MonthlyDeadlines.daysRemaining(
-                MonthlyDeadlines.managerRating()),
-          ),
-        ),
         PermissionsBanner(
           state: review.state,
           permissions: review.permissions,

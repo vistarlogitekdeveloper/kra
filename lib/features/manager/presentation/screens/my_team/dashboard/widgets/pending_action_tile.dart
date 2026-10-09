@@ -4,7 +4,6 @@ import '../../../../../../../core/constants/app_colors.dart';
 import '../../../../../../../core/utils/name_format.dart';
 import '../../../../../../../core/constants/app_strings.dart';
 import '../../../../../../employee/presentation/widgets/_formatters.dart';
-import '../../../../../../employee/presentation/widgets/deadline_chip.dart';
 import '../../../../../data/models/pending_action.dart';
 
 /// One row in the "Awaiting your review" list. Tappable — caller
@@ -65,11 +64,6 @@ class PendingActionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (action.deadlineRemaining != null)
-                DeadlineChip(
-                  daysRemaining: action.deadlineRemaining!,
-                  isOverdue: action.isOverdue,
-                ),
               const SizedBox(width: 4),
               Icon(
                 Icons.chevron_right_rounded,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vistar_app/core/constants/app_strings.dart';
 import 'package:vistar_app/core/enums/kra_reviewer.dart';
 import 'package:vistar_app/features/reviews/data/models/incentive_snapshot.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_kra_row.dart';
@@ -56,10 +55,9 @@ void main() {
   // reading the real clock would assert different copy from September onwards.
   final afterTheQuarter = DateTime(2026, 11, 3);
 
-  // The scope line now appends the stage deadline. Built from the schedule
-  // rather than restated, so a date change does not break these gates.
-  final selfHint = 'You can edit the Self ratings on this sheet.'
-      '${AppStrings.dueByEachMonth(ReviewStage.selfRating.deadlineDay!)}';
+  // Deadlines were removed from the app, so this is the whole line; it used
+  // to carry a "Due by the 10th of each month" suffix.
+  const selfHint = 'You can edit the Self ratings on this sheet.';
 
   const months = [
     ReviewPeriod(2026, 7),

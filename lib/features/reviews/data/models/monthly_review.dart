@@ -20,7 +20,7 @@ class ReviewPeriod {
   ///
   /// A month is rated once it has finished: through September you rate August.
   /// The deadline schedule already assumed this and is what makes it provable
-  /// rather than a preference — [MonthlyDeadlines] puts self-rating on the
+  /// rather than a preference — the self-rating was due on the 10th, which
   /// **10th**, so treating the current month as the one under review meant
   /// asking someone on 10 September to have finished rating a September that
   /// still had twenty days left to run.
