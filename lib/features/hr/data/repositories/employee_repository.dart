@@ -1,4 +1,5 @@
 import '../models/employee.dart';
+import '../models/employee_deletion_impact.dart';
 
 /// Contract for employee CRUD. UI binds to this, not the Dio impl —
 /// drop in a fake/mock by registering a different provider.
@@ -66,7 +67,25 @@ abstract class EmployeeRepository {
   Future<Employee> update(String id, Map<String, dynamic> changes);
 
   /// Soft delete — flips `isActive` to false on the server.
+  ///
+  /// The DEFAULT way to remove someone. Refuses with 409 while they have
+  /// active reports or an in-progress review, which is usually what you want
+  /// — see [purge] for the irreversible counterpart.
   Future<void> deactivate(String id);
+
+  /// What [purge] would remove, without removing anything.
+  ///
+  /// Fetch this before showing the confirmation: the figures include records
+  /// belonging to OTHER employees, which nobody expects a delete to touch.
+  Future<EmployeeDeletionImpact> deletionImpact(String id);
+
+  /// Hard delete. IRREVERSIBLE, and it never refuses.
+  ///
+  /// Removes the employee and everything referencing them — including the
+  /// reviews they rated for other people and the feeds they entered. Reports
+  /// are detached rather than deleted. Only call after an explicit
+  /// confirmation that showed [deletionImpact].
+  Future<EmployeeDeletionImpact> purge(String id);
 
   /// Admin-only: set a new login password for an employee via
   /// POST /employees/:id/set-password. Returns the updated employee.

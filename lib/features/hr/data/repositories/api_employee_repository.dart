@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/api/api_constants.dart';
+import '../../../../core/api/json_parse.dart';
 import '../models/employee.dart';
+import '../models/employee_deletion_impact.dart';
 import '../../../../core/api/envelope.dart';
 import 'employee_repository.dart';
 
@@ -134,6 +136,35 @@ class ApiEmployeeRepository implements EmployeeRepository {
   Future<void> deactivate(String id) async {
     try {
       await _dio.delete('${ApiConstants.employees}/$id');
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
+  Future<EmployeeDeletionImpact> deletionImpact(String id) async {
+    try {
+      final response =
+          await _dio.get('${ApiConstants.employees}/$id/deletion-impact');
+      return EmployeeDeletionImpact.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
+  Future<EmployeeDeletionImpact> purge(String id) async {
+    try {
+      final response = await _dio.delete('${ApiConstants.employees}/$id/purge');
+      // The response carries what was ACTUALLY removed under `removed`, the
+      // same shape the preview returns under `removes`. Normalised here so a
+      // caller can report the real figures rather than re-showing the preview.
+      final data = unwrapObject(response);
+      final removed = JsonParse.parseMap(data['removed']);
+      return EmployeeDeletionImpact.fromJson({
+        ...data,
+        if (removed != null) 'removes': removed,
+      });
     } catch (e, st) {
       rethrowAsApiError(e, st);
     }

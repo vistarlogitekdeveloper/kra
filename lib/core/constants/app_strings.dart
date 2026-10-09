@@ -392,6 +392,63 @@ class AppStrings {
       'assignments and incentive slabs.';
 
   /// Shown when the employee is still somebody's reporting manager.
+  // ───── Permanent delete (purge) ─────
+  //
+  // A SECOND, separate action from Delete/deactivate — never a replacement.
+  // Deactivate refuses while reports or in-progress reviews exist, which is
+  // the safe default; this one never refuses and cannot be undone.
+  static const String employeePurgeAction = 'Delete permanently';
+  static const String employeePurgeTitle = 'Delete permanently?';
+  static const String employeePurgeIrreversible = 'This cannot be undone.';
+  static const String employeePurgeNothingElse =
+      'This will permanently delete this employee.';
+  static const String employeePurgeOwnHeading = 'Their own records';
+  static const String employeePurgeOthersHeading =
+      'Records belonging to OTHER employees';
+  static const String employeePurgeOthersWhy =
+      'This person entered these on other employees’ sheets. Deleting them '
+      'removes that work from those employees too.';
+  static const String employeePurgeDetachHeading = 'Reporting lines';
+  static const String employeePurgeConfirm = 'Yes, delete permanently';
+  static const String employeePurgeSuccess = 'Employee deleted.';
+  static const String employeePurgeFailed =
+      'Could not delete permanently. Please try again.';
+  static const String employeePurgeImpactFailed =
+      'Could not check what this would remove. Nothing has been deleted.';
+
+  /// "3 reviews", "1 review" — a count with its noun agreed.
+  static String countOf(int n, String singular, String plural) =>
+      '$n ${n == 1 ? singular : plural}';
+
+  /// "5 direct reports will be left without a manager."
+  static String employeePurgeDetaches(int n) =>
+      '${countOf(n, 'direct report', 'direct reports')} will be left without '
+      'a manager. Reassign them first if that matters.';
+
+  // ───── Unassigning KRAs ─────
+  static const String kraUnassignAction = 'Unassign';
+  static const String kraUnassignAllAction = 'Unassign all KRAs';
+  static const String kraUnassignConfirmTitle = 'Unassign this KRA?';
+  static const String kraUnassignConfirmMessage =
+      'The assignment is removed. A review already in progress is kept.';
+  static const String kraUnassignAllConfirmTitle = 'Unassign every KRA?';
+  static const String kraUnassignAllConfirmMessage =
+      'Removes every KRA assignment for this employee, across all cycles. '
+      'Reviews that already carry scores are kept.';
+  static const String kraUnassignSuccess = 'KRA unassigned.';
+  static const String kraUnassignNone = 'No KRAs to unassign.';
+  static const String kraUnassignFailed =
+      'Could not unassign. Please try again.';
+
+  /// Said when the assignment went but a scored review did not — a half-done
+  /// state the user would otherwise find later on their own.
+  static const String kraUnassignReviewKept =
+      'KRA unassigned, but a review already in progress was kept. Reset or '
+      'delete that review separately to remove it.';
+
+  static String kraUnassignAllSuccess(int n) =>
+      '${countOf(n, 'KRA', 'KRAs')} unassigned.';
+
   static const String employeesDeactivateBlockedReports =
       'Cannot delete: they still have direct reports. Move that team to '
       'another reporting manager first.';
