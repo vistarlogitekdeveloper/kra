@@ -177,6 +177,15 @@ class MonthlyReview {
   final String? managerId;
   final String? managerName;
 
+  /// The employee's project location, by NAME ("Bhiwandi", "HO").
+  ///
+  /// Null means *unknown*, never "none": the review-detail payload does not
+  /// carry it (only the list payload's `projectLocation` does), so the sheet
+  /// backfills it from the summary it already fetched. Anything rendering it
+  /// must omit the field when null rather than print "not assigned", which
+  /// would be a claim about data this model has not seen.
+  final String? projectLocation;
+
   final ReviewPeriod period;
   final ReviewStage currentStage;
 
@@ -208,6 +217,7 @@ class MonthlyReview {
     this.grade,
     this.managerId,
     this.managerName,
+    this.projectLocation,
     required this.period,
     this.currentStage = ReviewStage.selfRating,
     this.stageRecords = const {},
@@ -536,6 +546,12 @@ class MonthlyReview {
       grade: JsonParse.parseString(json['grade']),
       managerId: JsonParse.parseString(json['managerId']),
       managerName: JsonParse.parseString(json['managerName']),
+      // Object on the wire in some payloads ({id, name}), a flat string in
+      // others — take the NAME, never the stringified map. `parseString` falls
+      // back to `value.toString()`, so an unguarded read would put a literal
+      // "{id: loc_x, name: HO}" on the header. Same guard as
+      // MonthlyReviewSummary.projectLocation, for the same reason.
+      projectLocation: _locationName(json['projectLocation']),
       period: period,
       currentStage:
           ReviewStage.fromApi(JsonParse.parseString(json['currentStage'])),
@@ -565,6 +581,7 @@ class MonthlyReview {
         'grade': grade,
         'managerId': managerId,
         'managerName': managerName,
+        'projectLocation': projectLocation,
         'period': period.key,
         'currentStage': currentStage.toApiString(),
         'stageRecords':
@@ -585,6 +602,7 @@ class MonthlyReview {
     String? grade,
     String? managerId,
     String? managerName,
+    String? projectLocation,
     ReviewPeriod? period,
     ReviewStage? currentStage,
     Map<ReviewStage, StageRecord>? stageRecords,
@@ -602,6 +620,10 @@ class MonthlyReview {
       grade: grade ?? this.grade,
       managerId: managerId ?? this.managerId,
       managerName: managerName ?? this.managerName,
+      // Carried by default, like the rating windows below: copyWith runs on
+      // every sheet load (_applyReviewerMap), and dropping the location there
+      // would erase the value the provider had just backfilled.
+      projectLocation: projectLocation ?? this.projectLocation,
       period: period ?? this.period,
       currentStage: currentStage ?? this.currentStage,
       stageRecords: stageRecords ?? this.stageRecords,
@@ -616,4 +638,18 @@ class MonthlyReview {
       ratingWindows: ratingWindows ?? this.ratingWindows,
     );
   }
+}
+
+/// The project-location NAME out of a payload that may send either
+/// `{"id": …, "name": "Bhiwandi"}` or a bare `"Bhiwandi"`.
+///
+/// Kept separate from `JsonParse.parseString` because that falls back to
+/// `toString()`: handed the map it would yield the literal text
+/// `{id: loc_x, name: Bhiwandi}` and put it straight on the header.
+String? _locationName(Object? raw) {
+  final map = JsonParse.parseMap(raw);
+  final name = map != null
+      ? JsonParse.parseString(map['name'])
+      : JsonParse.parseString(raw);
+  return (name == null || name.trim().isEmpty) ? null : name.trim();
 }

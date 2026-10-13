@@ -515,8 +515,20 @@ final quarterlySheetProvider = FutureProvider.autoDispose.family<
       scopeRole: scope?.role,
     );
     final matches = list.where((s) => s.employeeId == args.employeeId).toList();
-    reviews
-        .add(matches.isEmpty ? null : await repo.getReview(matches.first.id));
+    if (matches.isEmpty) {
+      reviews.add(null);
+      continue;
+    }
+    final full = await repo.getReview(matches.first.id);
+    // The employee's project location rides on the LIST payload but not on the
+    // detail one (the backend's findHeader joins no project_locations), so the
+    // sheet header would never see it. The list row for this very review is
+    // already in hand — carry it across rather than adding a second fetch, and
+    // leave it null when neither source knows, so the header omits the field
+    // instead of asserting "not assigned".
+    reviews.add(full.projectLocation != null
+        ? full
+        : full.copyWith(projectLocation: matches.first.projectLocation));
   }
   return (months: months, reviews: reviews);
 });
