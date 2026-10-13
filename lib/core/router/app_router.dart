@@ -12,6 +12,7 @@ import '../../features/reviews/presentation/screens/admin_review_dashboard_scree
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/performance_incentive_sheet_screen.dart';
 import '../../features/reviews/presentation/screens/quarterly_kra_sheet_screen.dart';
+import '../telemetry/telemetry.dart';
 import '../widgets/route_error_screen.dart';
 import '../../features/employee/presentation/screens/employee_shell_screen.dart';
 import '../../features/employee/presentation/screens/history/my_reviews_history_screen.dart';
@@ -35,7 +36,9 @@ import '../../features/hr/presentation/screens/kra_template_form_screen.dart';
 import '../../features/hr/presentation/screens/kra_templates_screen.dart';
 import '../../features/hr/presentation/screens/locations_screen.dart';
 import '../../features/hr/presentation/screens/organizations_screen.dart';
+import '../../features/hr/presentation/screens/rating_access_screen.dart';
 import '../../features/hr/presentation/screens/review_compliance_screen.dart';
+import '../../features/reviews/data/models/rating_access.dart';
 import '../../features/manager/presentation/screens/manager_shell_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_confirm_screen.dart';
 import '../../features/manager/presentation/screens/my_team/bulk_approve/bulk_approve_result_screen.dart';
@@ -117,6 +120,54 @@ class AppRoutes {
   /// area a super admin lands in, but it is gated on SUPER_ADMIN alone — an
   /// HR_ADMIN reaching it would only get 403s from /organizations.
   static const String hrOrganizations = '/hr/organizations';
+
+  /// One organisation's rating access — when each rating stage of a month
+  /// accepts entries, and the super admin's overrides (docs/RATING_ACCESS.md
+  /// §4.3). Nested under [hrOrganizations], so [isOrganizationsArea] covers
+  /// it; pushed, outside the HR shell. [period] is `YYYY-MM`.
+  static String hrOrganizationRatingAccess(String orgId, {String? period}) {
+    final path = '$hrOrganizations/${Uri.encodeComponent(orgId)}/rating-access';
+    if (period == null || period.isEmpty) return path;
+    return '$path?period=${Uri.encodeQueryComponent(period)}';
+  }
+
+  /// Moves the page on top to [location] without a back-stack or browser
+  /// history entry, keeping the page and its state.
+  ///
+  /// A pushed page is `replace`d. A page reached by URL is gone to with history
+  /// neglected instead: go_router 13 builds the address bar from the
+  /// declarative matches only, so `replace` there would leave the PARENT's
+  /// path in it, and a refresh would land on the parent.
+  static void replaceInPlace(BuildContext context, String location) {
+    final router = GoRouter.of(context);
+    final matches = router.routerDelegate.currentConfiguration.matches;
+    if (matches.isNotEmpty && matches.last is ImperativeRouteMatch) {
+      router.replace<Object?>(location);
+    } else {
+      Router.neglect(context, () => router.go(location));
+    }
+  }
+
+  /// Where the HR-home shortcut goes: rating access for the organisation the
+  /// session is acting in, or the organisations list when none is known.
+  static String ratingAccessEntryFor(String? actingOrgId) =>
+      (actingOrgId == null || actingOrgId.isEmpty)
+          ? hrOrganizations
+          : hrOrganizationRatingAccess(actingOrgId);
+
+  /// `/hr/organizations` itself or anything beneath it — not a sibling that
+  /// merely shares the prefix.
+  static bool isOrganizationsArea(String location) =>
+      location == hrOrganizations || location.startsWith('$hrOrganizations/');
+
+  /// Tenant administration, and rating access beneath it, is SUPER_ADMIN
+  /// alone: `hasRole`, not [User.isSuperAdmin], which also admits the legacy
+  /// ADMIN. Every `/organizations` route is gated on SUPER_ADMIN exactly, so
+  /// anyone else would only collect 403s. Same rule as
+  /// `canManageOrganizationsProvider`.
+  static bool canAccessOrganizations(User user) =>
+      user.hasRole(UserRole.superAdmin);
+
   static const String hrAuditLog = '/hr/reports/audit-log';
   static const String hrReviewCompliance = '/hr/reports/review-compliance';
 
@@ -243,13 +294,14 @@ class AppRoutes {
 ///   1. Unauthenticated AND target is not /login → /login
 ///   2. Authenticated AND target is /login        → role's dashboard
 ///   3. Authenticated non-HR/ADMIN hitting /hr/*  → their own dashboard
+///      … and anyone but SUPER_ADMIN hitting /hr/organizations/* likewise
 ///   4. Authenticated HR/ADMIN hitting /hr        → /hr/home
 ///   5. Otherwise                                  → no redirect
 ///
 /// We do NOT redirect during AuthLoading — the existing route stays put
 /// while a login is in flight, so the login screen's spinner can render.
 final routerProvider = Provider<GoRouter>((ref) {
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: AppRoutes.login,
     refreshListenable: _AuthListenable(ref),
     // Friendly fallback for unmatched routes (e.g. a backend deep-link to
@@ -289,6 +341,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         // get bounced to their own dashboard if they deep-link in.
         if (goingToHrArea &&
             !AppRoutes.canAccessHrAny(authState.user.effectiveRoles)) {
+          return AppRoutes.dashboardForRole(authState.user.role);
+        }
+        // Tenant administration and rating access are SUPER_ADMIN alone; the
+        // HR guard above also admits HR_ADMIN and the legacy ADMIN. The bounce
+        // target is never under /hr/organizations, so this cannot loop.
+        if (AppRoutes.isOrganizationsArea(loc) &&
+            !AppRoutes.canAccessOrganizations(authState.user)) {
           return AppRoutes.dashboardForRole(authState.user.role);
         }
         // Bare /hr → /hr/home for HR/HR_ADMIN/ADMIN.
@@ -667,6 +726,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.hrOrganizations,
         builder: (_, __) => const OrganizationsScreen(),
+        routes: [
+          // Pushed from an organisation card or the HR-home shortcut. Nested,
+          // so a deep link or a browser refresh lands with the organisations
+          // list beneath it. An unreadable `period` opens the current month.
+          GoRoute(
+            path: ':orgId/rating-access',
+            builder: (_, state) => RatingAccessScreen(
+              organizationId: state.pathParameters['orgId'] ?? '',
+              initialPeriod:
+                  parseRatingPeriod(state.uri.queryParameters['period']),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.hrEmployeeNew,
@@ -706,7 +778,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  return _withScreenViews(ref, router);
 });
+
+/// Reports each screen the router shows to usage analytics (by route
+/// pattern; see Telemetry.screen).
+GoRouter _withScreenViews(Ref ref, GoRouter router) {
+  if (!Telemetry.enabled) return router;
+  // The delegate, not the route-information provider: it also hears the
+  // location changes a redirect makes (sign-in landing on the dashboard).
+  void report() {
+    try {
+      Telemetry.screen(
+          router.routerDelegate.currentConfiguration.uri.toString());
+    } catch (_) {
+      // No configuration yet; the next change reports.
+    }
+  }
+
+  router.routerDelegate.addListener(report);
+  ref.onDispose(() => router.routerDelegate.removeListener(report));
+  // The listener only hears changes: report the starting screen too.
+  WidgetsBinding.instance.addPostFrameCallback((_) => report());
+  return router;
+}
 
 /// Bridges Riverpod auth state changes into GoRouter's refresh
 /// mechanism so the redirect rules re-run on login / logout / forced-logout.

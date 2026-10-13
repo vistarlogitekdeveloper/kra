@@ -4,13 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/bootstrap.dart';
 import 'core/constants/app_strings.dart';
 import 'core/router/app_router.dart';
+import 'core/telemetry/telemetry.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/widgets/keyboard_scroll_scope.dart';
 import 'core/widgets/shimmer_skeletons.dart';
 import 'features/auth/presentation/providers/app_boot_provider.dart';
 
-void main() => bootstrap(() => const ProviderScope(child: VistarApp()));
+void main() => bootstrap(
+      () => const ProviderScope(child: VistarApp()),
+      // Usage analytics: off unless the build carries ET_APP_ID + ET_WRITE_KEY
+      // (core/telemetry/telemetry.dart), and then waits at most 2 s and never
+      // throws. Off, nothing runs before runApp, exactly as before.
+      beforeRunApp: Telemetry.enabled ? Telemetry.init : null,
+    );
 
 class VistarApp extends ConsumerWidget {
   const VistarApp({super.key});

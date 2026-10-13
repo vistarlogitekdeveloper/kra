@@ -169,6 +169,10 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
               onEdit: () => _openForm(existing: org),
               onSwitch: () => _switchTo(org),
               onOpen: () => _open(org),
+              // Pushed with the organisation in the path: rating access is
+              // administered per tenant without switching into it.
+              onRatingAccess: () =>
+                  context.push(AppRoutes.hrOrganizationRatingAccess(org.id)),
             ),
             const SizedBox(height: 12),
           ],
@@ -300,6 +304,7 @@ class _OrgCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onSwitch;
   final VoidCallback onOpen;
+  final VoidCallback onRatingAccess;
 
   const _OrgCard({
     required this.org,
@@ -308,6 +313,7 @@ class _OrgCard extends StatelessWidget {
     required this.onEdit,
     required this.onSwitch,
     required this.onOpen,
+    required this.onRatingAccess,
   });
 
   @override
@@ -412,14 +418,22 @@ class _OrgCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Row(
+            // A Wrap rather than a Row: three labelled actions do not fit side
+            // by side on a 360 px card, and a Row would overflow.
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
               children: [
                 TextButton.icon(
                   onPressed: busy ? null : onEdit,
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: const Text(AppStrings.commonEdit),
                 ),
-                const Spacer(),
+                TextButton.icon(
+                  onPressed: busy ? null : onRatingAccess,
+                  icon: const Icon(Icons.lock_clock_rounded, size: 16),
+                  label: const Text(AppStrings.ratingAccessTitle),
+                ),
                 if (isCurrent)
                   TextButton.icon(
                     onPressed: busy ? null : onOpen,

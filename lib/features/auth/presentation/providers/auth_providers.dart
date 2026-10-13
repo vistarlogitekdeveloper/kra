@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/dio_client.dart';
 import '../../../../core/api/refresh_interceptor.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../../core/telemetry/telemetry.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/api_auth_repository.dart';
 import '../../data/repositories/auth_repository.dart';
@@ -88,6 +89,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthLoading();
     try {
       final user = await _repository.login(email: email, password: password);
+      // Usage analytics (not awaited): before the state change, so the screen
+      // it leads to is already theirs.
+      identifyForAnalytics(user);
       state = AuthAuthenticated(user);
     } on AuthException catch (e) {
       state = AuthError(e.message);
@@ -120,6 +124,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Usage analytics: not awaited, sign-out never waits for it.
+    Telemetry.signedOut();
     // Optimistically flip to Initial so the UI redirects fast,
     // then clear server + local state in the background.
     state = const AuthInitial();
@@ -128,8 +134,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Called by the forced-logout bus when refresh fails irrecoverably.
   void forceLogout() {
+    // An expired session is a sign-out too (not awaited).
+    if (state is AuthAuthenticated) Telemetry.signedOut();
     state = const AuthInitial();
   }
+
+  /// Usage analytics: who this is (user id and role only). Fire and forget.
+  static void identifyForAnalytics(User user) =>
+      Telemetry.signedIn(userId: user.id, role: user.role.toApiString());
 
   void clearError() {
     if (state is AuthError) {

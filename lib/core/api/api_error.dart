@@ -76,6 +76,17 @@ class ApiError implements Exception {
     return markers.any(haystack.contains);
   }
 
+  /// True when the server refused a rating write because that stage's window
+  /// for the month is shut: past its deadline, closed by a super admin, or a
+  /// month that has not ended yet. See docs/RATING_ACCESS.md §3.3.
+  ///
+  /// Sent as 403, never 409, so it cannot be mistaken for "the review moved
+  /// on" — the self-submit reads a 409 as already handed to the manager, and
+  /// the manager's multi-month submit skips 409s. [message] is copy written
+  /// for the user, naming the stage, the month and when it closed; show it
+  /// verbatim.
+  bool get isRatingClosed => code == 'AUTHZ_RATING_CLOSED';
+
   @override
   String toString() =>
       'ApiError($type, code=$code, status=$statusCode, msg="$message")';

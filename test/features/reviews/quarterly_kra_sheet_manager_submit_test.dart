@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/api/api_error.dart';
 import 'package:vistar_app/core/enums/kra_reviewer.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_kra_row.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_review.dart';
@@ -280,6 +281,61 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Submit self-rating'), findsOneWidget);
       expect(find.text('Submit my review'), findsNothing);
+    });
+  });
+
+  group('submitEachSkippingMoved — one stale month must not block the rest',
+      () {
+    // What the server answers when a review's cursor has already moved past the
+    // stage being submitted, e.g. HR rated a KRA and the cursor followed.
+    const moved = ApiError(
+      type: ApiErrorType.validation,
+      code: 'RES_002',
+      message: 'Review is at ACCOUNT_HR_RATING, not REPORTING_MANAGER_RATING.',
+      statusCode: 409,
+    );
+
+    final quarter = [
+      for (final m in [7, 8, 9])
+        review(const [], period: ReviewPeriod(2026, m)),
+    ];
+
+    test('a month already moved on is skipped and the others still go',
+        () async {
+      // The catch-up shape: a reopened July whose review had moved on, then
+      // August and September. The 409 used to abandon both of them.
+      final attempted = <String>[];
+      final submitted = await submitEachSkippingMoved(quarter, (r) async {
+        attempted.add(r.period.key);
+        if (r.period.month == 7) throw moved;
+      });
+      expect(attempted, ['2026-07', '2026-08', '2026-09']);
+      expect(submitted, 2);
+    });
+
+    test('reports nothing submitted when every month has moved on', () async {
+      final submitted =
+          await submitEachSkippingMoved(quarter, (_) async => throw moved);
+      expect(submitted, 0);
+    });
+
+    test('any other failure stops the loop and surfaces', () async {
+      final attempted = <String>[];
+      await expectLater(
+        submitEachSkippingMoved(quarter, (r) async {
+          attempted.add(r.period.key);
+          if (r.period.month == 8) {
+            throw const ApiError(
+              type: ApiErrorType.server,
+              code: 'SRV_001',
+              message: 'Something went wrong.',
+              statusCode: 500,
+            );
+          }
+        }),
+        throwsA(isA<ApiError>()),
+      );
+      expect(attempted, ['2026-07', '2026-08']);
     });
   });
 }

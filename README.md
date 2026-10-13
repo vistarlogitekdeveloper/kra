@@ -64,6 +64,42 @@ The router picks the landing screen from the authenticated user's role; deep-lin
 - **[CLAUDE.md](CLAUDE.md)** — project guide for AI assistants (stack, conventions, status).
 - **[docs/BACKEND_RBAC_FINDINGS.md](docs/BACKEND_RBAC_FINDINGS.md)** — current backend role-enforcement audit results + reproducible Node probe script.
 
+## Usage analytics (event tracker)
+
+`lib/core/telemetry/telemetry.dart`, using the in-house `vistar_event_tracker`
+SDK (vendored in `packages/`, see its `VENDORED.md`). Read in the Platform
+Console under Analytics > Event tracker; register the app there (Settings >
+Event tracker) as `kra_app` to get its write key.
+
+**Off unless the build gets both `ET_APP_ID` and `ET_WRITE_KEY`.** Without
+them nothing is initialised, the telemetry code is tree-shaken out of the web
+build and the app behaves exactly as before.
+
+- **Live web app.** Built by Cloudflare Workers Builds (Worker `kra`, see
+  `wrangler.toml`) with the build command typed in the Cloudflare dashboard.
+  To switch analytics on: under Settings > Build > Variables and secrets add
+  `ET_APP_ID` = `kra_app` and `ET_WRITE_KEY` (encrypted; paste the values with
+  no leading space or newline), then append
+  `--dart-define=ET_APP_ID=$ET_APP_ID --dart-define=ET_WRITE_KEY=$ET_WRITE_KEY`
+  to the dashboard's `flutter build web` command and redeploy.
+- **APK / other builds.** Add
+  `--dart-define=ET_APP_ID=kra_app --dart-define=ET_WRITE_KEY=wk_...`.
+
+Events go to the host of `API_BASE` (a UAT build reports to UAT);
+`ET_BASE_URL` overrides it.
+
+Sent: screen views by route pattern (`/manager/team/reviews/:id/rate`: ids,
+employee codes and review months replaced), sign-in / sign-out (the user as
+`kra:<user id>` with their role only), named actions from successful API
+writes (`self_rating_submitted`, `manager_rating_submitted`,
+`review_stage_submitted`, `rating_saved`, `kra_assigned`, ... see `_actions`),
+failed API calls (5xx / no connection: endpoint pattern, method, status) and
+client errors (error type only). Never sent: request or response bodies,
+error messages, ratings, scores, review comments, reasons, incentive amounts,
+employee names, codes or emails, KRA or template names. Nothing is awaited by
+a screen, a rating, a sign-in or a sign-out; start-up waits at most 2 s; the
+event queue is capped at 200 in shared preferences.
+
 ## Optional tooling
 
 ```bash

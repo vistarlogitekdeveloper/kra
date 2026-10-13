@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/jwt_claims.dart';
 import '../../../../core/providers/org_scope_provider.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../reviews/data/models/rating_reopen.dart';
 import '../../data/models/user.dart';
 import 'auth_providers.dart';
 
@@ -19,6 +20,9 @@ import 'auth_providers.dart';
 /// cached user data. Failures are silent (network may be unavailable
 /// at boot — that's fine, we'll re-fetch later).
 final appBootProvider = FutureProvider<void>((ref) async {
+  // Reopen the months granted for pending ratings before any sheet renders.
+  RatingReopen.adopt(RatingReopen.granted);
+
   final storage = ref.read(secureStorageProvider);
   final hasSession = await storage.hasSession();
   if (!hasSession) return;
@@ -34,6 +38,10 @@ final appBootProvider = FutureProvider<void>((ref) async {
     await storage.clearAll();
     return;
   }
+
+  // Usage analytics (not awaited): a restored session is a sign-in, before
+  // the state change so the first screen is already theirs.
+  AuthNotifier.identifyForAnalytics(user);
 
   // Hydrate state synchronously so the router's redirect runs with
   // AuthAuthenticated on the very first build.
