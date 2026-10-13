@@ -34,8 +34,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
   /// `employees.service.getById` fetches by id and then rejects when the row
   /// belongs to another organization, so a cross-tenant read is a 404 rather
   /// than a 403 — it does not even confirm the employee exists elsewhere.
-  static bool _isNotFound(Object e) =>
-      e is ApiError && (e.statusCode == 404 || e.code == 'RES_001');
+  static bool _isNotFound(Object e) => _isNotFoundResponse(e);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -325,9 +324,16 @@ class _DetailContent extends StatelessWidget {
           .deletionImpact(employee.id);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(AppStrings.employeePurgeImpactFailed),
+      // Say WHICH failure this was. One message for every cause hid the only
+      // one that matters here for months: on a server without the purge
+      // routes this is a flat 404, and "could not check" reads as a transient
+      // fault worth retrying rather than as "this was never deployed".
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_isNotFoundResponse(e)
+            ? AppStrings.employeePurgeApiMissing
+            : userFacingError(e)),
         backgroundColor: AppColors.error,
+        duration: const Duration(seconds: 10),
       ));
       return;
     }
@@ -340,9 +346,25 @@ class _DetailContent extends StatelessWidget {
       await ref.read(employeeRepositoryProvider).purge(employee.id);
     } on ApiError catch (e) {
       if (!context.mounted) return;
-      // 404 means somebody already removed them — the end state the user
-      // asked for, so report success and let the list refresh.
-      if (e.statusCode != 404) {
+      if (e.statusCode == 404) {
+        // 404 is AMBIGUOUS on this call and the two readings are opposites:
+        // somebody already removed them (the end state the user asked for), or
+        // this server has no /purge route at all and nothing was deleted. The
+        // old code assumed the first and reported "Employee deleted" over a
+        // delete that never ran. Ask the server who is right.
+        final gone = await _confirmGone(employee.id);
+        if (!context.mounted) return;
+        if (gone != true) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(gone == null
+                ? AppStrings.employeePurgeUnconfirmed
+                : AppStrings.employeePurgeApiMissing),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 10),
+          ));
+          return;
+        }
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               e.message.isEmpty ? AppStrings.employeePurgeFailed : e.message),
@@ -360,6 +382,24 @@ class _DetailContent extends StatelessWidget {
       const SnackBar(content: Text(AppStrings.employeePurgeSuccess)),
     );
     context.pop();
+  }
+
+  /// Whether [id] is really gone: true gone, false still there, **null** when
+  /// the server could not say.
+  ///
+  /// Only reached after the delete answered 404, where the status alone cannot
+  /// distinguish "already deleted" from "no such route". Null is deliberately
+  /// not folded into either: a delete that cannot be confirmed must not be
+  /// announced as one.
+  Future<bool?> _confirmGone(String id) async {
+    try {
+      await ref.read(employeeRepositoryProvider).getById(id);
+      return false;
+    } on ApiError catch (e) {
+      return e.statusCode == 404 ? true : null;
+    } catch (_) {
+      return null;
+    }
   }
 }
 
@@ -523,7 +563,12 @@ class _KraAssignmentsSection extends ConsumerWidget {
       }
     } on ApiError catch (e) {
       failed = true;
-      message = e.message.isEmpty ? AppStrings.kraUnassignFailed : e.message;
+      // Unassign ships in the same backend change as purge, so it is missing
+      // from the same deployments. Without this the user reads a raw
+      // "Route DELETE /kra-assignments/... not found".
+      message = _isNotFoundResponse(e)
+          ? AppStrings.kraUnassignApiMissing
+          : (e.message.isEmpty ? AppStrings.kraUnassignFailed : e.message);
     }
 
     ref.invalidate(kraAssignmentsProvider);
@@ -1038,3 +1083,14 @@ class _AssignIncentiveSheetState extends ConsumerState<_AssignIncentiveSheet> {
     );
   }
 }
+
+/// The backend's 404, however it is spelled.
+///
+/// One predicate, three meanings, and the CALLER decides which: a cross-tenant
+/// read that is hidden rather than refused, an employee that is already gone,
+/// or — the one that bit here — a route this deployment does not have at all,
+/// since an unmounted route answers 404 `RES_001` exactly as a missing row
+/// does. Use it to choose COPY; never to conclude that a destructive call
+/// succeeded.
+bool _isNotFoundResponse(Object e) =>
+    e is ApiError && (e.statusCode == 404 || e.code == 'RES_001');

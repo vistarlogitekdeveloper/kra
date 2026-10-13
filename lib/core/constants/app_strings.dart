@@ -188,6 +188,20 @@ class AppStrings {
       'assigned to you.';
 
   // Returning a self-rating for rework.
+  // Months the Reopen picker lists but cannot act on. The server gates the
+  // unlock on the same MANAGEMENT_REVIEW window as the lock, so a month whose
+  // window has shut can only be reopened by a super admin lifting the window
+  // first — and the copy has to say that, because the alternative (leaving the
+  // month out) is what made a locked August look as though it had vanished
+  // from the quarter.
+  static const String sheetReopenBlockedHeading = 'Cannot be reopened here';
+  static String sheetReopenBlockedOn(String date) =>
+      'Rating for this month closed on $date. A super admin can reopen it from '
+      'Organizations → Rating access.';
+  static const String sheetReopenBlockedNoDate =
+      'Rating for this month is closed. A super admin can reopen it from '
+      'Organizations → Rating access.';
+
   static const String sheetReworkAction = 'Send back for rework';
   static const String sheetReworkTitle = 'Send self-rating back for rework?';
   static const String sheetReworkMessage =
@@ -460,6 +474,24 @@ class AppStrings {
   static const String employeePurgeImpactFailed =
       'Could not check what this would remove. Nothing has been deleted.';
 
+  /// A 404 on the preview or the delete means this server has no purge routes,
+  /// which is a deploy state, not a failure the user can retry their way out
+  /// of. Said plainly, as `orgApiMissing` does for /organizations — the
+  /// generic copy above sent people hunting in the app for a backend that was
+  /// simply never deployed.
+  static const String employeePurgeApiMissing =
+      'Permanent delete is not available on this server yet. The API needs the '
+      '/employees/:id/deletion-impact and /employees/:id/purge endpoints '
+      'deployed. Nothing has been deleted.';
+
+  /// The delete answered 404 and the employee could not be re-read to find out
+  /// whether that meant "already gone" or "no such route". Never reported as
+  /// success: claiming a permanent delete that did not happen is the worse
+  /// error by far.
+  static const String employeePurgeUnconfirmed =
+      'Could not confirm whether the employee was deleted. Refresh the list '
+      'and check before trying again.';
+
   /// "3 reviews", "1 review" — a count with its noun agreed.
   static String countOf(int n, String singular, String plural) =>
       '$n ${n == 1 ? singular : plural}';
@@ -483,6 +515,12 @@ class AppStrings {
   static const String kraUnassignNone = 'No KRAs to unassign.';
   static const String kraUnassignFailed =
       'Could not unassign. Please try again.';
+
+  /// Unassign ships in the same backend change as permanent delete, so it is
+  /// absent from the same deployments. See [employeePurgeApiMissing].
+  static const String kraUnassignApiMissing =
+      'Unassigning KRAs is not available on this server yet. The API needs the '
+      '/kra-assignments delete endpoints deployed. Nothing has changed.';
 
   /// Said when the assignment went but a scored review did not — a half-done
   /// state the user would otherwise find later on their own.

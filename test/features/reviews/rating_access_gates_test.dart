@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vistar_app/core/constants/app_strings.dart';
 import 'package:vistar_app/core/enums/kra_reviewer.dart';
 import 'package:vistar_app/core/enums/review_flow.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
@@ -628,6 +629,139 @@ void main() {
         month(august, windows(august))
       ];
       expect(managementSignOffReviews(quarter, now), isEmpty);
+    });
+  });
+
+  /// Reported as "August is not occurring" in the Reopen picker.
+  ///
+  /// The picker was fed [managementSignOffReviews], which had already dropped
+  /// every month whose management window had shut. A locked August with a shut
+  /// window therefore had no row at all, under a heading promising one per
+  /// locked month — so the month read as having vanished from the quarter,
+  /// with nothing on screen to say otherwise or what would bring it back.
+  ///
+  /// It cannot simply be made selectable: the server gates unlock on the same
+  /// MANAGEMENT_REVIEW window as the lock, so offering it would earn a 403.
+  /// It has to be listed AND explained, which is why this returns both halves.
+  group('managementReopenGroups', () {
+    MonthlyReview month(
+      ReviewPeriod period, {
+      Map<ReviewStage, RatingWindow>? ratingWindows,
+      bool locked = true,
+    }) =>
+        MonthlyReview(
+          id: 'r-${period.key}',
+          employeeId: 'emp1',
+          employeeName: 'Asha',
+          period: period,
+          currentStage: ReviewStage.managementReview,
+          rows: [row(self: 8)],
+          ratingWindows: ratingWindows,
+          managementLockedAt: locked ? ist(2026, 10, 1) : null,
+        );
+
+    /// The reported quarter: July reopened to 31 Oct, August left on its own
+    /// deadline (15 Sep, long past), September still inside its 15 Oct window.
+    List<MonthlyReview?> reportedQuarter() => [
+          month(july,
+              ratingWindows: windows(july, {
+                ReviewStage.managementReview:
+                    opened(july, ReviewStage.managementReview),
+              })),
+          month(august, ratingWindows: windows(august)),
+          month(september, ratingWindows: windows(september)),
+        ];
+
+    test('a locked month with a shut window is BLOCKED, never dropped', () {
+      final groups = managementReopenGroups(reportedQuarter(), now);
+
+      // Exactly the reported picker: July and September offered, August gone.
+      expect(
+          groups.reopenable.map((r) => r.period.key), ['2026-07', '2026-09']);
+      // The whole bug: August used to appear in neither list.
+      expect(groups.blocked.map((r) => r.period.key), ['2026-08']);
+    });
+
+    test('every locked month in view is accounted for, in calendar order', () {
+      final groups = managementReopenGroups(reportedQuarter(), now);
+      final all = [...groups.reopenable, ...groups.blocked]
+          .map((r) => r.period.key)
+          .toList()
+        ..sort();
+
+      expect(all, ['2026-07', '2026-08', '2026-09']);
+    });
+
+    test('an UNLOCKED month is in neither list — nothing to reopen', () {
+      final groups = managementReopenGroups([
+        month(july, ratingWindows: windows(july), locked: false),
+        month(august, ratingWindows: windows(august)),
+      ], now);
+
+      expect(groups.reopenable, isEmpty);
+      expect(groups.blocked.map((r) => r.period.key), ['2026-08']);
+    });
+
+    test('a missing month contributes nothing and does not throw', () {
+      final groups = managementReopenGroups(
+        [null, month(august, ratingWindows: windows(august)), null],
+        now,
+      );
+
+      expect(groups.reopenable, isEmpty);
+      expect(groups.blocked.map((r) => r.period.key), ['2026-08']);
+    });
+
+    test('no windows at all: every locked month is reopenable, as before', () {
+      // An older backend sends no `ratingAccess`, and the sign-off covered
+      // every month present. Nothing here may narrow that.
+      final groups = managementReopenGroups(
+        [month(july), month(august), month(september)],
+        now,
+      );
+
+      expect(groups.reopenable.map((r) => r.period.key),
+          ['2026-07', '2026-08', '2026-09']);
+      expect(groups.blocked, isEmpty);
+    });
+
+    group('the reason names what actually shut it', () {
+      test('a deadline that ran out is given with its date', () {
+        final august2 = month(august, ratingWindows: windows(august));
+        final reason = managementReopenBlockedReason(august2);
+
+        // 10 Sep in these fixtures (kStageWindowCloseDay); the point is that a
+        // date is quoted at all, so the month reads as expired rather than
+        // missing.
+        expect(reason, contains('10 Sep 2026'));
+        expect(reason, contains('Rating access'));
+      });
+
+      test('a super admin CLOSE has no date, so it does not invent one', () {
+        final shut = month(august,
+            ratingWindows: windows(august, {
+              ReviewStage.managementReview:
+                  forceClosed(august, ReviewStage.managementReview),
+            }));
+
+        expect(managementReopenBlockedReason(shut),
+            AppStrings.sheetReopenBlockedNoDate);
+      });
+
+      test('every reason says who can lift it', () {
+        // A blocked row that only says "closed" leaves the reader stuck. Both
+        // forms have to name the route that works.
+        for (final r in [
+          month(august, ratingWindows: windows(august)),
+          month(august,
+              ratingWindows: windows(august, {
+                ReviewStage.managementReview:
+                    forceClosed(august, ReviewStage.managementReview),
+              })),
+        ]) {
+          expect(managementReopenBlockedReason(r), contains('super admin'));
+        }
+      });
     });
   });
 

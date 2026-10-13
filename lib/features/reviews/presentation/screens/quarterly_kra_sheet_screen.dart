@@ -915,18 +915,29 @@ class _QuarterlyKraSheetScreenState
   /// With a single month locked there is no choice to make and the picker is
   /// skipped; the toast still names the month, because the button sits on a
   /// quarter and "reopened" alone does not say what moved.
+  ///
+  /// Takes EVERY month in view, not the sign-off subset. A locked month whose
+  /// management window has shut cannot be reopened here, but it still has to
+  /// appear — silently omitting it is what made a locked August look as though
+  /// it had disappeared from the quarter.
   Future<void> _reopenManagement(List<MonthlyReview?> reviews) async {
-    final locked = [
-      for (final r in reviews)
-        if (r != null && r.isManagementLocked) r,
-    ];
-    if (locked.isEmpty) return;
+    final groups = managementReopenGroups(reviews, _now);
+    final locked = groups.reopenable;
+    final blocked = groups.blocked;
+    if (locked.isEmpty && blocked.isEmpty) return;
 
     final List<MonthlyReview> chosen;
-    if (locked.length == 1) {
+    // Skip the picker only when there is genuinely nothing to choose between:
+    // one reopenable month and nothing being withheld. With a blocked month
+    // present the dialog is the only place that says so.
+    if (locked.length == 1 && blocked.isEmpty) {
       chosen = locked;
     } else {
-      final picked = await _ReopenMonthsDialog.show(context, locked: locked);
+      final picked = await _ReopenMonthsDialog.show(
+        context,
+        locked: locked,
+        blocked: blocked,
+      );
       if (picked == null || picked.isEmpty) return;
       chosen = picked;
     }
@@ -1205,8 +1216,11 @@ class _QuarterlyKraSheetScreenState
                         if (!r.isManagementLocked) r,
                     ])
                 : null,
+            // Every month in view, not `signOff`: the picker has to be able to
+            // name a locked month whose window has shut, which `signOff` has
+            // already dropped.
             onReopenManagement:
-                canSignOff ? () => _reopenManagement(signOff) : null,
+                canSignOff ? () => _reopenManagement(mappedReviews) : null,
             // The reporting manager can hand a self-rating back when it looks
             // wrong. Null unless they actually have a month to return.
             onSendBackForRework: _reworkAction(mappedReviews, scope),
@@ -1384,6 +1398,57 @@ List<MonthlyReview> managementSignOffReviews(
       for (final r in reviews.whereType<MonthlyReview>())
         if (_stageWindowOpen(r, ReviewStage.managementReview, now)) r,
     ];
+
+/// Every LOCKED month in view, split by whether the server would accept an
+/// unlock at [now].
+///
+/// The picker used to be fed [managementSignOffReviews], which had already
+/// dropped the window-shut months — so a locked August simply was not in the
+/// list, under a heading promising one row per locked month. That reads as the
+/// month having vanished, and there is nothing on the screen to suggest
+/// otherwise or to say what would bring it back.
+///
+/// Both halves are returned so the picker can show the shut ones as what they
+/// are: locked, not reopenable here, and waiting on a super admin. Offering
+/// them as reopenable instead would only earn a 403 — the server gates unlock
+/// on the same MANAGEMENT_REVIEW window as the lock, deliberately, because a
+/// review that could be unlocked but not re-locked would be stranded.
+///
+/// Calendar order in both lists, so the picker reads like the sheet.
+@visibleForTesting
+({List<MonthlyReview> reopenable, List<MonthlyReview> blocked})
+    managementReopenGroups(
+  List<MonthlyReview?> reviews,
+  DateTime now,
+) {
+  final locked = [
+    for (final r in reviews.whereType<MonthlyReview>())
+      if (r.isManagementLocked) r,
+  ]..sort((a, b) => a.period.compareTo(b.period));
+  return (
+    reopenable: [
+      for (final r in locked)
+        if (_stageWindowOpen(r, ReviewStage.managementReview, now)) r,
+    ],
+    blocked: [
+      for (final r in locked)
+        if (!_stageWindowOpen(r, ReviewStage.managementReview, now)) r,
+    ],
+  );
+}
+
+/// Why [r]'s management review cannot be reopened from this screen — its
+/// closing date when the window simply ran out, or the undated line when a
+/// super admin shut it outright or the review carries no window at all.
+String managementReopenBlockedReason(MonthlyReview r) {
+  final window = r.windowFor(ReviewStage.managementReview);
+  final closesAt = window?.closesAt;
+  if (window == null || window.closed || closesAt == null) {
+    return AppStrings.sheetReopenBlockedNoDate;
+  }
+  return AppStrings.sheetReopenBlockedOn(
+      EmployeeFormatters.date(RatingWindow.toIst(closesAt)));
+}
 
 /// The sheet's "reopened for rating" notice: one line per distinct closing
 /// instant, or none when no review in view has a stage reopened at [now].
@@ -5214,18 +5279,29 @@ bool _isOpenReviewMonth(ReviewPeriod m, DateTime now) =>
 /// Nothing is ticked by default and the button stays disabled until something
 /// is: an action with that consequence should not be reachable by reflex, and
 /// a pre-ticked list is exactly the quarter-wide behaviour this replaces.
+///
+/// [blocked] months are locked too, but their management window has shut, so
+/// the server would refuse the unlock. They are listed and explained rather
+/// than left out: a heading that promises one row per locked month, with a
+/// month missing, reads as the month having disappeared from the quarter —
+/// which is how a locked August with a shut window was reported.
 class _ReopenMonthsDialog extends StatefulWidget {
   final List<MonthlyReview> locked;
-  const _ReopenMonthsDialog({required this.locked});
+  final List<MonthlyReview> blocked;
+  const _ReopenMonthsDialog({
+    required this.locked,
+    this.blocked = const [],
+  });
 
   /// The months chosen, or null if the user backed out.
   static Future<List<MonthlyReview>?> show(
     BuildContext context, {
     required List<MonthlyReview> locked,
+    List<MonthlyReview> blocked = const [],
   }) =>
       showDialog<List<MonthlyReview>>(
         context: context,
-        builder: (_) => _ReopenMonthsDialog(locked: locked),
+        builder: (_) => _ReopenMonthsDialog(locked: locked, blocked: blocked),
       );
 
   @override
@@ -5278,6 +5354,58 @@ class _ReopenMonthsDialogState extends State<_ReopenMonthsDialog> {
                 ),
               ),
             ),
+          // Locked, present, and not reopenable from here. Shown disabled with
+          // the reason and the one route that does work, so the month is
+          // accounted for instead of absent.
+          if (widget.blocked.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              AppStrings.sheetReopenBlockedHeading.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.7,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final review in widget.blocked)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.lock_rounded,
+                            size: 15, color: AppColors.textMuted),
+                        const SizedBox(width: 8),
+                        Text(
+                          review.period.shortLabel,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 23, top: 2),
+                      child: Text(
+                        managementReopenBlockedReason(review),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
       actions: [
