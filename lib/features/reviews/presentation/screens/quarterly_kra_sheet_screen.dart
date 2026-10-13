@@ -914,18 +914,46 @@ class _QuarterlyKraSheetScreenState
 
   /// Reopens a locked management review across the quarter so its scores can be
   /// revised, then re-locked.
+  /// Reopens the management review for the months the user picks.
+  ///
+  /// Month-wise rather than quarter-wide. The bar sits under a sheet showing
+  /// three months and used to unlock every locked one at once — so correcting
+  /// August also threw July and September back open, unsettling incentives
+  /// nobody had asked to revisit. Each month locks on its own, so each
+  /// reopens on its own.
+  ///
+  /// With a single month locked there is no choice to make and the picker is
+  /// skipped; the toast still names the month, because the button sits on a
+  /// quarter and "reopened" alone does not say what moved.
   Future<void> _reopenManagement(List<MonthlyReview?> reviews) async {
+    final locked = [
+      for (final r in reviews)
+        if (r != null && r.isManagementLocked) r,
+    ];
+    if (locked.isEmpty) return;
+
+    final List<MonthlyReview> chosen;
+    if (locked.length == 1) {
+      chosen = locked;
+    } else {
+      final picked = await _ReopenMonthsDialog.show(context, locked: locked);
+      if (picked == null || picked.isEmpty) return;
+      chosen = picked;
+    }
+    if (!mounted) return;
+
     setState(() => _saving = true);
     try {
       final repo = ref.read(monthlyReviewRepositoryProvider);
-      for (final review in reviews) {
-        if (review == null || !review.isManagementLocked) continue;
+      for (final review in chosen) {
         await repo.unlockManagement(review.id);
       }
       ref.invalidate(quarterlySheetProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Management review reopened — you can edit again.')));
+        final months = chosen.map((r) => r.period.shortLabel).join(', ');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Management review reopened for $months — you can '
+                'edit those months again.')));
       }
     } catch (e) {
       if (mounted) {
@@ -4745,3 +4773,98 @@ ReviewPeriod? _currentMonthNeedingSelfRating(
 /// find the month still owing a self-rating.
 bool _isOpenReviewMonth(ReviewPeriod m, DateTime now) =>
     m.key == ReviewPeriod.openForRating(now).key;
+
+/// Asks WHICH locked months to reopen.
+///
+/// The lock settles an incentive to a set of management scores, so reopening
+/// is not a neutral act — it puts a figure somebody signed off back in play.
+/// Nothing is ticked by default and the button stays disabled until something
+/// is: an action with that consequence should not be reachable by reflex, and
+/// a pre-ticked list is exactly the quarter-wide behaviour this replaces.
+class _ReopenMonthsDialog extends StatefulWidget {
+  final List<MonthlyReview> locked;
+  const _ReopenMonthsDialog({required this.locked});
+
+  /// The months chosen, or null if the user backed out.
+  static Future<List<MonthlyReview>?> show(
+    BuildContext context, {
+    required List<MonthlyReview> locked,
+  }) =>
+      showDialog<List<MonthlyReview>>(
+        context: context,
+        builder: (_) => _ReopenMonthsDialog(locked: locked),
+      );
+
+  @override
+  State<_ReopenMonthsDialog> createState() => _ReopenMonthsDialogState();
+}
+
+class _ReopenMonthsDialogState extends State<_ReopenMonthsDialog> {
+  final Set<String> _selected = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: const Text(
+        'Reopen which months?',
+        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5),
+      ),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Each month is locked on its own. Reopening one leaves the others '
+            'settled.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final review in widget.locked)
+            CheckboxListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              value: _selected.contains(review.id),
+              onChanged: (on) => setState(() {
+                if (on == true) {
+                  _selected.add(review.id);
+                } else {
+                  _selected.remove(review.id);
+                }
+              }),
+              title: Text(
+                review.period.shortLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(AppStrings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: _selected.isEmpty
+              ? null
+              : () => Navigator.of(context).pop([
+                    for (final r in widget.locked)
+                      if (_selected.contains(r.id)) r,
+                  ]),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primaryPurple,
+          ),
+          child: Text('Reopen (${_selected.length})'),
+        ),
+      ],
+    );
+  }
+}

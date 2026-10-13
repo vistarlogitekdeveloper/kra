@@ -284,12 +284,23 @@ class MonthlyReviewSummary {
     return null;
   }
 
-  /// Stage to SHOW on dashboards. Trusts the backend's stage cursor once it has
-  /// advanced past Self-Rating (it's authoritative then), and only repairs the
-  /// specific frozen-at-Self-Rating case: a review whose scores prove more work
-  /// was done still reads as Self-Rating because the cursor never moved. This
-  /// mirrors the quarterly KRA sheet, which derives the same stage from the full
-  /// review's scores.
+  /// Stage to SHOW on dashboards: the cursor, CAPPED at what the scores can
+  /// account for.
+  ///
+  /// The cursor alone cannot be trusted. It advances off whatever is scored and
+  /// is also set outright by mark-paid, so reviews sit at COMPLETED carrying
+  /// nothing but a self-rating — reported as "even the second stage review is
+  /// pending and it is showing completed".
+  ///
+  /// Trusting it "once it is past Self-Rating as long as SOMETHING is scored"
+  /// was too weak a test: one self score satisfied it, and every later claim
+  /// rode through unchecked. The rule now is per stage — a stage may be shown
+  /// as reached only when the evidence reaches it.
+  ///
+  /// The cursor is allowed to sit exactly ONE stage beyond the evidence,
+  /// because a stage is "current" while it AWAITS action: its own scores do not
+  /// exist yet, and that is the normal, correct state for the stage in hand.
+  /// Anything further is claiming work nothing can corroborate.
   ReviewStage get displayStage {
     // A cursor PAST Self-Rating with nothing scored behind it cannot be a real
     // state, so it is refused rather than echoed. The pipeline only advances off
@@ -302,15 +313,53 @@ class MonthlyReviewSummary {
     // This covers COMPLETED ("Completed · 0%" over an empty sheet) and equally
     // MANAGEMENT_REVIEW, which is how the same corruption showed up on the
     // quarter dashboard while the monthly list correctly read Self-Rating.
-    if (currentStage != ReviewStage.selfRating && !hasAnyScore) {
+    final proven = _provenStage;
+
+    // Nothing scored at all: whatever the cursor says, the work has not
+    // started. Covers COMPLETED over an empty sheet and MANAGEMENT_REVIEW
+    // over one.
+    if (proven == null) return ReviewStage.selfRating;
+
+    // Completed is only credible once the payout is settled AND something was
+    // rated — payoutSettled is that pair. Otherwise the ceiling is one stage
+    // past the evidence.
+    final ceiling = payoutSettled ? ReviewStage.completed : proven.next;
+    if (currentStage.pipelineIndex > ceiling.pipelineIndex) return ceiling;
+
+    // Below the ceiling the cursor leads, with ONE repair: a cursor frozen at
+    // Self-Rating, because an in-place save-scores does not advance it.
+    //
+    // Promotion is confined to that case on purpose. Generalising it would
+    // read managementReviewPct — which carries the Review AVERAGE when there
+    // is no override — as proof management had signed off, bumping a review
+    // still mid-stage-2 to Management Review.
+    if (currentStage == ReviewStage.selfRating) {
+      final scored = _scoredStage;
+      if (scored != null && scored.pipelineIndex > currentStage.pipelineIndex) {
+        return scored;
+      }
+    }
+    return currentStage;
+  }
+
+  /// The furthest stage the SCORES can corroborate as reached.
+  ///
+  /// Distinct from [_scoredStage], which folds in the payout flag: this one
+  /// answers only "how far does the rating evidence go", because it is used to
+  /// bound a cursor that may itself have been set by the payout.
+  ReviewStage? get _provenStage {
+    // managementReviewPct carries the Review average when there is no
+    // management override, so it cannot tell stage 2 from stage 3 apart. It is
+    // therefore evidence that the Review phase has scores, not that management
+    // has signed off — which is why the ceiling adds only one stage on top.
+    if (managementReviewPct != null) return ReviewStage.managementReview;
+    // finalScorePct included so that `proven == null` means exactly the same
+    // thing as `!hasAnyScore`. Without it a review carrying only a final score
+    // fell through to null and was reported as never started.
+    if (selfScorePct != null || finalScorePct > 0) {
       return ReviewStage.selfRating;
     }
-    if (currentStage != ReviewStage.selfRating) return currentStage;
-    final scored = _scoredStage;
-    if (scored == null) return currentStage;
-    return scored.pipelineIndex >= currentStage.pipelineIndex
-        ? scored
-        : currentStage;
+    return null;
   }
 
   /// Status of [displayStage]: submitted once the review is terminal/paid or the
@@ -321,8 +370,21 @@ class MonthlyReviewSummary {
     // nothing, whatever the stored status column claims. Without this the pill
     // still renders green ("submitted") behind a stale cursor.
     if (!hasAnyScore) return StageStatus.inProgress;
-    if (currentStage.isTerminal || (payoutPaid && hasAnyScore)) {
-      return StageStatus.submitted;
+
+    // Asked of the stage actually SHOWN, not the cursor. Reading the cursor
+    // here reintroduced the bug the cap removes: a review capped back to the
+    // Review phase still rendered a green "submitted" pill because the stored
+    // cursor said COMPLETED.
+    final shown = displayStage;
+    if (shown.isTerminal) return StageStatus.submitted;
+
+    // The shown stage is the one awaiting action, so it is only "submitted"
+    // when the cursor agrees it has moved on.
+    // The stage was CAPPED — the cursor claimed more than the scores support,
+    // so the stage now shown is precisely the one still awaiting work. Calling
+    // that "submitted" would restate the bug in the pill.
+    if (shown.pipelineIndex < currentStage.pipelineIndex) {
+      return StageStatus.inProgress;
     }
     if (currentStage != ReviewStage.selfRating) return currentStageStatus;
     return _scoredStage == null ? currentStageStatus : StageStatus.submitted;
