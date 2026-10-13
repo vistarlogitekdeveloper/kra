@@ -2244,6 +2244,20 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Code · grade · reporting manager · location. Any part the payload did
+    // not carry is dropped, so on a review that knows nothing but the name
+    // this is empty and the line is left out rather than reserved as a gap.
+    final meta = AppStrings.sheetEmployeeMeta(
+      employeeCode: review.employeeCode,
+      grade: review.grade,
+      managerName: review.managerName,
+      // Only a review with NEITHER a manager name nor a manager id has
+      // genuinely nobody assigned. A missing name beside a live id is a broken
+      // join, and claiming "not assigned" would send HR to fix a field that is
+      // already set.
+      managerUnassigned: review.managerId == null,
+      projectLocation: review.projectLocation,
+    );
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       padding: const EdgeInsets.all(16),
@@ -2263,16 +2277,14 @@ class _HeaderCard extends StatelessWidget {
             style: const TextStyle(
                 color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 2),
-          Text(
-            [
-              if (review.employeeCode.isNotEmpty) review.employeeCode,
-              if (review.grade != null) 'Grade ${review.grade}',
-              if (review.managerName != null) 'Mgr: ${review.managerName}',
-            ].join('  ·  '),
-            style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5),
-          ),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              meta,
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5),
+            ),
+          ],
           const SizedBox(height: 10),
           // Fiscal quarter this sheet covers — auto-derived from the months on
           // view (Q1 = Apr–Jun, Q2 = Jul–Sep, Q3 = Oct–Dec, Q4 = Jan–Mar), so

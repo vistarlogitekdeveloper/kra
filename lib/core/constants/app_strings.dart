@@ -75,6 +75,50 @@ class AppStrings {
   /// their name as pending would send them after work that cannot be done.
   static const String quarterlyAwaitingSelfTag = 'Self';
   static const String quarterlySheetTitle = 'Quarterly KRA Sheet';
+
+  // ───── Sheet header identity line ─────
+  //
+  // Spelled out, not abbreviated. "Mgr: Super Admin" read as an app quirk
+  // rather than as what it is — the reporting manager actually stored against
+  // the employee — so a wrong value looked like a display bug and went
+  // unquestioned. The label has to name the field it is reporting.
+  static const String sheetMetaGrade = 'Grade';
+  static const String sheetMetaManager = 'Reporting Manager';
+  static const String sheetMetaLocation = 'Location';
+
+  /// Only when the review carries NO manager id either: an absent name beside
+  /// a present id is an orphaned row, not an unassigned employee, and saying
+  /// "not assigned" there would be wrong.
+  static const String sheetMetaManagerUnassigned = 'Not assigned';
+
+  /// The identity line under the employee's name on the quarterly sheet.
+  ///
+  /// Every part is optional and a null one is DROPPED rather than rendered as
+  /// a placeholder, because null here means "this payload did not carry it",
+  /// which is not the same claim as "the employee has none". The one exception
+  /// is [managerUnassigned], which the caller sets only when it can tell the
+  /// difference.
+  static String sheetEmployeeMeta({
+    String? employeeCode,
+    String? grade,
+    String? managerName,
+    bool managerUnassigned = false,
+    String? projectLocation,
+  }) {
+    String? clean(String? v) =>
+        (v == null || v.trim().isEmpty) ? null : v.trim();
+    final manager = clean(managerName) ??
+        (managerUnassigned ? sheetMetaManagerUnassigned : null);
+    final location = clean(projectLocation);
+    final grd = clean(grade);
+    return [
+      if (clean(employeeCode) case final code?) code,
+      if (grd != null) '$sheetMetaGrade $grd',
+      if (manager != null) '$sheetMetaManager: $manager',
+      if (location != null) '$sheetMetaLocation: $location',
+    ].join('  ·  ');
+  }
+
   static const String quarterlyPayoutTitle = 'Quarter payout';
   static const String quarterlyPayoutAmount = 'Payout this quarter';
 
