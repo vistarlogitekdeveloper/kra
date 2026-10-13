@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vistar_app/core/utils/monthly_deadlines.dart';
 import 'package:vistar_app/features/reviews/data/models/monthly_review.dart';
-import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 
 /// "Which month are we rating?" — one answer, in one place.
 ///
@@ -172,30 +170,9 @@ void main() {
     });
   });
 
-  group('the deadline schedule agrees with this rule', () {
-    test('the self-rating deadline falls AFTER the month it covers', () {
-      // This is the evidence the rule is right rather than a preference.
-      // Self-rating is due on the 10th; if the month under review were the
-      // current one, the deadline would land with two-thirds of that month
-      // still to come.
-      final now = DateTime(2026, 9, 9);
-      final under = ReviewPeriod.openForRating(now);
-      final deadline = MonthlyDeadlines.selfRating(now);
-
-      expect(deadline.month, 9);
-      expect(deadline.day, ReviewStage.selfRating.deadlineDay);
-      expect(under.month, 8);
-      // The deadline is in the month after the one being rated.
-      expect(ReviewPeriod.fromDate(deadline).key, under.next.key,
-          reason: 'the deadline must sit in the month after the review month');
-    });
-
-    test('and there is still time left: 9 Sep is one day before the 10th', () {
-      final days = MonthlyDeadlines.daysRemaining(
-        MonthlyDeadlines.selfRating(DateTime(2026, 9, 9)),
-        DateTime(2026, 9, 9),
-      );
-      expect(days, 1, reason: 'matches the "closes in 1 day" banner');
-    });
-  });
+  // A group here used to prove this rule from the deadline schedule — the
+  // self-rating fell on the 10th, which only made sense as the 10th of the
+  // month AFTER the one being rated. Deadlines have since been removed from
+  // the app, so that evidence is gone; the rule is not. It is asserted
+  // directly above, which is where it always belonged.
 }

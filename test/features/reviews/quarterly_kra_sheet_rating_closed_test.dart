@@ -26,6 +26,14 @@ import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_s
 /// must re-read itself (or the affordance that invited the write stays up and
 /// invites it again) and show the server's sentence, which names the stage,
 /// the month and the date — never "already moved on", which is the 409's.
+/// Day of month a stage window closes on in these fixtures.
+///
+/// Was `stage.publishedDeadlineDay ?? 10` — the client no longer holds a
+/// deadline table, and the real value comes from the server on RatingWindow
+/// anyway. The day is incidental here: these tests assert ACCESS, and pass an
+/// explicit closesAt wherever the exact moment matters.
+const kStageWindowCloseDay = 10;
+
 void main() {
   DateTime ist(int y, int m, int d, [int h = 0]) =>
       DateTime.utc(y, m, d, h).subtract(const Duration(hours: 5, minutes: 30));
@@ -55,8 +63,7 @@ void main() {
           : RatingWindowSource.opened,
       closed: false,
       opensAt: ist(n.year, n.month, 1),
-      closesAt: reopenedUntil ??
-          ist(n.year, n.month, stage.publishedDeadlineDay ?? 10, 23),
+      closesAt: reopenedUntil ?? ist(n.year, n.month, kStageWindowCloseDay, 23),
     );
   }
 

@@ -20,17 +20,6 @@ void main() {
       expect(ReviewStage.completed.isTerminal, isTrue);
     });
 
-    test('carries the right deadline day per stage', () {
-      // The published schedule, verbatim. Account & HR fall due BEFORE the
-      // reporting manager, so the three Review raters no longer share a date.
-      expect(ReviewStage.selfRating.deadlineDay, 10);
-      expect(ReviewStage.accountHrRating.deadlineDay, 12);
-      expect(ReviewStage.financeRating.deadlineDay, 12);
-      expect(ReviewStage.reportingManagerRating.deadlineDay, 13);
-      expect(ReviewStage.managementReview.deadlineDay, 15);
-      expect(ReviewStage.incentivePayout.deadlineDay, 20);
-      expect(ReviewStage.completed.deadlineDay, isNull);
-    });
 
     test('self, the three Review raters and management are rating stages', () {
       expect(ReviewStage.selfRating.isRatingStage, isTrue);

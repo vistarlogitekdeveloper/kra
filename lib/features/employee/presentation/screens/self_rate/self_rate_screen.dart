@@ -6,8 +6,6 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/network/connectivity_service.dart';
 import '../../../../../core/router/app_router.dart';
-import '../../../../../core/utils/monthly_deadlines.dart';
-import '../../../../../core/widgets/monthly_deadline_notice.dart';
 import '../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../hr/presentation/widgets/confirm_action_dialog.dart';
 import '../../providers/employee_dashboard_providers.dart';
@@ -217,10 +215,6 @@ class _SelfRateScreenState extends ConsumerState<SelfRateScreen> {
 
     return Column(
       children: [
-        MonthlyDeadlineNotice(
-          title: AppStrings.deadlineSelfRatingTitle,
-          deadline: MonthlyDeadlines.selfRating(),
-        ),
         // Sticky top: progress bar + month picker
         WeightageProgressBar(
           weightedTotalPct: state.weightedTotalPct,

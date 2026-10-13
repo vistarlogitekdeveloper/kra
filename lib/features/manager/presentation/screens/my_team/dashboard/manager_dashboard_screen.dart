@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../../../core/api/error_text.dart';
 import '../../../../../../core/api/api_error.dart';
@@ -9,7 +8,6 @@ import '../../../../../../core/constants/app_strings.dart';
 import '../../../../../../core/widgets/shimmer_box.dart';
 import '../../../../../../core/widgets/shimmer_skeletons.dart';
 import '../../../../../../core/widgets/slow_load_hint.dart';
-import '../../../../../employee/presentation/widgets/deadline_chip.dart';
 import '../../../../../reviews/presentation/widgets/monthly_reviews_entry_banner.dart';
 import '../../../../data/models/manager_dashboard.dart';
 import '../../../providers/manager_dashboard_providers.dart';
@@ -105,9 +103,6 @@ class _ActiveCycleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final deadline = cycle.managerReviewDeadline;
-    final deadlineText =
-        deadline == null ? '' : DateFormat('d MMM yyyy').format(deadline);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Container(
@@ -150,10 +145,7 @@ class _ActiveCycleCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    deadlineText.isEmpty
-                        ? AppStrings.managerDashboardActiveCycle
-                        : '${AppStrings.managerDashboardManagerDeadline}: '
-                            '$deadlineText',
+                    AppStrings.managerDashboardActiveCycle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -165,11 +157,6 @@ class _ActiveCycleCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (cycle.deadlineRemaining != null)
-              DeadlineChip(
-                daysRemaining: cycle.deadlineRemaining!,
-                isOverdue: cycle.deadlineRemaining! < 0,
-              ),
           ],
         ),
       ),

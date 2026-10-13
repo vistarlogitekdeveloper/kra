@@ -12,6 +12,8 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/widgets/shimmer_box.dart';
 import '../../../../core/widgets/shimmer_skeletons.dart';
 import '../../data/models/employee.dart';
+import '../../data/models/employee_deletion_impact.dart';
+import '../widgets/purge_employee_dialog.dart';
 import '../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../data/models/kra_assignment.dart';
 import '../providers/employee_providers.dart';
@@ -228,6 +230,8 @@ class _DetailContent extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        // Deactivate stays the primary removal: it refuses while reports or
+        // in-progress reviews exist, which is the check you usually want.
         if (employee.isActive)
           OutlinedButton.icon(
             onPressed: () => _confirmDeactivate(context),
@@ -250,6 +254,26 @@ class _DetailContent extends StatelessWidget {
               ),
             ),
           ),
+        // The irreversible one. Kept apart from the button above and worded as
+        // a different act, because the two are a soft delete and a hard one —
+        // offering them as neighbouring equals invites the wrong tap.
+        const SizedBox(height: 18),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => _confirmPurge(context),
+            icon: const Icon(Icons.delete_forever_rounded,
+                size: 18, color: AppColors.error),
+            label: const Text(
+              AppStrings.employeePurgeAction,
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -285,6 +309,57 @@ class _DetailContent extends StatelessWidget {
       ref.invalidate(employeeDetailProvider(employee.id));
       if (context.mounted) context.pop();
     }
+  }
+
+  /// Permanent delete: preview what goes, confirm, then remove.
+  ///
+  /// The preview is fetched BEFORE the dialog and the dialog is not shown
+  /// without it. Confirming a deletion whose scope you were not shown is the
+  /// failure this endpoint exists to prevent — the counts include records on
+  /// OTHER employees, which nobody expects a delete to touch.
+  Future<void> _confirmPurge(BuildContext context) async {
+    final EmployeeDeletionImpact impact;
+    try {
+      impact = await ref
+          .read(employeeRepositoryProvider)
+          .deletionImpact(employee.id);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(AppStrings.employeePurgeImpactFailed),
+        backgroundColor: AppColors.error,
+      ));
+      return;
+    }
+    if (!context.mounted) return;
+
+    final ok = await PurgeEmployeeDialog.show(context, impact: impact);
+    if (ok != true || !context.mounted) return;
+
+    try {
+      await ref.read(employeeRepositoryProvider).purge(employee.id);
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      // 404 means somebody already removed them — the end state the user
+      // asked for, so report success and let the list refresh.
+      if (e.statusCode != 404) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              e.message.isEmpty ? AppStrings.employeePurgeFailed : e.message),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 10),
+        ));
+        return;
+      }
+    }
+
+    ref.invalidate(employeeListProvider);
+    ref.invalidate(employeeDetailProvider(employee.id));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text(AppStrings.employeePurgeSuccess)),
+    );
+    context.pop();
   }
 }
 
@@ -323,13 +398,37 @@ class _KraAssignmentsSection extends ConsumerWidget {
               ),
               const Spacer(),
               assignmentsAsync.when(
-                data: (list) => Text(
-                  list.isEmpty ? '—' : '${list.length}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryPurple,
-                  ),
+                data: (list) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      list.isEmpty ? '—' : '${list.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryPurple,
+                      ),
+                    ),
+                    // Offered only when there is something to clear: a button
+                    // that can only ever say "No KRAs to unassign" is noise.
+                    if (list.isNotEmpty)
+                      TextButton(
+                        onPressed: () => _unassignAll(context, ref),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          AppStrings.kraUnassignAllAction,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
@@ -393,6 +492,47 @@ class _KraAssignmentsSection extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Clears every KRA assignment for this employee, across all cycles.
+  ///
+  /// Reviews that already carry scores are KEPT by the server, so the result
+  /// is reported rather than assumed — an assignment gone while its scored
+  /// review stays is a half-done state the user would otherwise meet later.
+  Future<void> _unassignAll(BuildContext context, WidgetRef ref) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.kraUnassignAllConfirmTitle,
+      message: AppStrings.kraUnassignAllConfirmMessage,
+      confirmLabel: AppStrings.kraUnassignAllAction,
+    );
+    if (ok != true || !context.mounted) return;
+
+    String message;
+    bool failed = false;
+    try {
+      final result = await ref
+          .read(kraAssignmentRepositoryProvider)
+          .unassignAllForEmployee(employeeId);
+      if (result.deletedCount == 0) {
+        message = AppStrings.kraUnassignNone;
+      } else if (result.reviewsLeftInProgress > 0) {
+        message = AppStrings.kraUnassignReviewKept;
+      } else {
+        message = AppStrings.kraUnassignAllSuccess(result.deletedCount);
+      }
+    } on ApiError catch (e) {
+      failed = true;
+      message = e.message.isEmpty ? AppStrings.kraUnassignFailed : e.message;
+    }
+
+    ref.invalidate(kraAssignmentsProvider);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: failed ? AppColors.error : null,
+      duration: Duration(seconds: failed ? 10 : 6),
+    ));
   }
 }
 

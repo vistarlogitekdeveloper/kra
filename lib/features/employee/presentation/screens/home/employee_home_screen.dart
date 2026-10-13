@@ -13,10 +13,7 @@ import '../../../../../core/widgets/workspace_drawer.dart';
 import '../../../../../core/widgets/workspace_switcher.dart';
 import '../../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../hr/presentation/widgets/confirm_action_dialog.dart';
-import '../../../../../core/providers/org_scope_provider.dart';
 import '../../../../reviews/data/models/monthly_review.dart';
-import '../../../../reviews/data/models/review_flow.dart';
-import '../../../../reviews/data/models/review_stage.dart';
 import '../../../../reviews/presentation/providers/monthly_review_providers.dart';
 import '../../../data/models/employee_dashboard.dart';
 import '../../../data/models/enums.dart';
@@ -24,7 +21,6 @@ import '../../providers/employee_dashboard_providers.dart';
 import '../../providers/my_profile_providers.dart';
 import '../../widgets/empty_my_dashboard.dart';
 import 'widgets/current_month_card.dart';
-import 'widgets/deadline_banner.dart';
 import 'widgets/greeting_header.dart';
 import 'widgets/history_strip.dart';
 import 'widgets/incentive_snapshot_card.dart';
@@ -135,7 +131,6 @@ class EmployeeHomeScreen extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: 32),
                   children: [
                     header,
-                    const _DeadlineBannerSection(),
                     const _CurrentMonthSection(),
                     const _MyKrasSection(),
                     const _HistoryStripSection(),
@@ -265,66 +260,6 @@ class _EmptyKraBody extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────
 // Section 1: Deadline banner (dashboard-driven, conditional)
 // ─────────────────────────────────────────────────────────────────────
-
-class _DeadlineBannerSection extends ConsumerWidget {
-  static const int _bannerThresholdDays = 3;
-
-  const _DeadlineBannerSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dashboardAsync = ref.watch(employeeDashboardProvider);
-    return dashboardAsync.maybeWhen(
-      data: (dashboard) {
-        // Don't nag once the employee has already submitted everything for
-        // the cycle — the monthly deadline only matters while work is open.
-        // Same legacy-vs-monthly mismatch as the current-month card: without
-        // the monthly cross-check this nags "Self-rating overdue — submit now"
-        // at someone who has already rated every KRA.
-        final period = _CurrentMonthSection._periodFor(dashboard);
-        final monthly = ref
-            .watch(myMonthlyReviewProvider(period))
-            .maybeWhen(data: (r) => r, orElse: () => null);
-        final selfDone = monthly?.selfRatingSubmitted ?? false;
-        final submittedAll =
-            selfDone || (dashboard.scorecard?.state.hasSubmittedAll ?? false);
-        final days = dashboard.selfRatingDaysRemaining;
-        // Some organisations run a pipeline with NO self-rating at all. There
-        // the employee can never submit one, so `submittedAll` is false
-        // forever and this banner would sit on their home screen permanently
-        // telling them a task is overdue that does not exist and that they
-        // have no way to complete.
-        //
-        // Checked FIRST, and asked of the FLOW rather than of the deadline:
-        // the deadline is real either way, it is the work that is gone.
-        final selfRatingExists = stageIsInFlow(
-            ReviewStage.selfRating, ref.watch(currentReviewFlowProvider));
-        final showBanner = selfRatingExists &&
-            !submittedAll &&
-            days != null &&
-            (dashboard.isSelfRatingOverdue || days <= _bannerThresholdDays);
-        if (!showBanner) return const SizedBox.shrink();
-        // Scores typed in but never submitted. Worth its own wording: the
-        // employee HAS done the rating, so "overdue — submit now" alone left
-        // people hunting for work they had already finished.
-        final rated = (monthly?.selfScorePct ?? 0) > 0;
-        return DeadlineBanner(
-          daysRemaining: days,
-          isOverdue: dashboard.isSelfRatingOverdue,
-          // Name the month. The self-rate sheet shows a whole quarter, so
-          // "self-rating overdue" on its own does not say which column.
-          monthLabel: period.shortLabel,
-          ratedButNotSubmitted: rated,
-          onTap: () => context.go(AppRoutes.employeeSelfRate),
-        );
-      },
-      // Loading / error states for the banner don't add value — the
-      // banner is conditional anyway, so an absence is the same UX as
-      // a shimmer. Keep it quiet.
-      orElse: () => const SizedBox.shrink(),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────
 // Section 2: Current month card (dashboard-driven, always rendered)

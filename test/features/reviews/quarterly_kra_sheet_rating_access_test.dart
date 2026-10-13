@@ -15,6 +15,14 @@ import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_s
 /// Every pair below renders the SAME scores twice and changes only a window,
 /// so whatever differs on screen is the window's doing — the property the
 /// pure-gate tests cannot show, because the grid composes the gates itself.
+/// Day of month a stage window closes on in these fixtures.
+///
+/// Was `stage.publishedDeadlineDay ?? 10` — the client no longer holds a
+/// deadline table, and the real value comes from the server on RatingWindow
+/// anyway. The day is incidental here: these tests assert ACCESS, and pass an
+/// explicit closesAt wherever the exact moment matters.
+const kStageWindowCloseDay = 10;
+
 void main() {
   DateTime ist(int y, int m, int d, [int h = 0]) =>
       DateTime.utc(y, m, d, h).subtract(const Duration(hours: 5, minutes: 30));
@@ -41,7 +49,7 @@ void main() {
       source: RatingWindowSource.deadline,
       closed: false,
       opensAt: ist(n.year, n.month, 1),
-      closesAt: ist(n.year, n.month, stage.publishedDeadlineDay ?? 10, 23),
+      closesAt: ist(n.year, n.month, kStageWindowCloseDay, 23),
     );
   }
 

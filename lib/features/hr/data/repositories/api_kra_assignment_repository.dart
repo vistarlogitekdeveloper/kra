@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../../core/api/api_constants.dart';
 import '../models/bulk_assign_result.dart';
 import '../models/kra_assignment.dart';
+import '../models/kra_unassign_result.dart';
 import '../models/kra_template_item.dart';
 import '../../../../core/api/envelope.dart';
 import 'kra_assignment_repository.dart';
@@ -174,4 +175,34 @@ class ApiKraAssignmentRepository implements KraAssignmentRepository {
   static String _date(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Future<KraUnassignResult> unassign(String id) async {
+    try {
+      final response = await _dio.delete('${ApiConstants.kraAssignments}/$id');
+      return KraUnassignResult.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
+  Future<KraUnassignAllResult> unassignAllForEmployee(
+    String employeeId, {
+    String? cycleId,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        '${ApiConstants.kraAssignments}/employee/$employeeId',
+        // Omitted entirely to clear EVERY cycle; sending it empty would scope
+        // the call to a cycle with no id and clear nothing.
+        queryParameters: {
+          if (cycleId != null && cycleId.isNotEmpty) 'cycleId': cycleId,
+        },
+      );
+      return KraUnassignAllResult.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
 }

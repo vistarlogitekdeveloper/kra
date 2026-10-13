@@ -18,7 +18,7 @@ import 'monthly_review.dart';
 /// manager's ceiling, a completed (paid) review and management's lock all
 /// still apply, on the client and on the server.
 ///
-/// Held process-wide and adopted at boot, like `DeadlineSchedule`, because the
+/// Held process-wide and adopted at boot because the
 /// gates that read it are synchronous. Empty until adopted, so anywhere boot
 /// has not run — including every test that does not opt in — sees the ordinary
 /// window.

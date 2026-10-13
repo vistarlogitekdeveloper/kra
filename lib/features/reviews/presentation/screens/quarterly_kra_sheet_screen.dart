@@ -904,18 +904,46 @@ class _QuarterlyKraSheetScreenState
 
   /// Reopens a locked management review across the quarter so its scores can be
   /// revised, then re-locked.
+  /// Reopens the management review for the months the user picks.
+  ///
+  /// Month-wise rather than quarter-wide. The bar sits under a sheet showing
+  /// three months and used to unlock every locked one at once — so correcting
+  /// August also threw July and September back open, unsettling incentives
+  /// nobody had asked to revisit. Each month locks on its own, so each
+  /// reopens on its own.
+  ///
+  /// With a single month locked there is no choice to make and the picker is
+  /// skipped; the toast still names the month, because the button sits on a
+  /// quarter and "reopened" alone does not say what moved.
   Future<void> _reopenManagement(List<MonthlyReview?> reviews) async {
+    final locked = [
+      for (final r in reviews)
+        if (r != null && r.isManagementLocked) r,
+    ];
+    if (locked.isEmpty) return;
+
+    final List<MonthlyReview> chosen;
+    if (locked.length == 1) {
+      chosen = locked;
+    } else {
+      final picked = await _ReopenMonthsDialog.show(context, locked: locked);
+      if (picked == null || picked.isEmpty) return;
+      chosen = picked;
+    }
+    if (!mounted) return;
+
     setState(() => _saving = true);
     try {
       final repo = ref.read(monthlyReviewRepositoryProvider);
-      for (final review in reviews) {
-        if (review == null || !review.isManagementLocked) continue;
+      for (final review in chosen) {
         await repo.unlockManagement(review.id);
       }
       ref.invalidate(quarterlySheetProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Management review reopened — you can edit again.')));
+        final months = chosen.map((r) => r.period.shortLabel).join(', ');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Management review reopened for $months — you can '
+                'edit those months again.')));
       }
     } catch (e) {
       _refreshIfRatingClosed(e);
@@ -1849,6 +1877,7 @@ class _Sheet extends StatelessWidget {
     // Name the month that is actually outstanding rather than saying "this
     // sheet". The sheet covers a quarter, so a generic hint lets someone fill in
     // the wrong month, believe they are finished, and still be chased as overdue.
+    // `now` is main's local (clock ?? DateTime.now()), resolved once above.
     final dueMonth = _currentMonthNeedingSelfRating(months, reviews, now);
     // Months a super admin has reopened — empty on an older backend, and on
     // every sheet without a reopen, which then renders exactly as before.
@@ -1856,65 +1885,43 @@ class _Sheet extends StatelessWidget {
     // The months management's lock bar acts on (see managementSignOffReviews):
     // every month present on an older backend.
     final signOff = managementSignOffReviews(reviews, now);
-    // Whose stage this viewer owns, and therefore which deadline applies. A
-    // flat if-chain rather than nested ternaries: each branch now carries a
-    // stage as well as a sentence.
-    final String scopeBase;
-    final ReviewStage? scopeStage;
+    // What this viewer may do on this sheet. A flat if-chain rather than
+    // nested ternaries — each branch carried a STAGE as well, to resolve that
+    // stage's deadline; deadlines are gone, so the sentence is all that is
+    // left to choose.
+    final String scopeLabel;
     if (canSelf) {
       // "closed", not "current": dueMonth comes from _currentMonthNeedingSelfRating,
       // which resolves through ReviewPeriod.openForRating — the month that has
       // FINISHED, never the one still running. Calling it the current month
       // contradicted the helper directly below.
-      scopeBase = dueMonth != null
+      scopeLabel = dueMonth != null
           ? 'Rate your ${dueMonth.shortLabel} Self column — that month has '
               'closed and it is still empty.'
           : 'You can edit the Self ratings on this sheet.';
-      scopeStage = ReviewStage.selfRating;
     } else if (canMgr) {
       // The same seat reads differently in each pipeline. Under
       // administrators-only it is management picking up whatever HR and
       // Accounts were not assigned, so naming the reporting manager here
       // would describe a relationship the flow no longer uses.
-      //
-      // The DEADLINE is the column's either way. Whoever fills it, it is the
-      // Reporting Manager column being filled, and the 13th is what the
-      // backend counts REPORTING_MANAGER_RATING down to.
-      scopeBase =
+      scopeLabel =
           stageIsRelationshipGated(ReviewStage.reportingManagerRating, flow)
               ? 'You can rate the KRAs assigned to you as Reporting Manager — '
                   'tap a Review cell.'
               : 'You can rate the KRAs left to Management — the ones not '
                   'assigned to HR or Accounts. Tap a Review cell.';
-      scopeStage = ReviewStage.reportingManagerRating;
     } else if (canHr) {
-      scopeBase = 'You can rate the KRAs assigned to HR — tap a Review cell.';
-      scopeStage = ReviewStage.accountHrRating;
+      scopeLabel = 'You can rate the KRAs assigned to HR — tap a Review cell.';
     } else if (canFin) {
-      scopeBase =
+      scopeLabel =
           'You can rate the KRAs assigned to Accounts — tap a Review cell.';
-      scopeStage = ReviewStage.financeRating;
     } else if (canMgmt) {
-      scopeBase = 'You can enter the Management rating for each KRA.';
-      scopeStage = ReviewStage.managementReview;
+      scopeLabel = 'You can enter the Management rating for each KRA.';
     } else if (allComplete) {
-      scopeBase = 'This quarter is completed — scores are locked.';
-      scopeStage = null; // nothing is due on a finished quarter
+      scopeLabel = 'This quarter is completed — scores are locked.';
     } else {
-      scopeBase = 'View only — you cannot edit this sheet.';
-      scopeStage = null;
+      scopeLabel = 'View only — you cannot edit this sheet.';
     }
-
-    // The deadline for the stage this viewer actually owns.
-    //
-    // Until now only the employee self-rate and manager-rate screens carried a
-    // deadline cue, so HR, Accounts and Management — who do all their work on
-    // THIS sheet — were never shown a date anywhere in the app. Resolved from
-    // ReviewStage.deadlineDay, the same source every other countdown uses.
-    final dueDay = scopeStage?.deadlineDay;
-    final scopeLabel = dueDay == null
-        ? scopeBase
-        : '$scopeBase${AppStrings.dueByEachMonth(dueDay)}';
 
     // Payout follows the FINAL score (management override → Review average →
     // self), quarter-averaged across the three months.
@@ -5187,3 +5194,98 @@ ReviewPeriod? _currentMonthNeedingSelfRating(
 /// find the month still owing a self-rating.
 bool _isOpenReviewMonth(ReviewPeriod m, DateTime now) =>
     m.key == ReviewPeriod.openForRating(now).key;
+
+/// Asks WHICH locked months to reopen.
+///
+/// The lock settles an incentive to a set of management scores, so reopening
+/// is not a neutral act — it puts a figure somebody signed off back in play.
+/// Nothing is ticked by default and the button stays disabled until something
+/// is: an action with that consequence should not be reachable by reflex, and
+/// a pre-ticked list is exactly the quarter-wide behaviour this replaces.
+class _ReopenMonthsDialog extends StatefulWidget {
+  final List<MonthlyReview> locked;
+  const _ReopenMonthsDialog({required this.locked});
+
+  /// The months chosen, or null if the user backed out.
+  static Future<List<MonthlyReview>?> show(
+    BuildContext context, {
+    required List<MonthlyReview> locked,
+  }) =>
+      showDialog<List<MonthlyReview>>(
+        context: context,
+        builder: (_) => _ReopenMonthsDialog(locked: locked),
+      );
+
+  @override
+  State<_ReopenMonthsDialog> createState() => _ReopenMonthsDialogState();
+}
+
+class _ReopenMonthsDialogState extends State<_ReopenMonthsDialog> {
+  final Set<String> _selected = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: const Text(
+        'Reopen which months?',
+        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5),
+      ),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Each month is locked on its own. Reopening one leaves the others '
+            'settled.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final review in widget.locked)
+            CheckboxListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              value: _selected.contains(review.id),
+              onChanged: (on) => setState(() {
+                if (on == true) {
+                  _selected.add(review.id);
+                } else {
+                  _selected.remove(review.id);
+                }
+              }),
+              title: Text(
+                review.period.shortLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(AppStrings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: _selected.isEmpty
+              ? null
+              : () => Navigator.of(context).pop([
+                    for (final r in widget.locked)
+                      if (_selected.contains(r.id)) r,
+                  ]),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primaryPurple,
+          ),
+          child: Text('Reopen (${_selected.length})'),
+        ),
+      ],
+    );
+  }
+}

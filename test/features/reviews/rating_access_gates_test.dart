@@ -23,6 +23,14 @@ import 'package:vistar_app/features/reviews/presentation/screens/quarterly_kra_s
 ///
 /// The other half matters as much: with NO window — an older backend — every
 /// gate behaves exactly as it did before.
+/// Day of month a stage window closes on in these fixtures.
+///
+/// Was `stage.publishedDeadlineDay ?? 10` — the client no longer holds a
+/// deadline table, and the real value comes from the server on RatingWindow
+/// anyway. The day is incidental here: these tests assert ACCESS, and pass an
+/// explicit closesAt wherever the exact moment matters.
+const kStageWindowCloseDay = 10;
+
 void main() {
   // The server resolves every instant in IST. Noon on 2 Oct 2026: September
   // is the calendar's open month and its windows run to the 10th–15th; July
@@ -52,7 +60,7 @@ void main() {
   }) {
     final n = month.next;
     final deadlineAt =
-        ist(n.year, n.month, stage.publishedDeadlineDay ?? 10, 23, 59, 59, 999);
+        ist(n.year, n.month, kStageWindowCloseDay, 23, 59, 59, 999);
     final closed = source == RatingWindowSource.closed;
     return RatingWindow(
       source: source,

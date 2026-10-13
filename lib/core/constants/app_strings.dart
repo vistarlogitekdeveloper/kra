@@ -392,6 +392,63 @@ class AppStrings {
       'assignments and incentive slabs.';
 
   /// Shown when the employee is still somebody's reporting manager.
+  // ───── Permanent delete (purge) ─────
+  //
+  // A SECOND, separate action from Delete/deactivate — never a replacement.
+  // Deactivate refuses while reports or in-progress reviews exist, which is
+  // the safe default; this one never refuses and cannot be undone.
+  static const String employeePurgeAction = 'Delete permanently';
+  static const String employeePurgeTitle = 'Delete permanently?';
+  static const String employeePurgeIrreversible = 'This cannot be undone.';
+  static const String employeePurgeNothingElse =
+      'This will permanently delete this employee.';
+  static const String employeePurgeOwnHeading = 'Their own records';
+  static const String employeePurgeOthersHeading =
+      'Records belonging to OTHER employees';
+  static const String employeePurgeOthersWhy =
+      'This person entered these on other employees’ sheets. Deleting them '
+      'removes that work from those employees too.';
+  static const String employeePurgeDetachHeading = 'Reporting lines';
+  static const String employeePurgeConfirm = 'Yes, delete permanently';
+  static const String employeePurgeSuccess = 'Employee deleted.';
+  static const String employeePurgeFailed =
+      'Could not delete permanently. Please try again.';
+  static const String employeePurgeImpactFailed =
+      'Could not check what this would remove. Nothing has been deleted.';
+
+  /// "3 reviews", "1 review" — a count with its noun agreed.
+  static String countOf(int n, String singular, String plural) =>
+      '$n ${n == 1 ? singular : plural}';
+
+  /// "5 direct reports will be left without a manager."
+  static String employeePurgeDetaches(int n) =>
+      '${countOf(n, 'direct report', 'direct reports')} will be left without '
+      'a manager. Reassign them first if that matters.';
+
+  // ───── Unassigning KRAs ─────
+  static const String kraUnassignAction = 'Unassign';
+  static const String kraUnassignAllAction = 'Unassign all KRAs';
+  static const String kraUnassignConfirmTitle = 'Unassign this KRA?';
+  static const String kraUnassignConfirmMessage =
+      'The assignment is removed. A review already in progress is kept.';
+  static const String kraUnassignAllConfirmTitle = 'Unassign every KRA?';
+  static const String kraUnassignAllConfirmMessage =
+      'Removes every KRA assignment for this employee, across all cycles. '
+      'Reviews that already carry scores are kept.';
+  static const String kraUnassignSuccess = 'KRA unassigned.';
+  static const String kraUnassignNone = 'No KRAs to unassign.';
+  static const String kraUnassignFailed =
+      'Could not unassign. Please try again.';
+
+  /// Said when the assignment went but a scored review did not — a half-done
+  /// state the user would otherwise find later on their own.
+  static const String kraUnassignReviewKept =
+      'KRA unassigned, but a review already in progress was kept. Reset or '
+      'delete that review separately to remove it.';
+
+  static String kraUnassignAllSuccess(int n) =>
+      '${countOf(n, 'KRA', 'KRAs')} unassigned.';
+
   static const String employeesDeactivateBlockedReports =
       'Cannot delete: they still have direct reports. Move that team to '
       'another reporting manager first.';
@@ -939,7 +996,6 @@ class AppStrings {
   static const String hrActionItemsTitle = 'Needs your attention';
   static const String hrAllCaughtUp = 'All caught up! 🎉';
   static const String hrHeatmapTitle = 'Location Heatmap';
-  static const String hrDeadlinesTitle = 'Upcoming Deadlines';
   static const String hrRecentActivityTitle = 'Recent Activity';
   static const String hrOverdue = 'OVERDUE';
 
@@ -999,59 +1055,6 @@ class AppStrings {
   static const String homeIncentiveCaption =
       'Based on finalized reviews. Subject to change.';
   static const String homeIncentiveOf = 'of';
-
-  // ───── Deadline banner ─────
-  static const String deadlineSelfRatingClosesIn = 'Self-rating closes in';
-  static const String deadlineDay = 'day';
-  static const String deadlineDays = 'days';
-  static const String deadlineOverdue = 'Self-rating overdue — submit now';
-
-  /// Overdue wording that NAMES the month.
-  ///
-  /// The plain "Self-rating overdue" was read as "my self-rating", full stop —
-  /// so an employee who had rated an earlier month of the quarter saw it as a
-  /// bug rather than as a different month being due. The sheet covers three
-  /// months; the banner has to say which one it means.
-  static String deadlineOverdueFor(String monthLabel) =>
-      "$monthLabel self-rating is overdue — submit now";
-
-  /// Overdue, but the scores are already typed in and never submitted.
-  /// Saying "overdue" alone to someone who has filled the whole column reads
-  /// as the app losing their work.
-  static String deadlineUnsubmittedFor(String monthLabel) =>
-      "$monthLabel self-rating is filled in but not submitted — tap to submit";
-
-  /// Due-soon wording that names the month, for the same reason.
-  static String deadlineClosesInFor(String monthLabel, int days) =>
-      "$monthLabel self-rating closes in $days "
-      "${days == 1 ? deadlineDay : deadlineDays}";
-
-  /// "the 10th" / "the 12th" / "the 3rd" — an ordinal day for deadline copy.
-  ///
-  /// English ordinals, because the app is English-only today; the 11th-13th
-  /// exceptions are the ones a naive last-digit rule gets wrong.
-  static String ordinalDay(int day) {
-    final suffix = (day % 100 >= 11 && day % 100 <= 13)
-        ? 'th'
-        : switch (day % 10) { 1 => 'st', 2 => 'nd', 3 => 'rd', _ => 'th' };
-    return 'the $day$suffix';
-  }
-
-  /// The recurring due date for a stage, for copy that sits beside the action.
-  ///
-  /// Phrased per MONTH rather than as a date, because the quarterly sheet shows
-  /// three months at once and a single date would be wrong for two of them.
-  static String dueByEachMonth(int day) =>
-      ' Due by ${ordinalDay(day)} of each month.';
-
-  // ───── Monthly deadline notices ─────
-  //
-  // Dates are NOT written here. Every countdown resolves through
-  // ReviewStage.deadlineDay so the copy cannot drift from the schedule the
-  // app counts down to — this header claimed "self 7th / manager 10th" long
-  // after both had moved.
-  static const String deadlineSelfRatingTitle = 'Self-rating deadline';
-  static const String deadlineManagerRatingTitle = 'Manager rating deadline';
 
   // ───── Monthly reviews (new pipeline) ─────
   static const String monthlyReviewsTitleSelf = 'My Monthly Reviews';
@@ -1287,8 +1290,6 @@ class AppStrings {
   static const String managerDashboardTrendLowest = 'Lowest';
   static const String managerDashboardTrendCompletion = 'Completion rate';
   static const String managerDashboardActiveCycle = 'Active cycle';
-  static const String managerDashboardManagerDeadline =
-      'Manager review deadline';
   static const String managerDashboardNoReportsTitle =
       'You don\'t manage any team members';
   static const String managerDashboardNoReportsMessage =
@@ -1410,10 +1411,6 @@ class AppStrings {
   static const String managerRateConfirmMessage =
       'Once submitted, you cannot change scores unless you reopen within the deadline.';
   static const String managerRateOfflineTooltip = 'Internet required to submit';
-  static const String managerRateDeadlineWarning =
-      'Manager review deadline approaching';
-  static const String managerRateDeadlinePassed =
-      'Manager review deadline has passed';
   static const String managerRateSuccessTitle = 'Review submitted ✓';
   static const String managerRateSuccessSubtitle = 'Your rating is locked in.';
   static const String managerRateSuccessViewSubmission = 'View submission';
@@ -1429,8 +1426,6 @@ class AppStrings {
       'Ops or Finance hasn\'t filled in some scores yet.';
   static const String managerRateErrorMonthLocked =
       'One of the months in this review is locked.';
-  static const String managerRateErrorDeadlinePassed =
-      'Review deadline has passed.';
 
   // ───── Bulk approve ─────
   static const String bulkApproveTitle = 'Approve reviews';

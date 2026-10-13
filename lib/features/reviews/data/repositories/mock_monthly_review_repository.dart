@@ -96,7 +96,9 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
       records[stage] = StageRecord(
         actorId: stage == ReviewStage.selfRating ? employee.id : manager.id,
         actorName: stage == ReviewStage.selfRating ? employee.name : 'System',
-        submittedAt: period.dateOn(stage.deadlineDay ?? 1),
+        // A fixed mid-month day. This used to read the deadline schedule,
+        // which no longer exists; the value is only a plausible timestamp.
+        submittedAt: period.dateOn(10),
       );
       if (stage.isRatingStage) {
         rows = [
