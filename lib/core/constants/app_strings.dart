@@ -202,6 +202,32 @@ class AppStrings {
       'Rating for this month is closed. A super admin can reopen it from '
       'Organizations → Rating access.';
 
+  // The management sign-off bar. THREE states, not two.
+  //
+  // A quarter can be partly locked — and reopening a month's rating window
+  // from Organizations → Rating access is what creates that state, because it
+  // brings a locked month back into the bar's scope beside unlocked ones. The
+  // bar used to offer Reopen only when EVERY month was locked, so the act of
+  // opening August's window removed the only control that could unlock it.
+  //
+  // The two locks are genuinely different and the copy has to say so: the
+  // rating window decides WHEN management may write, the review's own lock
+  // decides whether the incentive is settled. Opening the first does not
+  // clear the second.
+  static const String sheetMgmtLockTitle = 'Management review';
+  static const String sheetMgmtLockTitleLocked = 'Management review locked';
+  static String sheetMgmtLockTitleMixed(int locked, int total) =>
+      'Management review — $locked of $total months locked';
+  static const String sheetMgmtLockBody =
+      'Saves the Management column — the Review score for every KRA you '
+      'haven’t changed, plus your edits — and locks the incentive to it.';
+  static const String sheetMgmtLockBodyLocked =
+      'The incentive is locked to these management scores. Reopen to change '
+      'them.';
+  static const String sheetMgmtLockBodyMixed =
+      'Save & Lock covers the months still open. Reopen to change one that is '
+      'already locked — reopening a month for rating does not unlock it.';
+
   static const String sheetReworkAction = 'Send back for rework';
   static const String sheetReworkTitle = 'Send self-rating back for rework?';
   static const String sheetReworkMessage =

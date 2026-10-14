@@ -1950,6 +1950,13 @@ class _Sheet extends StatelessWidget {
     // The months management's lock bar acts on (see managementSignOffReviews):
     // every month present on an older backend.
     final signOff = managementSignOffReviews(reviews, now);
+    // How the quarter is locked, for the bar. Both ends matter: a quarter with
+    // some months locked and some not needs BOTH actions, and offering only
+    // one of them is what made a locked August unreachable.
+    final reopenGroups = managementReopenGroups(reviews, now);
+    final lockedInView =
+        reopenGroups.reopenable.length + reopenGroups.blocked.length;
+    final unlockedSignOff = signOff.where((r) => !r.isManagementLocked).length;
     // What this viewer may do on this sheet. A flat if-chain rather than
     // nested ternaries — each branch carried a STAGE as well, to resolve that
     // stage's deadline; deadlines are gone, so the sentence is all that is
@@ -2138,13 +2145,18 @@ class _Sheet extends StatelessWidget {
             if (onLockManagement != null) ...[
               const SizedBox(height: 14),
               _LockManagementBar(
-                // Locked once every month the bar acts on is locked — on an
-                // older backend, every month present this quarter. Judged
-                // over the same months the actions cover, or a locked July
-                // whose window is shut would hold the bar on "Save & Lock"
-                // for an open August that is already locked.
-                locked: signOff.isNotEmpty &&
-                    signOff.every((r) => r.isManagementLocked),
+                // Counted, not an all-or-nothing flag. A quarter is routinely
+                // PART locked, and the bar used to collapse that to "not
+                // locked" and drop the Reopen button entirely — so a single
+                // locked month among three could not be reached at all.
+                //
+                // Locked months are counted over the whole quarter, because
+                // the picker explains a locked month whose window has shut as
+                // well as offering the ones it can act on. Unlocked months are
+                // counted over `signOff`, since those are the ones Save & Lock
+                // can actually write.
+                lockedMonths: lockedInView,
+                unlockedMonths: unlockedSignOff,
                 onSave: onLockManagement!,
                 onReopen: onReopenManagement,
               ),
@@ -2170,12 +2182,30 @@ class _Sheet extends StatelessWidget {
 /// and persists the whole Management column, so the incentive is locked to the
 /// management review (unchanged rows keep the stage-2 Review score they
 /// inherited). Once LOCKED it reads as locked and offers "Reopen" to revise.
+/// Management's Save & Lock / Reopen bar.
+///
+/// THREE states, because a quarter is routinely part locked. The bar used to
+/// take a single `locked` flag meaning "every month is locked", and showed
+/// Reopen only then — so one locked month beside two unlocked ones offered
+/// Save & Lock and nothing else, and that month could not be unlocked from
+/// anywhere in the app.
+///
+/// Reopening a month's rating window is what produces that state in practice:
+/// it brings a locked month back into the bar's scope alongside unlocked ones,
+/// which flipped the flag false and took the Reopen button away — the exact
+/// opposite of what the person reopening it wanted.
 class _LockManagementBar extends StatefulWidget {
-  final bool locked;
+  /// Locked months across the quarter — including any whose rating window has
+  /// shut, which the picker lists and explains rather than acts on.
+  final int lockedMonths;
+
+  /// Months the sign-off can still write, i.e. not locked yet.
+  final int unlockedMonths;
   final Future<void> Function() onSave;
   final Future<void> Function()? onReopen;
   const _LockManagementBar({
-    required this.locked,
+    required this.lockedMonths,
+    required this.unlockedMonths,
     required this.onSave,
     required this.onReopen,
   });
@@ -2199,8 +2229,28 @@ class _LockManagementBarState extends State<_LockManagementBar> {
 
   @override
   Widget build(BuildContext context) {
-    final locked = widget.locked;
-    final accent = locked ? AppColors.success : AppColors.primaryPurple;
+    // Which of the three states this quarter is in. `allLocked` is the old
+    // `locked` flag; the middle case is the one it could not express.
+    final anyLocked = widget.lockedMonths > 0;
+    final allLocked = anyLocked && widget.unlockedMonths == 0;
+    final showReopen = anyLocked && widget.onReopen != null;
+    final showSave = widget.unlockedMonths > 0;
+    final accent = allLocked ? AppColors.success : AppColors.primaryPurple;
+
+    final String title;
+    final String body;
+    if (allLocked) {
+      title = AppStrings.sheetMgmtLockTitleLocked;
+      body = AppStrings.sheetMgmtLockBodyLocked;
+    } else if (anyLocked) {
+      title = AppStrings.sheetMgmtLockTitleMixed(
+          widget.lockedMonths, widget.lockedMonths + widget.unlockedMonths);
+      body = AppStrings.sheetMgmtLockBodyMixed;
+    } else {
+      title = AppStrings.sheetMgmtLockTitle;
+      body = AppStrings.sheetMgmtLockBody;
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(14),
@@ -2218,7 +2268,7 @@ class _LockManagementBarState extends State<_LockManagementBar> {
               color: accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(locked ? Icons.lock_rounded : Icons.verified_rounded,
+            child: Icon(anyLocked ? Icons.lock_rounded : Icons.verified_rounded,
                 color: accent, size: 22),
           ),
           const SizedBox(width: 12),
@@ -2227,19 +2277,14 @@ class _LockManagementBarState extends State<_LockManagementBar> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(locked ? 'Management review locked' : 'Management review',
+                Text(title,
                     style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary)),
                 const SizedBox(height: 2),
                 Text(
-                  locked
-                      ? 'The incentive is locked to these management scores. '
-                          'Reopen to change them.'
-                      : 'Saves the Management column — the Review score for '
-                          'every KRA you haven’t changed, plus your edits — and '
-                          'locks the incentive to it.',
+                  body,
                   style: TextStyle(
                       fontSize: 11.5,
                       height: 1.3,
@@ -2249,46 +2294,62 @@ class _LockManagementBarState extends State<_LockManagementBar> {
             ),
           ),
           const SizedBox(width: 12),
-          if (locked)
-            OutlinedButton.icon(
-              onPressed: (_busy || widget.onReopen == null)
-                  ? null
-                  : () => _run(widget.onReopen!),
-              icon: _busy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2.2),
-                    )
-                  : const Icon(Icons.lock_open_rounded, size: 18),
-              label: const Text('Reopen'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryPurple,
-                side: BorderSide(
-                    color: AppColors.primaryPurple.withValues(alpha: 0.5)),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            )
-          else
-            FilledButton.icon(
-              onPressed: _busy ? null : () => _run(widget.onSave),
-              icon: _busy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2.2, color: Colors.white),
-                    )
-                  : const Icon(Icons.lock_rounded, size: 18),
-              label: const Text('Save & Lock'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primaryPurple,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
+          // Stacked, never side by side. Two buttons and the explanation
+          // compete for one phone-width Row, and the Expanded text is what
+          // gives — squeezed towards nothing while the buttons keep their
+          // intrinsic width. Height is the cheaper thing to spend here.
+          //
+          // IntrinsicWidth so the two buttons match the wider of them —
+          // `stretch` alone cannot, because a non-flex child of a Row is laid
+          // out with unbounded width and stretching to it is infinite.
+          IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (showSave)
+                  FilledButton.icon(
+                    onPressed: _busy ? null : () => _run(widget.onSave),
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.2, color: Colors.white),
+                          )
+                        : const Icon(Icons.lock_rounded, size: 18),
+                    label: const Text('Save & Lock'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primaryPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                if (showSave && showReopen) const SizedBox(height: 8),
+                if (showReopen)
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _run(widget.onReopen!),
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2.2),
+                          )
+                        : const Icon(Icons.lock_open_rounded, size: 18),
+                    label: const Text('Reopen'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryPurple,
+                      side: BorderSide(
+                          color:
+                              AppColors.primaryPurple.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );
