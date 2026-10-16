@@ -643,6 +643,94 @@ void main() {
   /// It cannot simply be made selectable: the server gates unlock on the same
   /// MANAGEMENT_REVIEW window as the lock, so offering it would earn a 403.
   /// It has to be listed AND explained, which is why this returns both halves.
+  /// The super admin is the authority on locks.
+  ///
+  /// Three locks used to answer independently — the rating window,
+  /// `managementLockedAt`, and a COMPLETED cursor — so opening a month changed
+  /// nothing a user could see. `superAdminOpened` is the client half of the
+  /// server's `supersedesReviewLocks`, and the two must agree exactly: more
+  /// permissive here offers a cell whose save returns 409, stricter here hides
+  /// work the server would accept.
+  group('superAdminOpened', () {
+    MonthlyReview month(ReviewPeriod period,
+            [Map<ReviewStage, RatingWindow>? ratingWindows]) =>
+        MonthlyReview(
+          id: 'r-${period.key}',
+          employeeId: 'emp1',
+          employeeName: 'Asha',
+          period: period,
+          currentStage: ReviewStage.managementReview,
+          rows: [row(self: 8)],
+          ratingWindows: ratingWindows,
+          managementLockedAt: ist(2026, 10, 1),
+        );
+
+    test('a super-admin OPEN that is still live overrides the lock', () {
+      final r = month(
+          august,
+          windows(august, {
+            ReviewStage.managementReview:
+                opened(august, ReviewStage.managementReview),
+          }));
+
+      expect(superAdminOpened(r, ReviewStage.managementReview, now), isTrue);
+    });
+
+    test('the ordinary DEADLINE window never does', () {
+      // THE load-bearing case. If the deadline overrode the lock, Save & Lock
+      // would be a no-op until the day it expired — and settling the incentive
+      // during exactly that stretch is what the button is for.
+      final r = month(september, windows(september)); // runs to the 10th
+      expect(managementSignOffReviews([r], now), isNotEmpty,
+          reason: 'precondition: the deadline window IS open');
+      expect(superAdminOpened(r, ReviewStage.managementReview, now), isFalse);
+    });
+
+    test('an EXPIRED super-admin open does not override', () {
+      // Source alone is not enough — a grant that has run out is not a grant.
+      final r = month(
+          august,
+          windows(august, {
+            ReviewStage.managementReview: window(
+                august, ReviewStage.managementReview,
+                source: RatingWindowSource.opened, closesAt: ist(2026, 9, 20)),
+          }));
+
+      expect(superAdminOpened(r, ReviewStage.managementReview, now), isFalse);
+    });
+
+    test('a force-CLOSED override never overrides', () {
+      final r = month(
+          august,
+          windows(august, {
+            ReviewStage.managementReview:
+                forceClosed(august, ReviewStage.managementReview),
+          }));
+
+      expect(superAdminOpened(r, ReviewStage.managementReview, now), isFalse);
+    });
+
+    test('no windows at all overrides nothing', () {
+      // An older backend sends no `ratingAccess`. There is no super-admin
+      // instruction to honour, so the lock stands exactly as it did.
+      expect(superAdminOpened(month(august), ReviewStage.managementReview, now),
+          isFalse);
+    });
+
+    test('it is asked PER STAGE, not per month', () {
+      // Opening the management seat must not unlock the self column too.
+      final r = month(
+          august,
+          windows(august, {
+            ReviewStage.managementReview:
+                opened(august, ReviewStage.managementReview),
+          }));
+
+      expect(superAdminOpened(r, ReviewStage.managementReview, now), isTrue);
+      expect(superAdminOpened(r, ReviewStage.selfRating, now), isFalse);
+    });
+  });
+
   group('managementReopenGroups', () {
     MonthlyReview month(
       ReviewPeriod period, {

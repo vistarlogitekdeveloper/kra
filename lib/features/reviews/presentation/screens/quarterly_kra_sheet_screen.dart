@@ -1270,6 +1270,28 @@ extension _Let<T> on T {
 bool _windowOpen(RatingWindow window, ReviewPeriod month, DateTime now) =>
     month.isRatableOn(now) && window.isOpenAt(now);
 
+/// Whether a SUPER ADMIN has explicitly opened [stage] of [r]'s month and that
+/// grant is still live at [now] — in which case it overrides the review's OWN
+/// locks, `managementLockedAt` above all.
+///
+/// The mirror of the server's `supersedesReviewLocks`, and it has to stay one:
+/// a client that is more permissive offers a cell whose save comes back 409,
+/// and one that is stricter hides work the server would accept, which is how
+/// "I reopened the month and nothing happened" kept being reported.
+///
+/// [RatingWindowSource.opened] ONLY. A plain deadline window must not override
+/// a lock — settling an incentive with Save & Lock during the stretch before
+/// the deadline is the whole purpose of the lock, so letting the deadline void
+/// it would make the button a no-op until the day it expires. A closed
+/// override needs no handling: [_windowOpen] already refuses it.
+@visibleForTesting
+bool superAdminOpened(MonthlyReview r, ReviewStage stage, DateTime now) {
+  final window = r.windowFor(stage);
+  return window != null &&
+      window.source == RatingWindowSource.opened &&
+      _windowOpen(window, r.period, now);
+}
+
 /// Whether [r]'s window for [stage] is open at [now] — true when the server
 /// sent none, which leaves the caller's own rule to decide on its own.
 bool _stageWindowOpen(MonthlyReview r, ReviewStage stage, DateTime now) {
@@ -3087,7 +3109,15 @@ class _GridState extends State<_Grid> {
                     // and must not overwrite HR's or Accounts' own scores.
                     managementMayScoreRow(
                         row as MonthlyKraRow, widget.reviewFlow) &&
-                    !r.isManagementLocked &&
+                    // The super admin is the authority on locks: an explicit
+                    // OPEN for the month overrides Save & Lock, exactly as
+                    // saveScores and submitStage now do server-side. Without
+                    // this the cell stays read-only after a reopen the server
+                    // would honour — which is what "I reopened August and
+                    // nothing happened" was.
+                    (!r.isManagementLocked ||
+                        superAdminOpened(
+                            r, ReviewStage.managementReview, widget.now)) &&
                     _open(i, row, ReviewStage.managementReview))),
       ],
       if (_showSelf)
