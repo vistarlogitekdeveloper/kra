@@ -252,6 +252,24 @@ class _DetailContent extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
+          )
+        else
+          // Deactivated: hidden from every list and review until restored.
+          FilledButton.icon(
+            onPressed: () => _confirmReactivate(context),
+            icon: const Icon(Icons.restore_rounded),
+            label: const Text(
+              AppStrings.employeesActionReactivate,
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
           ),
         // The irreversible one. Kept apart from the button above and worded as
         // a different act, because the two are a soft delete and a hard one —
@@ -302,6 +320,31 @@ class _DetailContent extends StatelessWidget {
             Text(success ? AppStrings.employeesDeactivateSuccess : failure),
         backgroundColor: success ? null : AppColors.error,
         duration: Duration(seconds: success ? 4 : 10),
+      ),
+    );
+    if (success) {
+      ref.invalidate(employeeDetailProvider(employee.id));
+      if (context.mounted) context.pop();
+    }
+  }
+
+  Future<void> _confirmReactivate(BuildContext context) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.employeesReactivateConfirmTitle,
+      message: AppStrings.employeesReactivateConfirmMessage,
+      confirmLabel: AppStrings.employeesActionReactivate,
+    );
+    if (ok != true || !context.mounted) return;
+    final failure =
+        await ref.read(employeeListProvider.notifier).reactivate(employee.id);
+    if (!context.mounted) return;
+    final success = failure == null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text(success ? AppStrings.employeesReactivateSuccess : failure),
+        backgroundColor: success ? null : AppColors.error,
       ),
     );
     if (success) {

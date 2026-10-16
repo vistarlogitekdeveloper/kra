@@ -125,19 +125,20 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
                 roles: _availableRoles,
                 onChanged: filterCtrl.setRole,
               ),
-              _ActiveFilterChip(
-                value: filter.isActive,
-                onChanged: filterCtrl.setActive,
-              ),
             ],
           ),
+          _SectionSwitch(
+            deactivated: filter.isActive == false,
+            onChanged: (deactivated) => filterCtrl.setActive(!deactivated),
+          ),
+          if (filter.isActive == false) const _DeactivatedBanner(),
           Expanded(
             child: RefreshIndicator(
               color: AppColors.primaryPurple,
               onRefresh: () async {
                 await ref.read(employeeListProvider.notifier).refresh();
               },
-              child: _buildBody(state, isSearching),
+              child: _buildBody(state, isSearching, filter.isActive == false),
             ),
           ),
         ],
@@ -145,7 +146,8 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
     );
   }
 
-  Widget _buildBody(EmployeeListState state, bool isSearching) {
+  Widget _buildBody(
+      EmployeeListState state, bool isSearching, bool deactivated) {
     if (state.isInitialLoading) return const _LoadingList();
 
     if (state.error != null) {
@@ -169,20 +171,28 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           const SizedBox(height: 60),
-          EmptyState(
-            icon:
-                isSearching ? Icons.search_off_rounded : Icons.groups_outlined,
-            title: isSearching
-                ? AppStrings.employeesNoSearchResults
-                : AppStrings.employeesEmptyTitle,
-            message: isSearching
-                ? AppStrings.employeesNoSearchHint
-                : AppStrings.employeesEmptyMessage,
-            actionLabel: isSearching ? null : AppStrings.employeesEmptyCta,
-            onAction: isSearching
-                ? null
-                : () => context.push(AppRoutes.hrEmployeeNew),
-          ),
+          if (deactivated && !isSearching)
+            const EmptyState(
+              icon: Icons.person_off_outlined,
+              title: AppStrings.employeesDeactivatedEmptyTitle,
+              message: AppStrings.employeesDeactivatedEmptyMessage,
+            )
+          else
+            EmptyState(
+              icon: isSearching
+                  ? Icons.search_off_rounded
+                  : Icons.groups_outlined,
+              title: isSearching
+                  ? AppStrings.employeesNoSearchResults
+                  : AppStrings.employeesEmptyTitle,
+              message: isSearching
+                  ? AppStrings.employeesNoSearchHint
+                  : AppStrings.employeesEmptyMessage,
+              actionLabel: isSearching ? null : AppStrings.employeesEmptyCta,
+              onAction: isSearching
+                  ? null
+                  : () => context.push(AppRoutes.hrEmployeeNew),
+            ),
         ],
       );
     }
@@ -201,6 +211,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
           onTap: () => context.push(AppRoutes.hrEmployeeDetail(employee.id)),
           onEdit: () => context.push(AppRoutes.hrEmployeeEdit(employee.id)),
           onDeactivate: () => _confirmDeactivate(employee.id),
+          onReactivate: () => _confirmReactivate(employee.id),
         );
       },
     );
@@ -229,6 +240,28 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
         duration: Duration(seconds: success ? 4 : 10),
       ),
     );
+  }
+
+  Future<void> _confirmReactivate(String employeeId) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.employeesReactivateConfirmTitle,
+      message: AppStrings.employeesReactivateConfirmMessage,
+      confirmLabel: AppStrings.employeesActionReactivate,
+    );
+    if (ok != true || !mounted) return;
+    final failure =
+        await ref.read(employeeListProvider.notifier).reactivate(employeeId);
+    if (!mounted) return;
+    final success = failure == null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text(success ? AppStrings.employeesReactivateSuccess : failure),
+        backgroundColor: success ? AppColors.textPrimary : AppColors.error,
+      ),
+    );
+    if (success) ref.invalidate(employeeDetailProvider(employeeId));
   }
 }
 
@@ -296,89 +329,81 @@ class _RoleFilterChip extends StatelessWidget {
   }
 }
 
-/// Three-way tri-state mapped to `bool?` at the boundary — see the comment
-/// on [_RoleFilterChip._allSentinel] for why we can't pass `null` as the
-/// value of a PopupMenuItem.
-enum _ActiveChoice { all, active, inactive }
+/// Active | Deactivated — the two sections of the Employees screen. A
+/// deactivated employee is listed only under Deactivated.
+class _SectionSwitch extends StatelessWidget {
+  final bool deactivated;
+  final ValueChanged<bool> onChanged;
 
-class _ActiveFilterChip extends StatelessWidget {
-  final bool? value;
-  final ValueChanged<bool?> onChanged;
-
-  const _ActiveFilterChip({required this.value, required this.onChanged});
-
-  _ActiveChoice get _choice => switch (value) {
-        null => _ActiveChoice.all,
-        true => _ActiveChoice.active,
-        false => _ActiveChoice.inactive,
-      };
+  const _SectionSwitch({required this.deactivated, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<_ActiveChoice>(
-      tooltip: 'Filter by status',
-      initialValue: _choice,
-      onSelected: (picked) {
-        switch (picked) {
-          case _ActiveChoice.all:
-            onChanged(null);
-          case _ActiveChoice.active:
-            onChanged(true);
-          case _ActiveChoice.inactive:
-            onChanged(false);
-        }
-      },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: _ActiveChoice.all,
-          child: Text(AppStrings.employeesFilterStatusAll),
-        ),
-        PopupMenuItem(
-          value: _ActiveChoice.active,
-          child: Text(AppStrings.employeesFilterStatusActive),
-        ),
-        PopupMenuItem(
-          value: _ActiveChoice.inactive,
-          child: Text(AppStrings.employeesFilterStatusInactive),
-        ),
-      ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              value == false
-                  ? Icons.toggle_off_outlined
-                  : Icons.toggle_on_outlined,
-              color: AppColors.textSecondary,
-              size: 18,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<bool>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(
+              value: false,
+              icon: Icon(Icons.groups_rounded, size: 18),
+              label: Text(AppStrings.employeesSectionActive),
             ),
-            const SizedBox(width: 6),
-            Text(
-              _label(value),
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+            ButtonSegment(
+              value: true,
+              icon: Icon(Icons.person_off_outlined, size: 18),
+              label: Text(AppStrings.employeesSectionDeactivated),
             ),
           ],
+          selected: {deactivated},
+          onSelectionChanged: (picked) => onChanged(picked.first),
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? AppColors.primaryPurple.withValues(alpha: 0.12)
+                  : AppColors.surface,
+            ),
+            foregroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? AppColors.primaryPurple
+                  : AppColors.textSecondary,
+            ),
+          ),
         ),
       ),
     );
   }
+}
 
-  String _label(bool? v) {
-    if (v == null) return AppStrings.employeesFilterStatusAll;
-    return v
-        ? AppStrings.employeesFilterStatusActive
-        : AppStrings.employeesFilterStatusInactive;
+class _DeactivatedBanner extends StatelessWidget {
+  const _DeactivatedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.divider.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded,
+              size: 18, color: AppColors.textSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              AppStrings.employeesDeactivatedBanner,
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -29,12 +29,16 @@ final employeeRepositoryProvider = Provider<EmployeeRepository>((ref) {
 class EmployeeFilter {
   final String search;
   final String? role;
+
+  /// Which section of the Employees screen: `true` = Active (the default),
+  /// `false` = Deactivated. A deactivated employee is shown nowhere else,
+  /// so the list never mixes the two.
   final bool? isActive;
 
   const EmployeeFilter({
     this.search = '',
     this.role,
-    this.isActive,
+    this.isActive = true,
   });
 
   EmployeeFilter copyWith({
@@ -285,7 +289,9 @@ class EmployeeListController extends StateNotifier<EmployeeListState> {
 
     try {
       await _repository.deactivate(id);
-      // If filter excludes inactive, the next refresh will drop it.
+      // The Active section shows active employees only, so the row leaves it
+      // now rather than lingering, greyed out, until the next refresh.
+      if (_filter.isActive == true) _drop(id);
       return null;
     } catch (e) {
       final revert = [...state.employees];
@@ -297,6 +303,31 @@ class EmployeeListController extends StateNotifier<EmployeeListState> {
       }
       return deactivateFailureReason(e);
     }
+  }
+
+  /// Bring a deactivated employee back: they return to the Active section and
+  /// to every list, picker and review screen. Returns null on success, or a
+  /// message to show.
+  Future<String?> reactivate(String id) async {
+    try {
+      await _repository.update(id, const {'isActive': true});
+      if (_filter.isActive == false) _drop(id);
+      return null;
+    } on ApiError catch (e) {
+      return e.message.isNotEmpty ? e.message : AppStrings.employeesReactivateFailed;
+    } catch (_) {
+      return AppStrings.employeesReactivateFailed;
+    }
+  }
+
+  void _drop(String id) {
+    final before = state.employees.length;
+    final next = state.employees.where((e) => e.id != id).toList();
+    if (next.length == before) return;
+    state = state.copyWith(
+      employees: next,
+      total: state.total > 0 ? state.total - 1 : 0,
+    );
   }
 }
 

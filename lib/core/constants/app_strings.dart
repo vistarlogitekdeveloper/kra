@@ -428,9 +428,24 @@ class AppStrings {
   static const String employeesTitle = 'Employees';
   static const String employeesSearchHint = 'Search by name, code, or email';
   static const String employeesFilterAll = 'All roles';
-  static const String employeesFilterStatusAll = 'Any status';
-  static const String employeesFilterStatusActive = 'Active only';
-  static const String employeesFilterStatusInactive = 'Inactive only';
+  // The Employees screen's two sections. A deactivated ("deleted") employee
+  // appears only under Deactivated — never in any other list, picker or review.
+  static const String employeesSectionActive = 'Active';
+  static const String employeesSectionDeactivated = 'Deactivated';
+  static const String employeesDeactivatedEmptyTitle = 'No deactivated employees';
+  static const String employeesDeactivatedEmptyMessage =
+      'Employees you delete are listed here, and can be restored.';
+  static const String employeesDeactivatedBanner =
+      'Deactivated employees are hidden from every list, review and report. '
+      'Reactivate someone to bring them back.';
+  static const String employeesActionReactivate = 'Reactivate';
+  static const String employeesReactivateConfirmTitle = 'Reactivate employee?';
+  static const String employeesReactivateConfirmMessage =
+      'They return to the active roster, can sign in again, and appear in '
+      'lists, reviews and reports.';
+  static const String employeesReactivateSuccess = 'Employee reactivated.';
+  static const String employeesReactivateFailed =
+      'Could not reactivate. Please try again.';
   static const String employeesEmptyTitle = 'No employees yet';
   static const String employeesEmptyMessage =
       'Add your first employee to get started.';

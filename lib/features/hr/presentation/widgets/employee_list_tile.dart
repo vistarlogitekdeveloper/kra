@@ -13,12 +13,16 @@ class EmployeeListTile extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDeactivate;
 
+  /// Shown instead of Delete on a deactivated row.
+  final VoidCallback? onReactivate;
+
   const EmployeeListTile({
     super.key,
     required this.employee,
     this.onTap,
     this.onEdit,
     this.onDeactivate,
+    this.onReactivate,
   });
 
   @override
@@ -68,11 +72,12 @@ class EmployeeListTile extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               _ActivePill(isActive: employee.isActive),
-              if (onEdit != null || onDeactivate != null) ...[
+              if (onEdit != null || onDeactivate != null || onReactivate != null) ...[
                 const SizedBox(width: 4),
                 _OverflowMenu(
                   onEdit: onEdit,
                   onDeactivate: employee.isActive ? onDeactivate : null,
+                  onReactivate: employee.isActive ? null : onReactivate,
                 ),
               ],
             ],
@@ -182,7 +187,8 @@ class _ActivePill extends StatelessWidget {
 class _OverflowMenu extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDeactivate;
-  const _OverflowMenu({this.onEdit, this.onDeactivate});
+  final VoidCallback? onReactivate;
+  const _OverflowMenu({this.onEdit, this.onDeactivate, this.onReactivate});
 
   @override
   Widget build(BuildContext context) {
@@ -195,6 +201,7 @@ class _OverflowMenu extends StatelessWidget {
       onSelected: (value) {
         if (value == 'edit' && onEdit != null) onEdit!();
         if (value == 'deactivate' && onDeactivate != null) onDeactivate!();
+        if (value == 'reactivate' && onReactivate != null) onReactivate!();
       },
       itemBuilder: (context) => [
         if (onEdit != null)
@@ -219,6 +226,21 @@ class _OverflowMenu extends StatelessWidget {
                 Text(
                   AppStrings.employeesActionDeactivate,
                   style: TextStyle(color: AppColors.error),
+                ),
+              ],
+            ),
+          ),
+        if (onReactivate != null)
+          const PopupMenuItem(
+            value: 'reactivate',
+            child: Row(
+              children: [
+                Icon(Icons.restore_rounded,
+                    size: 18, color: AppColors.primaryPurple),
+                SizedBox(width: 10),
+                Text(
+                  AppStrings.employeesActionReactivate,
+                  style: TextStyle(color: AppColors.primaryPurple),
                 ),
               ],
             ),
