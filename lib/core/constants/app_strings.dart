@@ -228,6 +228,12 @@ class AppStrings {
       'Save & Lock covers the months still open. Reopen to change one that is '
       'already locked — reopening a month for rating does not unlock it.';
 
+  /// Fallback only — a server that explains itself (503 SRV_BLOB_UNREACHABLE,
+  /// "stored on a file service this server cannot reach") has its own message
+  /// shown instead, because that one names the fix.
+  static const String sheetProofOpenFailed =
+      'Could not open the attachment. Please try again.';
+
   static const String sheetReworkAction = 'Send back for rework';
   static const String sheetReworkTitle = 'Send self-rating back for rework?';
   static const String sheetReworkMessage =

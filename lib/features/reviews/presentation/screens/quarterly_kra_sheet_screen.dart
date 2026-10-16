@@ -994,8 +994,17 @@ class _QuarterlyKraSheetScreenState
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not open proof: $e')));
+        // Was `'Could not open proof: $e'`, which on an ApiError renders the
+        // debug form — the very thing the comment on _saveErrorText forbids.
+        // It matters more here than elsewhere: the server distinguishes "no
+        // attachment on this row" from "the bytes are in a file store this
+        // environment cannot reach" (503 SRV_BLOB_UNREACHABLE), and that second
+        // message is the only thing on screen that says the file is intact and
+        // the fix is a setting.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(_saveErrorText(e, AppStrings.sheetProofOpenFailed)),
+          duration: const Duration(seconds: 10),
+        ));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
