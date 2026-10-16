@@ -6,6 +6,7 @@ import '../../data/models/hr_dashboard_models.dart';
 import '../../data/repositories/api_hr_dashboard_repository.dart';
 import '../../data/repositories/hr_dashboard_repository.dart';
 import 'employee_providers.dart';
+import 'kra_assignment_providers.dart';
 
 // ─────────────────────────────────────────────────────────────────────
 // Repository swap point
@@ -59,6 +60,44 @@ final hrActiveEmployeeCountProvider = FutureProvider.autoDispose<int>((ref) {
       .watch(employeeRepositoryProvider)
       .list(page: 1, pageSize: 1, isActive: true)
       .then((page) => page.total);
+});
+
+/// How many DISTINCT employees hold a KRA assignment, and how many are active.
+///
+/// Shown beside the active-employee count because the two numbers only mean
+/// something together: 42 active employees with 44 pending reviews reads as
+/// arithmetic gone wrong, when the real question is how many of those 42 have
+/// KRAs to be reviewed at all. An unassigned employee generates no review and
+/// earns no incentive, and nothing else on this dashboard says so.
+///
+/// DISTINCT is the whole point: an employee may hold several assignments (one
+/// per template), so counting rows would report more "assigned employees" than
+/// the organisation employs — the same shape of error as the count this card
+/// sits next to.
+///
+/// Scoped to the cycle under review when there is one. An assignment from a
+/// closed cycle is history: counting it would claim coverage the current
+/// quarter does not have. With no active cycle every assignment counts, which
+/// is the only honest answer when there is no cycle to scope to.
+final hrAssignedEmployeeCountProvider =
+    FutureProvider.autoDispose<({int assigned, int active})>((ref) async {
+  ref.keepAlive();
+  // AWAITED, not read as a current value. `hrActiveCycleIdProvider` is a
+  // synchronous projection of an async fetch, so on the first build its value
+  // is null — and a null here does not mean "no active cycle", it means "not
+  // loaded yet". Reading it unwrapped silently counted every closed cycle's
+  // assignments and produced a plausible, wrong number.
+  final cycle = await ref.watch(hrActiveCycleProvider.future);
+  final cycleId = cycle?.id;
+  final assignments = await ref.read(kraAssignmentRepositoryProvider).list();
+  final scoped = cycleId == null
+      ? assignments
+      : assignments.where((a) => a.cycleId == cycleId);
+  final active = await ref.watch(hrActiveEmployeeCountProvider.future);
+  return (
+    assigned: scoped.map((a) => a.employeeId).toSet().length,
+    active: active,
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────
