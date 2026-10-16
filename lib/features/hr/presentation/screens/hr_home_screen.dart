@@ -251,8 +251,26 @@ class _StatsGrid extends ConsumerWidget {
         iconFg: AppColors.accentYellow,
         valueColor: AppColors.textPrimary,
       ),
-      // Empty slot for balance
-      const SizedBox.shrink(),
+      // The fourth slot was a spacer. It now carries the number that makes the
+      // first one readable: how many of those active employees actually hold
+      // KRAs. Without it, "42 active employees / 44 pending reviews" looks like
+      // broken arithmetic, when the real question is coverage — an unassigned
+      // employee generates no review and earns no incentive, and nothing else
+      // on this screen says so.
+      //
+      // "—" while it loads rather than a zero: a zero here is a real and
+      // alarming state (nobody assigned this cycle) and must not be faked for
+      // the half-second a fetch takes.
+      OverviewStatCard(
+        icon: Icons.assignment_turned_in_rounded,
+        label: AppStrings.hrKpiAssignedEmployees,
+        value: ref.watch(hrAssignedEmployeeCountProvider).maybeWhen(
+              data: (c) => AppStrings.hrKpiAssignedOf(c.assigned, c.active),
+              orElse: () => '—',
+            ),
+        iconBg: AppColors.primaryPurple.withValues(alpha: 0.10),
+        iconFg: AppColors.primaryPurple,
+      ),
     ];
 
     return LayoutBuilder(

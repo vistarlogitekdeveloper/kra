@@ -1103,6 +1103,15 @@ class AppStrings {
 
   // ───── KPI / Dashboard extras ─────
   static const String hrKpiActiveEmployees = 'Active Employees';
+
+  /// Coverage, not a headcount: how many active employees hold KRAs for the
+  /// cycle under review. "of" rather than "/" because the two numbers are not
+  /// a fraction to be read as a ratio — the second is the population, and the
+  /// gap between them is people who will generate no review and earn no
+  /// incentive.
+  static const String hrKpiAssignedEmployees = 'KRAs Assigned';
+  static String hrKpiAssignedOf(int assigned, int active) =>
+      '$assigned of $active';
   static const String hrKpiPendingReviews = 'Pending Reviews';
   static const String hrKpiQuarterPayout = 'Incentive Payout';
   static const String hrKpiCompletion = 'Completion';
