@@ -112,8 +112,9 @@ void main() {
           StageStatus.inProgress);
       expect(back.rows.single.scoreFor(ReviewStage.selfRating)?.value, 9);
       expect(back.eligibleAmount, 5000);
-      // finalScorePct uses self (the only rated stage): 9/10 × 100 = 90.
-      expect(back.finalScorePct, closeTo(90, 1e-9));
+      // finalScorePct counts management scores only; this review has a self
+      // score and no management score, so it is 0 — never the self 90%.
+      expect(back.finalScorePct, 0);
     });
 
     test(

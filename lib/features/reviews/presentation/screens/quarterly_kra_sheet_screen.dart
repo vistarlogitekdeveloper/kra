@@ -2924,9 +2924,9 @@ class _GridState extends State<_Grid> {
     return r!.reviewPctForRow(row);
   }
 
-  // The final score for ONE KRA/month (management override → Review → self),
-  // per row, straight from the model so the Qtr Final column, totals and payout
-  // all agree. See MonthlyReview.finalPctForRow.
+  // The final score for ONE KRA/month — the management score only, 0 while
+  // management has not rated it — straight from the model so the Qtr Final
+  // column, totals and payout all agree. See MonthlyReview.finalPctForRow.
   double? _rowFinalPct(MonthlyReview? r, String rowId) {
     final row = _rowIn(r, rowId);
     if (row == null) return null;
@@ -3263,9 +3263,9 @@ class _GridState extends State<_Grid> {
     // Management review inherits the Review-cycle score. Once this KRA's
     // assigned reviewer has rated it (Review done) and management hasn't
     // entered an override yet, pre-fill the Mgmt cell with that Review score so
-    // management starts from it — accept it as-is or change it. The Qtr Final
-    // already falls back to the Review score, so this just surfaces the value
-    // that's effectively standing and seeds the editor with it. It's shown
+    // management starts from it — accept it as-is or change it. It is only a
+    // suggestion: the Qtr Final and the payout count it as 0 until management
+    // saves a score (Save & Lock does that for every KRA). It's shown
     // muted + italic until management saves, so an inherited value reads apart
     // from one management has actually set.
     final double? reviewPct = stage == ReviewStage.managementReview
@@ -3911,8 +3911,9 @@ class _PayoutCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Payout = monthly incentive × 3 × quarter final average '
-            '(management override, else the Review average).',
+            'Payout = monthly incentive × 3 × quarter final average. '
+            'Only management ratings count; a KRA management has not rated '
+            'counts as 0.',
             style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
         ],

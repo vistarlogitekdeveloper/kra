@@ -70,7 +70,14 @@ class PerformanceIncentiveRow {
     // that has data.
     final agg = QuarterAggregate.of(months);
     final selfRatings = [for (final m in months) m?.selfScorePct];
-    final managementRatings = [for (final m in months) m?.managementReviewPct];
+    // The management rating that PAYS: the month's final score, which counts
+    // management scores only (a KRA management has not rated is 0). Blank until
+    // the Review/Management cycle has started, so a month nobody has reviewed
+    // reads as "not yet" rather than as a zero — though it counts 0 in the total.
+    final managementRatings = [
+      for (final m in months)
+        m == null || m.managementReviewPct == null ? null : m.finalScorePct,
+    ];
 
     return PerformanceIncentiveRow(
       srNo: srNo,

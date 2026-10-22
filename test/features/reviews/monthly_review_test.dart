@@ -362,11 +362,12 @@ void main() {
       expect(r.displayStage, ReviewStage.managementReview);
       expect(r.displayStatus, StageStatus.inProgress);
       // The summary the dashboard renders reflects it: Management Review
-      // pending, with the Review average as the running score.
+      // pending. The final score counts management only, so it stays 0 until
+      // management rates — the Review's 95 does not pay out on its own.
       final summary = MonthlyReviewSummary.fromReview(r);
       expect(summary.currentStage, ReviewStage.managementReview);
       expect(summary.currentStageStatus, StageStatus.inProgress);
-      expect(summary.finalScorePct, closeTo(95, 1e-9));
+      expect(summary.finalScorePct, 0);
     });
 
     test('a partly-reviewed sheet stays in the Review phase (in progress)', () {
@@ -465,12 +466,30 @@ void main() {
     });
   });
 
+  // The incentive counts MANAGEMENT scores only. A KRA management has not
+  // rated is 0 — never the Review or the self score — and still counts in the
+  // weighting. Only a management N/A takes a KRA out of the total.
   group('MonthlyReview.finalScorePct', () {
     const rows = [
       MonthlyKraRow(id: 'a', name: 'A', weightagePercent: 100, maxScore: 10),
     ];
 
-    test('prefers the reporting manager stage when it has any score', () {
+    test('is the management score', () {
+      final r = reviewAt(
+        ReviewStage.managementReview,
+        rows: [
+          rows[0]
+              .withStageScore(ReviewStage.selfRating, const RowScore(value: 5))
+              .withStageScore(
+                  ReviewStage.reportingManagerRating, const RowScore(value: 7))
+              .withStageScore(
+                  ReviewStage.managementReview, const RowScore(value: 9)),
+        ],
+      );
+      expect(r.finalScorePct, closeTo(90, 1e-9));
+    });
+
+    test('a reporting-manager score alone is 0 — it does not stand in', () {
       final r = reviewAt(
         ReviewStage.reportingManagerRating,
         rows: [
@@ -480,10 +499,10 @@ void main() {
                   ReviewStage.reportingManagerRating, const RowScore(value: 9)),
         ],
       );
-      expect(r.finalScorePct, closeTo(90, 1e-9));
+      expect(r.finalScorePct, 0);
     });
 
-    test('falls back to account/HR when manager stage has no scores', () {
+    test('an HR / Accounts score alone is 0', () {
       final r = reviewAt(
         ReviewStage.reportingManagerRating,
         rows: [
@@ -493,18 +512,77 @@ void main() {
                   ReviewStage.accountHrRating, const RowScore(value: 8)),
         ],
       );
-      expect(r.finalScorePct, closeTo(80, 1e-9));
+      expect(r.finalScorePct, 0);
     });
 
-    test('falls back to self-rating when both later stages are empty', () {
+    test('a self rating alone is 0 — the employee cannot pay out on it', () {
       final r = reviewAt(
         ReviewStage.reportingManagerRating,
         rows: [
           rows[0]
-              .withStageScore(ReviewStage.selfRating, const RowScore(value: 5)),
+              .withStageScore(ReviewStage.selfRating, const RowScore(value: 10)),
         ],
       );
-      expect(r.finalScorePct, closeTo(50, 1e-9));
+      expect(r.finalScorePct, 0);
+    });
+
+    test('an unrated KRA counts 0 in the weighting, it does not drop out', () {
+      // A rated 100 by management (weight 60), B not rated (weight 40):
+      // 60, not 100.
+      final r = reviewAt(ReviewStage.managementReview, rows: [
+        const MonthlyKraRow(id: 'a', name: 'A', weightagePercent: 60, maxScore: 10)
+            .withStageScore(
+                ReviewStage.managementReview, const RowScore(value: 10)),
+        const MonthlyKraRow(id: 'b', name: 'B', weightagePercent: 40, maxScore: 10)
+            .withStageScore(ReviewStage.selfRating, const RowScore(value: 10)),
+      ]);
+      expect(r.finalPctForRow(r.rows[1]), 0);
+      expect(r.finalScorePct, closeTo(60, 1e-9));
+    });
+
+    test('a management N/A takes the KRA out of the total', () {
+      final r = reviewAt(ReviewStage.managementReview, rows: [
+        const MonthlyKraRow(id: 'a', name: 'A', weightagePercent: 60, maxScore: 10)
+            .withStageScore(
+                ReviewStage.managementReview, const RowScore(value: 10)),
+        const MonthlyKraRow(id: 'b', name: 'B', weightagePercent: 40, maxScore: 10)
+            .withStageScore(
+                ReviewStage.managementReview, const RowScore(value: null)),
+      ]);
+      expect(r.finalPctForRow(r.rows[1]), isNull);
+      expect(r.finalScorePct, closeTo(100, 1e-9));
+    });
+
+    test('the reported case: August and September self-rated, never reviewed',
+        () {
+      // Ganga Jha, Q2: management rated July 90%; August and September carry
+      // only the employee's 100% self rating. Those months are 0, so the
+      // quarter is (90 + 0 + 0) / 3 = 30 — not 97.
+      final w = [20, 20, 20, 15, 15, 10];
+      MonthlyReview month(int? mgmt) => reviewAt(ReviewStage.managementReview, rows: [
+            for (var k = 0; k < w.length; k++)
+              () {
+                var row = MonthlyKraRow(
+                        id: 'r$k', name: 'K$k', weightagePercent: w[k].toDouble(), maxScore: 100)
+                    .withStageScore(
+                        ReviewStage.selfRating, const RowScore(value: 100));
+                if (mgmt != null) {
+                  row = row
+                      .withStageScore(ReviewStage.reportingManagerRating,
+                          RowScore(value: mgmt.toDouble()))
+                      .withStageScore(ReviewStage.managementReview,
+                          RowScore(value: mgmt.toDouble()));
+                }
+                return row;
+              }(),
+          ]);
+      final q = [month(90), month(null), month(null)];
+      final quarter = q.map((m) => m.finalScorePct).reduce((a, b) => a + b) / 3;
+      expect(q[0].finalScorePct, closeTo(90, 1e-9));
+      expect(q[1].finalScorePct, 0);
+      expect(quarter, closeTo(30, 1e-9));
+      // ₹2,000 a month: 6,000 × 30% = 1,800.
+      expect(2000 * 3 * quarter / 100, closeTo(1800, 1e-6));
     });
 
     test('returns 0 when nothing has been scored yet', () {
@@ -531,7 +609,8 @@ void main() {
       ]);
       expect(r.reviewPctForRow(r.rows.first), closeTo(80, 1e-9));
       expect(r.reviewWeightedPct, closeTo(80, 1e-9));
-      expect(r.finalScorePct, closeTo(80, 1e-9));
+      // The Review average is shown, but it is not the final: no management.
+      expect(r.finalScorePct, 0);
     });
 
     test('a single Review rater present is the row average (no zero-fill)', () {
@@ -609,11 +688,13 @@ void main() {
       expect(r.reviewPctForRow(r.rows.first), isNull);
     });
 
-    test('finalScorePct blends each KRA\'s OWN furthest stage (per-row)', () {
-      // Regression: a partial management rework must not collapse Final onto
-      // only the reworked KRAs. 2 KRAs, weight 50 each, max 10.
+    test('finalScorePct counts each KRA\'s management score, 0 where missing',
+        () {
+      // A partial management rating must not collapse Final onto only the
+      // rated KRAs (that renormalising was the old mgmt-only bug), nor fill
+      // the gap with the Review score. 2 KRAs, weight 50 each, max 10.
       //   A: self8 / RM9 / mgmt6  → final 60%
-      //   B (assigned RM): self7 / RM8 / no mgmt → final 80%
+      //   B (assigned RM): self7 / RM8 / no mgmt → final 0%
       final r = reviewAt(ReviewStage.managementReview, rows: [
         const MonthlyKraRow(
                 id: 'a',
@@ -637,13 +718,15 @@ void main() {
                 ReviewStage.reportingManagerRating, const RowScore(value: 8)),
       ]);
       expect(r.finalPctForRow(r.rows[0]), closeTo(60, 1e-9));
-      expect(r.finalPctForRow(r.rows[1]), closeTo(80, 1e-9));
-      // (60×50 + 80×50) / 100 = 70 — NOT 60 (the old whole-review mgmt-only bug).
-      expect(r.finalScorePct, closeTo(70, 1e-9));
+      expect(r.finalPctForRow(r.rows[1]), 0);
+      // (60×50 + 0×50) / 100 = 30 — not 60 (renormalised) and not 70 (fallback).
+      expect(r.finalScorePct, closeTo(30, 1e-9));
     });
 
-    test('finalScorePct blends reviewed rows with self-only rows', () {
-      // A reviewed at 80%; B only self-rated at 60% → weighted 70%, no row dropped.
+    test('finalScorePct is 0 with Review and self scores but no management',
+        () {
+      // A reviewed at 80%; B only self-rated at 60%; management has rated
+      // neither, so neither counts.
       final r = reviewAt(ReviewStage.reportingManagerRating, rows: [
         const MonthlyKraRow(
                 id: 'a',
@@ -661,7 +744,7 @@ void main() {
                 reviewerGroup: KraReviewer.hr)
             .withStageScore(ReviewStage.selfRating, const RowScore(value: 6)),
       ]);
-      expect(r.finalScorePct, closeTo(70, 1e-9));
+      expect(r.finalScorePct, 0);
     });
   });
 
@@ -673,11 +756,11 @@ void main() {
           const MonthlyKraRow(
                   id: 'a', name: 'A', weightagePercent: 100, maxScore: 10)
               .withStageScore(
-                  ReviewStage.reportingManagerRating, const RowScore(value: 7)),
+                  ReviewStage.managementReview, const RowScore(value: 7)),
         ],
         incentive: const IncentiveSnapshot(eligibleAmount: 10000),
       );
-      // 70% of ₹10 000 = ₹7 000
+      // management 70% of ₹10 000 = ₹7 000
       expect(r.projectedPayout, closeTo(7000, 1e-9));
     });
 

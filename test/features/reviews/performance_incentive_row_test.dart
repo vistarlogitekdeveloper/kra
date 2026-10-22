@@ -131,4 +131,26 @@ void main() {
     expect(row.total, 0);
     expect(row.payableIncentive, 0);
   });
+
+  test('the Management column shows the score that pays — 0 when only the Review is in',
+      () {
+    // The server sends managementReviewPct = the Review average (80) when
+    // management has not rated, but the final score that pays is 0. The
+    // column must not show 80 next to a total built from 0.
+    final row = PerformanceIncentiveRow.build(
+      srNo: 1,
+      employeeId: 'emp1',
+      months: [
+        month(m: 7, eligible: 2000, self: 100, management: 90, finalPct: 90,
+            stage: ReviewStage.completed),
+        month(m: 8, eligible: 2000, self: 100, finalPct: 0,
+            stage: ReviewStage.selfRating),
+        month(m: 9, eligible: 2000, self: 100, management: 80, finalPct: 0,
+            stage: ReviewStage.managementReview),
+      ],
+    );
+    expect(row.managementRatings, [90, null, 0]);
+    expect(row.total, closeTo(30, 1e-9));
+    expect(row.payableIncentive, closeTo(1800, 1e-6));
+  });
 }

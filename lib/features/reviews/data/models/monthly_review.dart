@@ -386,28 +386,27 @@ class MonthlyReview {
     return (weighted / totalWeight).clamp(0, 100).toDouble();
   }
 
-  /// The final score for a single KRA row, as a 0–100 %, by cycle precedence
-  /// applied PER ROW: management override (rework) → the row's Review score →
-  /// self. Null until the row has any of the three.
+  /// The final score for a single KRA row, as a 0–100 %: the MANAGEMENT score
+  /// only. A KRA management has not rated is 0 — it never falls back to the
+  /// Review or the self rating, so an unrated month cannot pay out on the
+  /// employee's own score. (Management's Save & Lock writes a management score
+  /// for every KRA, copying the Review score into the ones it left as they
+  /// were, so a signed-off month is unaffected.)
   ///
-  /// Precedence is per row, not per review: management reworks ONE KRA at a
-  /// time, and each KRA's Review score comes from its own assigned reviewer —
-  /// so a review can hold a management override on KRA A, a plain Review score
-  /// on KRA B and only a self score on KRA C, each contributing its own final.
+  /// Null — the KRA leaves the total — only when management marked it N/A
+  /// (a management score with no value), or the KRA has no scale.
   double? finalPctForRow(MonthlyKraRow row) {
     if (row.maxScore <= 0) return null;
-    final mgmt = row.scoreFor(ReviewStage.managementReview)?.value;
-    if (mgmt != null) return (mgmt / row.maxScore) * 100;
-    final review = reviewPctForRow(row);
-    if (review != null) return review;
-    final self = row.scoreFor(ReviewStage.selfRating)?.value;
-    if (self != null) return (self / row.maxScore) * 100;
-    return null;
+    final mgmt = row.scoreFor(ReviewStage.managementReview);
+    if (mgmt == null) return 0;
+    final value = mgmt.value;
+    if (value == null) return null; // N/A
+    return (value / row.maxScore) * 100;
   }
 
   /// The score that drives the incentive: the weighted total of every KRA's
-  /// [finalPctForRow], so each KRA contributes its own furthest-along score.
-  /// Rows nothing has touched drop from both numerator and denominator.
+  /// [finalPctForRow] — management scores only, an unrated KRA counting 0.
+  /// Only a KRA management marked N/A drops from numerator and denominator.
   double get finalScorePct {
     double weighted = 0;
     double totalWeight = 0;
