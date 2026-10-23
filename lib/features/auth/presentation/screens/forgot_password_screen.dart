@@ -76,16 +76,16 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         children: [
           BrandedTextField(
             controller: _emailController,
-            label: AppStrings.loginEmailLabel,
-            hint: AppStrings.loginEmailHint,
+            label: AppStrings.forgotIdentifierLabel,
+            hint: AppStrings.forgotIdentifierHint,
             prefixIcon: Icons.person_outline_rounded,
-            keyboardType: TextInputType.emailAddress,
+            keyboardType: TextInputType.text,
             autofillHints: const [AutofillHints.username],
             autofocus: true,
             onSubmitted: (_) => _submit(),
             validator: (v) {
               final s = (v ?? '').trim();
-              if (s.isEmpty) return AppStrings.validationEmailRequired;
+              if (s.isEmpty) return AppStrings.forgotIdentifierRequired;
               return null;
             },
           ),

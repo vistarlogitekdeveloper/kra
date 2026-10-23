@@ -345,6 +345,13 @@ class AppStrings {
 
   // ───── Validation ─────
   static const String validationEmailRequired = 'Please enter your email';
+
+  // Forgot password takes what login takes. A mailbox several employees
+  // share resolves to nobody, so they reset with their employee code.
+  static const String forgotIdentifierLabel = 'Employee code or email';
+  static const String forgotIdentifierHint = 'VLPL0001 or you@vistar.com';
+  static const String forgotIdentifierRequired =
+      'Please enter your employee code or email';
   static const String validationEmailInvalid =
       'Please enter a valid email address';
   static const String validationIdentifierRequired =
