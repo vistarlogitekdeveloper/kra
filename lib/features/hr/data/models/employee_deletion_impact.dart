@@ -7,9 +7,11 @@ import '../../../../core/api/json_parse.dart';
 /// confirming, so they are kept apart here rather than summed:
 ///
 ///   * [ownCounts] — this employee's own record.
-///   * [marksOnOthers] — what this person did to OTHER people's records. These
-///     are deleted too, and it is the group nobody expects: purging a manager
-///     removes the reviews they rated for their whole team.
+///   * [marksOnOthers] — what this person did to OTHER people's records. An
+///     API that reports [marksOnOthersKept] keeps these, re-attributed to
+///     whoever deletes; an older one deletes them too — the group nobody
+///     expects: purging a manager removed the reviews they rated for their
+///     whole team.
 ///   * [subordinates] — reports who are DETACHED, not deleted. Their manager
 ///     becomes empty.
 class EmployeeDeletionImpact {
@@ -34,6 +36,10 @@ class EmployeeDeletionImpact {
   // ── detached, not deleted ──
   final int subordinates;
 
+  /// The API keeps [marksOnOthersTotal] instead of deleting it. False from an
+  /// API that predates that, so the dialog keeps its louder warning there.
+  final bool marksOnOthersKept;
+
   const EmployeeDeletionImpact({
     required this.employeeId,
     this.employeeCode,
@@ -49,6 +55,7 @@ class EmployeeDeletionImpact {
     this.opsFeedsEntered = 0,
     this.opsScopesAssigned = 0,
     this.subordinates = 0,
+    this.marksOnOthersKept = false,
   });
 
   factory EmployeeDeletionImpact.fromJson(Map<String, dynamic> json) {
@@ -72,6 +79,7 @@ class EmployeeDeletionImpact {
       opsFeedsEntered: count('opsFeedsEntered'),
       opsScopesAssigned: count('opsScopesAssigned'),
       subordinates: count('subordinates'),
+      marksOnOthersKept: JsonParse.parseBool(removes['marksOnOthersKept']) ?? false,
     );
   }
 
@@ -96,5 +104,6 @@ class EmployeeDeletionImpact {
 
   /// True when other people's records lose data — the case worth a louder
   /// warning than "this employee will be deleted".
-  bool get touchesOthers => marksOnOthersTotal > 0 || subordinates > 0;
+  bool get touchesOthers =>
+      (marksOnOthersTotal > 0 && !marksOnOthersKept) || subordinates > 0;
 }

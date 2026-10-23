@@ -498,6 +498,11 @@ class AppStrings {
   static const String employeePurgeOthersWhy =
       'This person entered these on other employees’ sheets. Deleting them '
       'removes that work from those employees too.';
+  static const String employeePurgeOthersKeptHeading =
+      'Kept — what they entered for OTHER employees';
+  static const String employeePurgeOthersKeptWhy =
+      'These stay on the other employees’ sheets and are shown as entered by '
+      'you.';
   static const String employeePurgeDetachHeading = 'Reporting lines';
   static const String employeePurgeConfirm = 'Yes, delete permanently';
   static const String employeePurgeSuccess = 'Employee deleted.';

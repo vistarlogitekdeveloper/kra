@@ -105,18 +105,24 @@ class PurgeEmployeeDialog extends StatelessWidget {
             // alone do not convey that this is somebody else's data.
             if (impact.marksOnOthersTotal > 0) ...[
               const SizedBox(height: 14),
-              const _GroupHeading(
-                AppStrings.employeePurgeOthersHeading,
-                emphasised: true,
+              _GroupHeading(
+                impact.marksOnOthersKept
+                    ? AppStrings.employeePurgeOthersKeptHeading
+                    : AppStrings.employeePurgeOthersHeading,
+                emphasised: !impact.marksOnOthersKept,
               ),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 6),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
-                  AppStrings.employeePurgeOthersWhy,
+                  impact.marksOnOthersKept
+                      ? AppStrings.employeePurgeOthersKeptWhy
+                      : AppStrings.employeePurgeOthersWhy,
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.4,
-                    color: AppColors.error,
+                    color: impact.marksOnOthersKept
+                        ? AppColors.textSecondary
+                        : AppColors.error,
                   ),
                 ),
               ),

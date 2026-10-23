@@ -914,6 +914,10 @@ class _QuarterlyKraSheetScreenState
         final rowScores = <String, RowScore>{};
         for (final row in review.rows) {
           final existing = row.scoreFor(ReviewStage.managementReview);
+          // A management N/A (a score with no value) stays N/A: the KRA is
+          // excluded from the incentive. Copying the Review score in would
+          // turn it back into a score that counts.
+          if (existing != null && existing.value == null) continue;
           double? value;
           if (existing?.value != null) {
             value = existing!.value; // keep management's own edit
@@ -2087,8 +2091,8 @@ class _Sheet extends StatelessWidget {
       scopeLabel = 'View only — you cannot edit this sheet.';
     }
 
-    // Payout follows the FINAL score (management override → Review average →
-    // self), quarter-averaged across the three months.
+    // Payout follows the FINAL score — management scores only, an unrated KRA
+    // 0, a management N/A excluded — quarter-averaged across the three months.
     double qFinalOf() {
       double sum = 0;
       for (var i = 0; i < 3; i++) {
@@ -2099,7 +2103,14 @@ class _Sheet extends StatelessWidget {
 
     final qFinal = qFinalOf();
     final qSelf = qAvg(ReviewStage.selfRating);
-    final eligibleMonthly = any.eligibleAmount;
+    // The monthly ceiling as the Performance Incentive Sheet reads it
+    // (QuarterAggregate.base): the highest across the quarter's months, not
+    // whichever month happens to be first — the two used to disagree when an
+    // incentive changed mid-quarter.
+    final eligibleMonthly = [
+      for (final r in reviews)
+        if (r != null) r.eligibleAmount,
+    ].fold<double>(0, (a, b) => a > b ? a : b);
     final quarterEligible = eligibleMonthly * 3;
     final payout = quarterEligible * qFinal / 100;
 
@@ -3891,8 +3902,11 @@ class _GridState extends State<_Grid> {
                       color: AppColors.accentOrange))),
           _cell(
               _wMon,
-              Text(
-                  '${widget.monthTotal(i, ReviewStage.managementReview).round()}%',
+              // The month's FINAL — the figure the Qtr Final averages and the
+              // incentive pays. weightedScorePct dropped unrated KRAs from
+              // the denominator, so one KRA rated 100% of two showed 100%
+              // here while the Qtr Final counted that month at 50%.
+              Text('${monthFinal(i).round()}%',
                   style: const TextStyle(
                       fontWeight: FontWeight.w700, fontSize: 12))),
         ],
