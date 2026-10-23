@@ -69,6 +69,10 @@ class MonthlyReviewSummary {
   /// the review has been rated. Feeds the performance-incentive report.
   final double? managementReviewPct;
 
+  /// When management signed the month off (Save & Lock). Null while it has
+  /// not. Mark paid needs it — the server refuses without it.
+  final DateTime? managementLockedAt;
+
   const MonthlyReviewSummary({
     required this.id,
     required this.employeeId,
@@ -90,6 +94,7 @@ class MonthlyReviewSummary {
     this.reworkRequested = false,
     this.selfScorePct,
     this.managementReviewPct,
+    this.managementLockedAt,
   });
 
   /// Wire form from the monthly-review backend's list endpoint.
@@ -143,6 +148,9 @@ class MonthlyReviewSummary {
               : JsonParse.parseString(json['projectLocation']);
         }(),
         reworkRequested: JsonParse.parseBool(json['reworkRequested']) ?? false,
+        managementLockedAt: json['managementLockedAt'] is String
+            ? DateTime.tryParse(json['managementLockedAt'] as String)
+            : null,
         selfScorePct: JsonParse.parseDouble(json['selfScorePct']),
         managementReviewPct: JsonParse.parseDouble(json['managementReviewPct']),
       );
@@ -169,6 +177,7 @@ class MonthlyReviewSummary {
         incentiveEligibleAmount: r.eligibleAmount,
         payoutStatus: r.payoutStatus,
         reworkRequested: r.stageRecords.values.any((rec) => rec.returned),
+        managementLockedAt: r.managementLockedAt,
         selfScorePct: r.weightedScorePct(ReviewStage.selfRating),
         managementReviewPct:
             r.weightedScorePct(ReviewStage.managementReview) > 0
@@ -433,11 +442,23 @@ class MonthlyReviewSummary {
         currentStageStatus == StageStatus.submitted;
   }
 
-  /// Whether [role] may settle the incentive for THIS review right now — the
-  /// management review is done, it isn't already paid, and the role is a payout
-  /// actor (Accounts / HR / HR-admin). Drives the dashboard's "mark paid" check.
-  bool canMarkPaidBy(UserRole role) =>
+  /// Whether the rated month is over (IST): it cannot be paid while running.
+  bool monthEndedAt(DateTime now) {
+    final next = month == 12 ? DateTime.utc(year + 1, 1, 1) : DateTime.utc(year, month + 1, 1);
+    return !now.toUtc().isBefore(next.subtract(const Duration(hours: 5, minutes: 30)));
+  }
+
+  /// Whether [role] may settle the incentive for THIS review right now: the
+  /// month is over, management has signed it off (Save & Lock), it isn't
+  /// already paid, it isn't [userId]'s own review, and the role is a payout
+  /// actor (Accounts / HR / HR-admin). Drives the dashboard's "mark paid"
+  /// check. The server also requires every KRA to carry a management rating
+  /// and refuses with the reason if one does not.
+  bool canMarkPaidBy(UserRole role, {String? userId, DateTime? now}) =>
       managementReviewDone &&
+      managementLockedAt != null &&
+      monthEndedAt(now ?? DateTime.now()) &&
       !payoutPaid &&
+      (userId == null || userId != employeeId) &&
       ReviewStage.incentivePayout.actorRoles.contains(role);
 }

@@ -65,6 +65,21 @@ void main() {
       );
     });
 
+    test('HR and Accounts cannot rate their own review', () {
+      // Only the self-rating of your own review is yours; the server refuses
+      // the rest (403), so the cell is not offered.
+      expect(
+        canRateReviewStage(ReviewStage.accountHrRating,
+            scopeFor(UserRole.hr, userId: 'emp1'), reviewFor(employeeId: 'emp1')),
+        isFalse,
+      );
+      expect(
+        canRateReviewStage(ReviewStage.financeRating,
+            scopeFor(UserRole.finance, userId: 'emp1'), reviewFor(employeeId: 'emp1')),
+        isFalse,
+      );
+    });
+
     test('an employee cannot rate the HR seat', () {
       expect(
         canRateReviewStage(ReviewStage.accountHrRating,

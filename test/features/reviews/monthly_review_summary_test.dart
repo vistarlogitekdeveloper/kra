@@ -21,8 +21,10 @@ void main() {
     double? managementReviewPct,
     double finalScorePct = 0,
     String employeeId = 'emp1',
+    DateTime? managementLockedAt,
   }) {
     return MonthlyReviewSummary(
+      managementLockedAt: managementLockedAt,
       id: 'r1',
       employeeId: employeeId,
       employeeName: 'Asha',
@@ -114,16 +116,70 @@ void main() {
   });
 
   group('MonthlyReviewSummary payout / mark-paid', () {
-    test('Accounts can mark paid once the management review is done', () {
+    // June 2026 fixtures; signed off on 14 July.
+    final locked = DateTime.utc(2026, 7, 14, 10);
+
+    test('Accounts can mark paid once the month is over and management signed it off',
+        () {
       final s = summary(
         stage: ReviewStage.managementReview,
         status: StageStatus.submitted,
+        managementLockedAt: locked,
       );
       expect(s.managementReviewDone, isTrue);
       expect(s.canMarkPaidBy(UserRole.finance), isTrue);
       // HR / HR-admin are payout actors too.
       expect(s.canMarkPaidBy(UserRole.hr), isTrue);
       expect(s.canMarkPaidBy(UserRole.hrAdmin), isTrue);
+    });
+
+    test('not markable without management Save & Lock, even with a management score',
+        () {
+      // One management score is enough for "management review done"; it is
+      // not enough to pay. A July review was paid that way, on 27 July.
+      final s = summary(
+        stage: ReviewStage.managementReview,
+        status: StageStatus.submitted,
+      );
+      expect(s.managementReviewDone, isTrue);
+      expect(s.canMarkPaidBy(UserRole.finance), isFalse);
+    });
+
+    test('not markable while the month is still running (IST)', () {
+      final s = summary(
+        stage: ReviewStage.managementReview,
+        status: StageStatus.submitted,
+        managementLockedAt: locked,
+      );
+      // June ends at 1 July 00:00 IST = 30 June 18:30 UTC.
+      expect(s.canMarkPaidBy(UserRole.finance, now: DateTime.utc(2026, 6, 30, 18, 29)), isFalse);
+      expect(s.canMarkPaidBy(UserRole.finance, now: DateTime.utc(2026, 6, 30, 18, 31)), isTrue);
+    });
+
+    test('nobody marks their own review paid', () {
+      final s = summary(
+        stage: ReviewStage.managementReview,
+        status: StageStatus.submitted,
+        managementLockedAt: locked,
+        employeeId: 'fin1',
+      );
+      expect(s.canMarkPaidBy(UserRole.finance, userId: 'fin1'), isFalse);
+      expect(s.canMarkPaidBy(UserRole.finance, userId: 'fin2'), isTrue);
+    });
+
+    test('the lock is read from the list payload', () {
+      final s = MonthlyReviewSummary.fromJson({
+        'id': 'r1', 'employeeId': 'e1', 'employeeName': 'A', 'employeeCode': 'C',
+        'year': 2026, 'month': 6, 'currentStage': 'MANAGEMENT_REVIEW',
+        'currentStageStatus': 'SUBMITTED', 'managementLockedAt': '2026-07-14T10:00:00.000Z',
+      });
+      expect(s.managementLockedAt, DateTime.utc(2026, 7, 14, 10));
+      final unlocked = MonthlyReviewSummary.fromJson({
+        'id': 'r1', 'employeeId': 'e1', 'employeeName': 'A', 'employeeCode': 'C',
+        'year': 2026, 'month': 6, 'currentStage': 'MANAGEMENT_REVIEW',
+        'currentStageStatus': 'SUBMITTED', 'managementLockedAt': null,
+      });
+      expect(unlocked.managementLockedAt, isNull);
     });
 
     test('not markable before the management review is done', () {

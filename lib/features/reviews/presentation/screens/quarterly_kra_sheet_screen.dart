@@ -290,8 +290,12 @@ class _QuarterlyKraSheetScreenState
       canActOnStage(
           ReviewStage.managementReview, scope.reviewFlow, scope.effectiveRoles);
 
+  // Never on your own review: nobody signs off their own incentive (the
+  // server refuses it too).
   bool _canEditManagement(MonthlyReview r, ReviewScope? scope) =>
-      _hasManagementRole(scope) && !r.isComplete;
+      _hasManagementRole(scope) &&
+      !r.isComplete &&
+      r.employeeId != scope?.userId;
 
   Future<void> _editCell({
     required MonthlyReview review,
@@ -804,6 +808,59 @@ class _QuarterlyKraSheetScreenState
   /// management scores, so the incentive is computed from the management review;
   /// KRAs management didn't change keep the stage-2 Review score they inherited.
   Future<void> _lockManagementReview(List<MonthlyReview?> reviews) async {
+    // Every KRA needs a management score before the lock: this commits the
+    // Review score where management kept it, but a KRA with neither a Review
+    // nor a management score would be locked at 0 — the incentive counts
+    // management only. Say which ones, and stop. (The server refuses too.)
+    // A month sent back for rework is not ready either.
+    final notReady = <String>[];
+    for (final review in reviews) {
+      if (review == null) continue;
+      final month = review.period.shortLabel;
+      if (review.selfRatingReturned) {
+        notReady.add('$month: sent back to the employee — waiting for their resubmission');
+        continue;
+      }
+      final missing = [
+        for (final row in review.rows)
+          if (row.maxScore > 0 &&
+              row.scoreFor(ReviewStage.managementReview) == null &&
+              review.reviewPctForRow(row) == null)
+            row.name,
+      ];
+      if (missing.isNotEmpty) {
+        notReady.add('$month: no rating yet for ${missing.join(', ')}');
+      }
+    }
+    if (notReady.isNotEmpty) {
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.surfaceElevated,
+            title: const Text('Not ready to lock'),
+            content: SingleChildScrollView(
+              child: Text(
+                'Every KRA needs a rating before Save & Lock — a KRA without '
+                'one would count 0 in the incentive.\n\n'
+                '${notReady.map((l) => '• $l').join('\n')}\n\n'
+                'Ask the reviewer to rate these, or enter a management score '
+                'yourself, then lock again.',
+              ),
+            ),
+            actions: [
+              FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple),
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
     // How many KRA/months carry a Review or management score to commit.
     var pending = 0;
     for (final review in reviews) {
@@ -1177,7 +1234,11 @@ class _QuarterlyKraSheetScreenState
               _applyReviewerMap(
                   r, reviewerMap, scope?.reviewFlow ?? ReviewFlow.standard),
           ];
-          final canManage = _hasManagementRole(scope);
+          // Not on your own sheet: the server refuses a lock, reopen or
+          // management score on your own review, so the bar is not offered.
+          final ownSheet = scope != null &&
+              mappedReviews.any((r) => r?.employeeId == scope.userId);
+          final canManage = _hasManagementRole(scope) && !ownSheet;
           // The months the sign-off may act on: every month present on an
           // older backend, and only those whose management window is open
           // once the server sends windows. None means no lock bar at all.
@@ -5077,6 +5138,8 @@ bool canRateReviewStage(
   MonthlyReview review,
 ) {
   if (scope == null || review.isComplete) return false;
+  // HR / Accounts never rate their own review — only its self-rating is theirs.
+  if (review.employeeId == scope.userId) return false;
   // Flow-aware. For ReviewFlow.standard this is a pass-through to
   // stage.actorRoles, so the original pipeline is unchanged; for admin-only it
   // returns an empty set for the stages that flow removes, which reads as

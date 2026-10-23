@@ -403,10 +403,15 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
           const SnackBar(content: Text(AppStrings.monthlyReviewPaid)),
         );
       }
-    } catch (_) {
+    } catch (e) {
+      // Show the server's reason — "not signed off yet", "2 KRAs have no
+      // management rating yet (…)" — rather than a generic failure.
       if (mounted) {
+        final reason = e is ApiError && e.message.isNotEmpty
+            ? e.message
+            : AppStrings.monthlyReviewActionFailed;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.monthlyReviewActionFailed)),
+          SnackBar(content: Text(reason), duration: const Duration(seconds: 8)),
         );
       }
     } finally {
@@ -572,7 +577,8 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                 // Corroborated by a score — a "Paid" badge on a review nobody
                 // ever rated reads as money already gone.
                 paid: summary.payoutSettled,
-                canMarkPaid: role != null && summary.canMarkPaidBy(role!),
+                canMarkPaid: role != null &&
+                    summary.canMarkPaidBy(role!, userId: userId),
                 busy: _payingOut,
                 onMarkPaid: _markPaid,
               ),
