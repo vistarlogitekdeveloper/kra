@@ -1242,6 +1242,40 @@ class AppStrings {
   static const String perfIncentiveExportNothing = 'Nothing to export yet.';
   static const String perfIncentiveExportUnsupported =
       'Export/download is only available in the web app.';
+
+  // ── KRA rating report (Reports → KRA rating report) ──
+  static const String ratingReportTitle = 'KRA rating report';
+  static const String ratingReportSubtitle =
+      'Download Excel or PDF of employees\' KRA ratings — choose the '
+      'employees, months and ratings.';
+  static const String ratingReportIntro =
+      'Choose who, which months and which ratings, then download. Excel has a '
+      'summary sheet (one row per employee and month) and a KRA details sheet '
+      '(every KRA with each rating and remark). PDF has one section per '
+      'employee with a KRA table for each month.';
+  static const String ratingReportAllHint =
+      'Every active employee of the organisation who has a review in the '
+      'chosen months.';
+  static const String ratingReportExcelHint =
+      'Best for filtering, sorting and further calculation.';
+  static const String ratingReportPdfHint =
+      'Best for printing or sharing — one section per employee.';
+  static const String ratingReportNeedMonth = 'Choose at least one month.';
+  static const String ratingReportTooManyMonths =
+      'Choose 24 months or fewer.';
+  static const String ratingReportNeedRating = 'Choose at least one rating.';
+  static const String ratingReportNeedEmployee =
+      'Choose at least one employee, or switch to All employees.';
+  static const String ratingReportPreparing = 'Preparing report…';
+  static const String ratingReportNothing =
+      'No KRA reviews for the selected employees and months.';
+  static const String ratingReportFailed =
+      'Could not prepare the report. Please try again.';
+  static const String ratingReportEmployeesFailed =
+      'Could not load the employee list.';
+  static String ratingReportDone(String file, int employees, int reviews) =>
+      'Downloaded $file — $employees employee${employees == 1 ? '' : 's'}, '
+      '$reviews monthly review${reviews == 1 ? '' : 's'}.';
   static const String perfIncentiveEmpty =
       'No reviews have been generated for this quarter yet.';
   static const String perfIncColSrNo = 'Sr';

@@ -110,6 +110,12 @@ class _MonthlyReviewDashboardScreenState
               tooltip: AppStrings.perfIncentiveTitle,
               onPressed: () => context.push(AppRoutes.perfIncentiveSheet),
             ),
+          if (role != null && AppRoutes.canReview(role))
+            IconButton(
+              icon: const Icon(Icons.download_rounded),
+              tooltip: AppStrings.ratingReportTitle,
+              onPressed: () => context.push(AppRoutes.kraRatingReport),
+            ),
           if (reviewOnly)
             IconButton(
               icon: const Icon(Icons.logout_rounded),

@@ -11,6 +11,7 @@ import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/reviews/presentation/screens/admin_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/monthly_review_dashboard_screen.dart';
 import '../../features/reviews/presentation/screens/performance_incentive_sheet_screen.dart';
+import '../../features/reviews/presentation/screens/kra_rating_report_screen.dart';
 import '../../features/reviews/presentation/screens/quarterly_kra_sheet_screen.dart';
 import '../telemetry/telemetry.dart';
 import '../widgets/route_error_screen.dart';
@@ -85,6 +86,7 @@ class AppRoutes {
   // (not under /hr) so HR / Accounts / Management can all reach it; the redirect
   // guards it to those roles via [canReview].
   static const String perfIncentiveSheet = '/reports/performance-incentive';
+  static const String kraRatingReport = '/reports/kra-ratings';
 
   // ── Employee module nested routes ──
   // Every authenticated user (except ADMIN) lands inside /employee/* —
@@ -357,7 +359,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
         // Performance Incentive Sheet is a Management / HR / Accounts report —
         // any other role deep-linking in is bounced to their own dashboard.
-        if (loc == AppRoutes.perfIncentiveSheet &&
+        if ((loc == AppRoutes.perfIncentiveSheet ||
+                loc == AppRoutes.kraRatingReport) &&
             !AppRoutes.canReviewAny(authState.user.effectiveRoles)) {
           return AppRoutes.dashboardForRole(authState.user.role);
         }
@@ -449,6 +452,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.perfIncentiveSheet,
         builder: (_, __) => const PerformanceIncentiveSheetScreen(),
+      ),
+
+      // KRA rating report (Excel / PDF download) — same audience and guard as
+      // the incentive sheet; the server allows exactly these roles too.
+      GoRoute(
+        path: AppRoutes.kraRatingReport,
+        builder: (_, __) => const KraRatingReportScreen(),
       ),
 
       // ───── Employee module ─────
