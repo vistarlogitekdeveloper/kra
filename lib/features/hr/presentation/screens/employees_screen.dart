@@ -201,6 +201,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
           onTap: () => context.push(AppRoutes.hrEmployeeDetail(employee.id)),
           onEdit: () => context.push(AppRoutes.hrEmployeeEdit(employee.id)),
           onDeactivate: () => _confirmDeactivate(employee.id),
+          onReactivate: () => _confirmReactivate(employee.id),
         );
       },
     );
@@ -226,6 +227,36 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen> {
         backgroundColor: success ? AppColors.textPrimary : AppColors.error,
         // A refusal names what is blocking and what to do about it, which is
         // more than four seconds of reading.
+        duration: Duration(seconds: success ? 4 : 10),
+      ),
+    );
+  }
+
+  /// Undo a delete. Confirmed like the delete it reverses — this puts someone
+  /// back on the roster and lets them sign in, which is not a tap to take by
+  /// accident from a crowded list.
+  Future<void> _confirmReactivate(String employeeId) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.employeesReactivateConfirmTitle,
+      message: AppStrings.employeesReactivateConfirmMessage,
+      confirmLabel: AppStrings.employeesActionReactivate,
+      // Not a destructive act, and it should not borrow the delete dialog's
+      // red warning — the user is undoing one.
+      icon: Icons.restore_rounded,
+      accentColor: AppColors.success,
+    );
+    if (ok != true || !mounted) return;
+    final failure = await ref
+        .read(employeeListProvider.notifier)
+        .reactivateOptimistic(employeeId);
+    if (!mounted) return;
+    final success = failure == null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text(success ? AppStrings.employeesReactivateSuccess : failure),
+        backgroundColor: success ? AppColors.textPrimary : AppColors.error,
         duration: Duration(seconds: success ? 4 : 10),
       ),
     );

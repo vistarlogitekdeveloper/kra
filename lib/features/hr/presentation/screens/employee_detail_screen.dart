@@ -253,6 +253,30 @@ class _DetailContent extends StatelessWidget {
               ),
             ),
           ),
+        // The undo for the button above. Shown only while the employee is
+        // inactive, so the screen offers exactly one of delete / restore and
+        // the pair can never read as two ways to change the same state.
+        if (!employee.isActive)
+          OutlinedButton.icon(
+            onPressed: () => _confirmReactivate(context),
+            icon: const Icon(Icons.restore_rounded, color: AppColors.success),
+            label: const Text(
+              AppStrings.employeesActionReactivate,
+              style: TextStyle(
+                color: AppColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(
+                color: AppColors.success.withValues(alpha: 0.5),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
         // The irreversible one. Kept apart from the button above and worded as
         // a different act, because the two are a soft delete and a hard one —
         // offering them as neighbouring equals invites the wrong tap.
@@ -307,6 +331,39 @@ class _DetailContent extends StatelessWidget {
     if (success) {
       ref.invalidate(employeeDetailProvider(employee.id));
       if (context.mounted) context.pop();
+    }
+  }
+
+  /// Undo a delete.
+  ///
+  /// Unlike the deactivate path this stays on the screen: the employee is
+  /// still here, now active, and the detail is invalidated so every field
+  /// reflects the server rather than the stale copy that was rendered.
+  Future<void> _confirmReactivate(BuildContext context) async {
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.employeesReactivateConfirmTitle,
+      message: AppStrings.employeesReactivateConfirmMessage,
+      confirmLabel: AppStrings.employeesActionReactivate,
+      icon: Icons.restore_rounded,
+      accentColor: AppColors.success,
+    );
+    if (ok != true || !context.mounted) return;
+    final failure = await ref
+        .read(employeeListProvider.notifier)
+        .reactivateOptimistic(employee.id);
+    if (!context.mounted) return;
+    final success = failure == null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text(success ? AppStrings.employeesReactivateSuccess : failure),
+        backgroundColor: success ? null : AppColors.error,
+        duration: Duration(seconds: success ? 4 : 10),
+      ),
+    );
+    if (success) {
+      ref.invalidate(employeeDetailProvider(employee.id));
     }
   }
 

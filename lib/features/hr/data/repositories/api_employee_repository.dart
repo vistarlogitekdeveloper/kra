@@ -142,6 +142,18 @@ class ApiEmployeeRepository implements EmployeeRepository {
   }
 
   @override
+  Future<Employee> reactivate(String id) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.employees}/$id/reactivate',
+      );
+      return Employee.fromJson(unwrapObject(response));
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
   Future<EmployeeDeletionImpact> deletionImpact(String id) async {
     try {
       final response =

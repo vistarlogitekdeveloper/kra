@@ -301,6 +301,11 @@ abstract final class Telemetry {
     ('DELETE', RegExp(r'^/employees/:(id|ref)$'), 'employee_deactivated'),
     (
       'POST',
+      RegExp(r'^/employees/:(id|ref)/reactivate$'),
+      'employee_reactivated'
+    ),
+    (
+      'POST',
       RegExp(r'^/employees/:(id|ref)/transfer$'),
       'employee_transferred'
     ),

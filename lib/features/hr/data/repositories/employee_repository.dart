@@ -73,6 +73,18 @@ abstract class EmployeeRepository {
   /// — see [purge] for the irreversible counterpart.
   Future<void> deactivate(String id);
 
+  /// Undo a [deactivate] — POST /employees/:id/reactivate.
+  ///
+  /// A named server action rather than `update(id, {'isActive': true})`,
+  /// because the restore is audited as its own event (EMPLOYEE.REACTIVATED)
+  /// and the server refuses (409) when the employee is already active. Returns
+  /// the employee as the server now holds them.
+  ///
+  /// Nothing is rebuilt: [deactivate] only flips the flag, so the employee
+  /// code, manager, location, KRA assignments and review history come back as
+  /// they were. This is NOT an undo for [purge], which removes the record.
+  Future<Employee> reactivate(String id);
+
   /// What [purge] would remove, without removing anything.
   ///
   /// Fetch this before showing the confirmation: the figures include records

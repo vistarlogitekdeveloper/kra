@@ -82,12 +82,24 @@ A paginated, searchable list of every employee in the org.
 - **List tile** — name, role, location, current cycle status.
 - **+ button** (top-right) → `/hr/employees/new` → Employee Form.
 - **Tap a row** → `/hr/employees/:id` → Employee Detail.
+- **Row menu (⋮)** — Edit, and then either **Delete** or **Restore**, never
+  both: Delete is a soft delete (the record stays, under the Inactive filter),
+  and Restore is its undo. Set the status filter to Inactive to find someone to
+  restore. Neither is offered for the other state, so the menu always says
+  which one the row is in.
+
+A restore puts the employee back on the active roster and lets them sign in
+again. Nothing is rebuilt — their employee code, reporting manager, KRAs and
+review history were never removed — and the action is recorded in Reports →
+Audit Log as its own entry, distinct from an ordinary edit. **Delete
+permanently** (purge) is the one that cannot be restored.
 
 #### 4.2.1 Employee Detail `/hr/employees/:id`
 
 Shows the employee's profile (read-only), assigned KRA template, current cycle status, and reporting manager.
 
 - **Edit** → `/hr/employees/:id/edit` (same form as creation, pre-filled).
+- **Delete** / **Restore** — whichever the employee's current status allows.
 - **Assign KRA** → jumps to KRA Assign with this employee pre-selected.
 - **View history** → all their past reviews (HR view).
 

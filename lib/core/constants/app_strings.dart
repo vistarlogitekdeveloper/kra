@@ -473,6 +473,33 @@ class AppStrings {
   static const String employeesDeactivateFailed =
       'Could not delete. Please try again.';
 
+  // ───── Restore (undo a Delete / deactivate) ─────
+  //
+  // The counterpart of the soft delete above: POST /employees/:id/reactivate
+  // puts the record back on the active roster. Nothing is rebuilt — the row was
+  // never removed — so the copy promises exactly what the server does and does
+  // not imply that reviews or assignments are being recreated.
+  //
+  // Called "Restore" because the delete's own confirmation already tells the
+  // user the record "can be restored if this was a mistake"; a different verb
+  // here would read as a different act.
+  static const String employeesActionReactivate = 'Restore';
+  static const String employeesReactivateConfirmTitle = 'Restore employee?';
+  static const String employeesReactivateConfirmMessage =
+      'They go back on the active roster and can sign in again. Their '
+      'employee code, reporting manager, KRAs and review history are '
+      'unchanged — nothing was removed when they were deleted.';
+  static const String employeesReactivateSuccess = 'Employee restored.';
+  static const String employeesReactivateFailed =
+      'Could not restore. Please try again.';
+
+  /// Shown when the server says the employee is already active — someone else
+  /// restored them, or the list on screen is stale. Retrying cannot help, so
+  /// the message says what to do instead.
+  static const String employeesReactivateAlreadyActive =
+      'This employee is already active. Refresh the list to see their current '
+      'status.';
+
   /// Shown when the server refuses the delete because the employee still has
   /// an unfinished review of their OWN.
   ///

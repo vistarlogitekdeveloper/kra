@@ -298,6 +298,49 @@ class EmployeeListController extends StateNotifier<EmployeeListState> {
       return deactivateFailureReason(e);
     }
   }
+
+  /// Restores [id], returning null on success or a user-facing REASON on
+  /// failure. The mirror of [deactivateOptimistic].
+  ///
+  /// The server's answer replaces the row rather than a locally patched copy:
+  /// reactivate returns the employee as stored, so the list shows what the
+  /// server holds and not an optimistic guess that happened to be right.
+  ///
+  /// Unlike the deactivate path this does NOT require the row to be on screen.
+  /// The detail screen calls it for an employee the list may never have loaded
+  /// (a deep link, or a list filtered to active only), and refusing there would
+  /// report a failure for a restore that was never attempted.
+  Future<String?> reactivateOptimistic(String id) async {
+    final idx = state.employees.indexWhere((e) => e.id == id);
+    final original = idx == -1 ? null : state.employees[idx];
+    if (original != null) {
+      final next = [...state.employees];
+      next[idx] = original.copyWith(isActive: true);
+      state = state.copyWith(employees: next);
+    }
+
+    try {
+      final restored = await _repository.reactivate(id);
+      final confirmed = [...state.employees];
+      final cidx = confirmed.indexWhere((e) => e.id == id);
+      if (cidx != -1) {
+        confirmed[cidx] = restored;
+        state = state.copyWith(employees: confirmed);
+      }
+      return null;
+    } catch (e) {
+      if (original != null) {
+        final revert = [...state.employees];
+        // The list may have moved on; defensively look the row up again.
+        final ridx = revert.indexWhere((e) => e.id == id);
+        if (ridx != -1) {
+          revert[ridx] = original;
+          state = state.copyWith(employees: revert);
+        }
+      }
+      return reactivateFailureReason(e);
+    }
+  }
 }
 
 /// Turns a failed deactivate into something the user can act on.
@@ -319,6 +362,23 @@ String deactivateFailureReason(Object error) {
   }
   // Anything else: the server's own words beat a generic retry prompt.
   return message.isEmpty ? AppStrings.employeesDeactivateFailed : message;
+}
+
+/// Turns a failed restore into something the user can act on.
+///
+/// The one refusal that is not a retry is 409 "already active": the row on
+/// screen is stale, so the advice is to refresh rather than to try again. A
+/// 404 is left to the server's own words — on a backend that predates the
+/// route it means the endpoint is missing, and "could not restore" would send
+/// the user back to tapping it.
+@visibleForTesting
+String reactivateFailureReason(Object error) {
+  if (error is! ApiError) return AppStrings.employeesReactivateFailed;
+  final message = error.message;
+  if (message.toLowerCase().contains('already active')) {
+    return AppStrings.employeesReactivateAlreadyActive;
+  }
+  return message.isEmpty ? AppStrings.employeesReactivateFailed : message;
 }
 
 /// Paginated employee list driven by the current filter. autoDispose
