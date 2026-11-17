@@ -1236,7 +1236,6 @@ class AppStrings {
   static const String monthlyReviewSubmit = 'Submit rating';
   static const String monthlyReviewApprove = 'Approve';
   static const String monthlyReviewReturn = 'Return for rework';
-  static const String monthlyReviewMarkPaid = 'Mark incentive paid';
   static const String monthlyReviewCommentLabel = 'Comment (optional)';
   static const String monthlyReviewScoreHint = 'Score';
   static const String monthlyReviewRemarkHint = 'Remark (optional)';
@@ -1244,14 +1243,10 @@ class AppStrings {
   static const String monthlyReviewApproved = 'Approved — sent to payout.';
   static const String monthlyReviewReturned =
       'Returned to the reporting manager.';
-  static const String monthlyReviewPaid = 'Incentive marked as paid.';
+  /// Shown per month in the review lists once its quarter was settled.
+  /// A read-out only: months are paid as a quarter, from the sheet's
+  /// payout card, never one at a time.
   static const String monthlyReviewPaidBadge = 'Paid';
-  static const String monthlyReviewMarkPaidTooltip = 'Mark incentive paid';
-  static const String monthlyReviewMarkPaidConfirmTitle =
-      'Mark incentive paid?';
-  static const String monthlyReviewMarkPaidConfirmMessage =
-      'Confirm the incentive payout has been settled. This finalizes the '
-      'review and can\'t be undone.';
   // ───── Why an incentive cannot be paid yet ─────
   //
   // The payout control used to vanish whenever a condition was unmet, so "not
@@ -1259,15 +1254,39 @@ class AppStrings {
   // Each line names the blocker AND what clears it, because the person reading
   // it is usually not the person who can clear it — Accounts waits on
   // management, not on itself.
-  static const String monthlyReviewMarkPaidMonthNotEnded =
-      'This month is still running. It can be paid once the month is over and '
-      'management has signed it off.';
-  static const String monthlyReviewMarkPaidManagementNotDone =
-      'Waiting on the management review. It can be paid once management has '
-      'rated every KRA and signed the month off.';
-  static const String monthlyReviewMarkPaidNotSignedOff =
-      'Management has not signed this month off yet (Save & Lock). It can be '
-      'paid after that.';
+  //
+  // Each takes the MONTH that is blocking: the incentive is paid per quarter,
+  // so "this month is still running" is useless when three were asked about.
+  // The month reads "September 2026", the same way the server names it in its
+  // own refusals, so a client block and a server block are one sentence.
+  static String quarterPayoutMonthNotEnded(String month) =>
+      '$month is still running. The quarter can be paid once every month in '
+      'it is over and management has signed it off.';
+  static String quarterPayoutManagementNotDone(String month) =>
+      'Waiting on the management review for $month. The quarter can be paid '
+      'once management has rated every KRA and signed each month off.';
+  static String quarterPayoutNotSignedOff(String month) =>
+      'Management has not signed $month off yet (Save & Lock). The quarter '
+      'can be paid after that.';
+
+  // ───── Settling a quarter ─────
+  static const String quarterPayoutMarkPaid = 'Mark quarter paid';
+  static const String quarterPayoutPaidBadge = 'Paid';
+  static const String quarterPayoutConfirmTitle = 'Mark this quarter paid?';
+  static const String quarterPayoutConfirmMessage =
+      'Confirm the quarter\'s incentive has been settled. Every month in the '
+      'quarter is marked paid together, and this cannot be undone.';
+  static const String quarterPayoutDone = 'Quarter marked as paid.';
+  static const String quarterPayoutFailed =
+      'Could not mark the quarter paid. Please try again.';
+
+  /// Printed under the amount so the figure can be checked by hand. The
+  /// wording is the rule: each month at its OWN incentive and its OWN final
+  /// score, added up — not a quarter average against one month's ceiling.
+  static const String quarterPayoutFormula =
+      'Payout = each month\'s incentive × that month\'s final average, added '
+      'up. Only management ratings count; a KRA management has not rated '
+      'counts as 0.';
 
   static const String monthlyReviewActionFailed =
       'Could not complete the action. Please try again.';

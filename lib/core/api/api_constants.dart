@@ -96,8 +96,16 @@ class ApiConstants {
   //                                              (scoped server-side from JWT)
   //   GET  $monthlyReviews/:id                 → MonthlyReview
   //   POST $monthlyReviews/:id/submit-stage    → submit/advance a stage
-  //   POST $monthlyReviews/:id/mark-paid        → mark incentive paid
+  //   POST $monthlyReviews/:id/mark-paid        → mark one month paid
+  //   POST $monthlyReviews/mark-paid-quarter    → settle a whole quarter
   static const String monthlyReviews = '/reviews/monthly';
+
+  /// Settle a quarter's incentive in one call: `{ reviewIds: [...] }`, all
+  /// marked paid together or none. The incentive is calculated per month and
+  /// paid per quarter, so this — not the per-month path above — is what the
+  /// app calls. A static segment, so it is declared before `/:id` server-side.
+  static const String monthlyReviewsMarkPaidQuarter =
+      '$monthlyReviews/mark-paid-quarter';
 
   // ───── Endpoints that should NOT have a Bearer token attached ─────
   // Marked via options.extra['skipAuth'] = true at the call site.

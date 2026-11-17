@@ -18,6 +18,8 @@ import '../../../../core/widgets/workspace_drawer.dart';
 import '../../../employee/presentation/widgets/_formatters.dart';
 import '../../data/models/monthly_kra_row.dart';
 import '../../data/models/monthly_review.dart';
+import '../widgets/payout_copy.dart';
+import '../../data/models/quarter_payout.dart';
 import '../../data/models/rating_reopen.dart';
 import '../../data/models/rating_window.dart';
 import '../../../../core/enums/review_flow.dart';
@@ -963,6 +965,68 @@ class _QuarterlyKraSheetScreenState
     }
   }
 
+  /// Settles the quarter's incentive.
+  ///
+  /// Quarter-wise, in one server call, because that is how the incentive is
+  /// paid: it is calculated per month — each month at its own amount and its
+  /// own final score — and handed over for the quarter. Three per-month taps
+  /// could leave a quarter half paid, which is why the per-month control is
+  /// gone and this names every unpaid month at once.
+  ///
+  /// The client's gates are the ones it can see (month ended, signed off,
+  /// management done); the one it cannot — a KRA with no management rating —
+  /// is the server's, and its refusal names the month and the KRA, so it is
+  /// shown verbatim.
+  Future<void> _markQuarterPaid(List<MonthlyReview?> reviews) async {
+    final scope = ref.read(currentReviewScopeProvider);
+    if (scope == null) return;
+    final quarter = QuarterPayout.fromReviews(reviews, now: _now);
+    final ids = quarter.unpaidReviewIds;
+    if (ids.isEmpty) return;
+
+    final ok = await ConfirmActionDialog.show(
+      context,
+      title: AppStrings.quarterPayoutConfirmTitle,
+      message: '${AppStrings.quarterPayoutConfirmMessage}\n\n'
+          '${EmployeeFormatters.currencyInr(quarter.amount)}',
+      confirmLabel: AppStrings.quarterPayoutMarkPaid,
+      icon: Icons.payments_rounded,
+      accentColor: AppColors.success,
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      await ref.read(monthlyReviewRepositoryProvider).markQuarterPaid(
+            ids,
+            actorId: scope.userId,
+            actorName: scope.userName,
+          );
+      ref.invalidate(quarterlySheetProvider);
+      // The review lists badge payout state from the summary.
+      ref.invalidate(monthlyReviewListProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.quarterPayoutDone)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        // The server's own words: "September 2026 has not ended yet",
+        // "2 KRAs have no management rating yet (…)". A generic failure would
+        // throw away the only thing that says what to do next.
+        final reason = e is ApiError && e.message.isNotEmpty
+            ? e.message
+            : AppStrings.quarterPayoutFailed;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(reason), duration: const Duration(seconds: 8)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   /// Reopens a locked management review across the quarter so its scores can be
   /// revised, then re-locked.
   /// Reopens the management review for the months the user picks.
@@ -1302,6 +1366,17 @@ class _QuarterlyKraSheetScreenState
             onSubmitSelfRating: _submitAction(mappedReviews, scope),
             // The reporting manager's counterpart, scoped to their own KRAs.
             onSubmitManagerReview: _managerSubmitAction(mappedReviews, scope),
+            // Accounts / HR admin settle the quarter here, where the amount
+            // they are settling is on screen. Derived from the stage model
+            // rather than a restated role list, and never on your own sheet —
+            // the server refuses that too. Null hides the action; the card
+            // explains the review-state blockers itself.
+            onMarkQuarterPaid: scope != null &&
+                    !ownSheet &&
+                    canActOnStage(ReviewStage.incentivePayout,
+                        scope.reviewFlow, scope.effectiveRoles)
+                ? () => _markQuarterPaid(mappedReviews)
+                : null,
           );
         },
       ),
@@ -1762,6 +1837,11 @@ Widget quarterlyKraSheetBodyForTest({
   Future<void> Function()? onSubmitSelfRating,
   Future<void> Function()? onSubmitManagerReview,
 
+  /// Non-null when the viewer may settle this quarter's incentive. The card
+  /// still decides whether the quarter is PAYABLE — pass this to exercise the
+  /// three states it can draw (button, blocked-with-reason, Paid).
+  Future<void> Function()? onMarkQuarterPaid,
+
   /// Pins "today" so a test can assert the current-month copy deterministically.
   DateTime? now,
 
@@ -1850,6 +1930,7 @@ Widget quarterlyKraSheetBodyForTest({
     onSendBackForRework: onSendBackForRework,
     onSubmitSelfRating: onSubmitSelfRating,
     onSubmitManagerReview: onSubmitManagerReview,
+    onMarkQuarterPaid: onMarkQuarterPaid,
   );
 }
 
@@ -1929,6 +2010,13 @@ class _Sheet extends StatelessWidget {
   /// them. Null unless they actually have a month of their own to submit.
   final Future<void> Function()? onSubmitManagerReview;
 
+  /// Settles the quarter's incentive. Null when the viewer holds no payout
+  /// seat or the sheet is their own — neither is something the state of the
+  /// quarter can change, so no control is drawn at all. Everything that CAN
+  /// change (a month still running, unsigned, unrated) is explained by the
+  /// payout card instead of hiding the button.
+  final Future<void> Function()? onMarkQuarterPaid;
+
   const _Sheet({
     this.clock,
     required this.months,
@@ -1950,6 +2038,7 @@ class _Sheet extends StatelessWidget {
     this.onSendBackForRework,
     this.onSubmitSelfRating,
     this.onSubmitManagerReview,
+    this.onMarkQuarterPaid,
   });
 
   MonthlyReview? get _any =>
@@ -2092,27 +2181,16 @@ class _Sheet extends StatelessWidget {
     }
 
     // Payout follows the FINAL score — management scores only, an unrated KRA
-    // 0, a management N/A excluded — quarter-averaged across the three months.
-    double qFinalOf() {
-      double sum = 0;
-      for (var i = 0; i < 3; i++) {
-        sum += reviews[i]?.finalScorePct ?? 0;
-      }
-      return sum / 3;
-    }
-
-    final qFinal = qFinalOf();
+    // 0, a management N/A excluded.
+    //
+    // The incentive is CALCULATED PER MONTH and PAID PER QUARTER, so the
+    // quarter's money is the three months added up, each at its own amount
+    // and its own final score. The old formula took one ceiling (the highest
+    // month's) times three times the average final — identical while the
+    // incentive never moves mid-quarter, and wrong by exactly the raise when
+    // it does, which is the month an employee notices.
+    final quarter = QuarterPayout.fromReviews(reviews, now: clock);
     final qSelf = qAvg(ReviewStage.selfRating);
-    // The monthly ceiling as the Performance Incentive Sheet reads it
-    // (QuarterAggregate.base): the highest across the quarter's months, not
-    // whichever month happens to be first — the two used to disagree when an
-    // incentive changed mid-quarter.
-    final eligibleMonthly = [
-      for (final r in reviews)
-        if (r != null) r.eligibleAmount,
-    ].fold<double>(0, (a, b) => a > b ? a : b);
-    final quarterEligible = eligibleMonthly * 3;
-    final payout = quarterEligible * qFinal / 100;
 
     // Centre the sheet at a max width matching the grid so the header, table
     // and payout card stay aligned and don't stretch edge-to-edge on a desktop.
@@ -2268,10 +2346,8 @@ class _Sheet extends StatelessWidget {
             _PayoutCard(
               qSelf: qSelf,
               showSelfAverage: stageIsInFlow(ReviewStage.selfRating, flow),
-              qFinal: qFinal,
-              eligibleMonthly: eligibleMonthly,
-              quarterEligible: quarterEligible,
-              payout: payout,
+              quarter: quarter,
+              onMarkQuarterPaid: onMarkQuarterPaid,
             ),
           ],
         ),
@@ -3942,17 +4018,22 @@ class _PayoutCard extends StatelessWidget {
   /// real final average — which looks like the employee scored zero rather
   /// than like the row does not apply to them.
   final bool showSelfAverage;
-  final double qFinal;
-  final double eligibleMonthly;
-  final double quarterEligible;
-  final double payout;
+
+  /// The quarter's money, month by month. The card shows the parts as well as
+  /// the total, because the total is the only number anyone is asked to hand
+  /// over and "₹71,900" with no working is not something an Accounts person
+  /// can check.
+  final QuarterPayout quarter;
+
+  /// Settles the quarter. Null when the viewer cannot settle any quarter —
+  /// see `_Sheet.onMarkQuarterPaid`.
+  final Future<void> Function()? onMarkQuarterPaid;
+
   const _PayoutCard({
     required this.qSelf,
     required this.showSelfAverage,
-    required this.qFinal,
-    required this.eligibleMonthly,
-    required this.quarterEligible,
-    required this.payout,
+    required this.quarter,
+    this.onMarkQuarterPaid,
   });
 
   @override
@@ -3973,24 +4054,35 @@ class _PayoutCard extends StatelessWidget {
           const SizedBox(height: 12),
           if (showSelfAverage)
             _row('Quarter self average', '${qSelf.round()}%'),
-          _row('Quarter final average', '${qFinal.round()}%'),
-          _row('Monthly incentive',
-              EmployeeFormatters.currencyInr(eligibleMonthly)),
-          _row('Quarter eligible (×3)',
-              EmployeeFormatters.currencyInr(quarterEligible)),
+          _row('Quarter final average', '${quarter.finalPct.round()}%'),
+          // The working, month by month: each month's own incentive at its own
+          // final score. Three lines that add up to the figure below them.
+          for (final m in quarter.months)
+            _row(
+              '${m.label} · ${EmployeeFormatters.currencyInr(m.eligibleAmount)}'
+              ' × ${m.finalScorePct.round()}%',
+              EmployeeFormatters.currencyInr(m.amount),
+            ),
+          _row('Quarter eligible',
+              EmployeeFormatters.currencyInr(quarter.eligibleAmount)),
           const Divider(height: 20),
           _row(
             AppStrings.quarterlyPayoutAmount,
-            EmployeeFormatters.currencyInr(payout),
+            EmployeeFormatters.currencyInr(quarter.amount),
             emphasize: true,
           ),
           const SizedBox(height: 4),
           Text(
-            'Payout = monthly incentive × 3 × quarter final average. '
-            'Only management ratings count; a KRA management has not rated '
-            'counts as 0.',
+            AppStrings.quarterPayoutFormula,
             style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
+          if (onMarkQuarterPaid != null) ...[
+            const SizedBox(height: 14),
+            _QuarterPayoutAction(
+              quarter: quarter,
+              onMarkQuarterPaid: onMarkQuarterPaid!,
+            ),
+          ],
         ],
       ),
     );
@@ -4017,6 +4109,79 @@ class _PayoutCard extends StatelessWidget {
                       ? AppColors.primaryPurple
                       : AppColors.textPrimary)),
         ],
+      ),
+    );
+  }
+}
+
+/// The settle-the-quarter affordance under the payout card.
+///
+/// Three states, and the middle one is the point: a quarter that is not
+/// payable yet SAYS SO instead of hiding the button. The control used to be a
+/// per-month icon that simply vanished whenever a gate was unmet, which is
+/// indistinguishable from an app that cannot mark incentives paid — which is
+/// exactly how it was reported.
+class _QuarterPayoutAction extends StatelessWidget {
+  final QuarterPayout quarter;
+  final Future<void> Function() onMarkQuarterPaid;
+
+  const _QuarterPayoutAction({
+    required this.quarter,
+    required this.onMarkQuarterPaid,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (quarter.allPaid) {
+      return const Row(
+        children: [
+          Icon(Icons.check_circle_rounded,
+              size: 18, color: AppColors.success),
+          SizedBox(width: 8),
+          Text(
+            AppStrings.quarterPayoutPaidBadge,
+            style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: AppColors.success),
+          ),
+        ],
+      );
+    }
+
+    final blocking = quarter.blockingMonth;
+    final reason = blocking?.blocker == null
+        ? null
+        : markPaidBlockerMessage(blocking!.blocker!, month: blocking.label);
+    if (reason != null) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.schedule_rounded, size: 16, color: AppColors.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              reason,
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: onMarkQuarterPaid,
+        icon: const Icon(Icons.payments_rounded, size: 18),
+        label: const Text(AppStrings.quarterPayoutMarkPaid),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.success,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       ),
     );
   }

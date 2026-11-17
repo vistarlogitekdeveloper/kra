@@ -106,6 +106,22 @@ class ApiMonthlyReviewRepository implements MonthlyReviewRepository {
   }
 
   @override
+  Future<void> markQuarterPaid(
+    List<String> reviewIds, {
+    required String actorId,
+    required String actorName,
+  }) async {
+    try {
+      await _dio.post(
+        ApiConstants.monthlyReviewsMarkPaidQuarter,
+        data: {'reviewIds': reviewIds},
+      );
+    } catch (e, st) {
+      rethrowAsApiError(e, st);
+    }
+  }
+
+  @override
   Future<MonthlyReview> saveStageScores(
     String reviewId,
     ReviewStage stage, {

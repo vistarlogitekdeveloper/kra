@@ -376,54 +376,9 @@ class _ReviewTile extends ConsumerStatefulWidget {
 }
 
 class _ReviewTileState extends ConsumerState<_ReviewTile> {
-  bool _payingOut = false;
-
   MonthlyReviewSummary get summary => widget.summary;
   UserRole? get role => widget.role;
   String? get userId => widget.userId;
-
-  // Settle the incentive for this review — the payout action Accounts/Finance
-  // runs once the management review is done. Confirms first (it's terminal),
-  // then refreshes the list so the tile flips to a "Paid" badge.
-  Future<void> _markPaid() async {
-    final scope = ref.read(currentReviewScopeProvider);
-    if (scope == null) return;
-    final ok = await ConfirmActionDialog.show(
-      context,
-      title: AppStrings.monthlyReviewMarkPaidConfirmTitle,
-      message: AppStrings.monthlyReviewMarkPaidConfirmMessage,
-      confirmLabel: AppStrings.monthlyReviewMarkPaid,
-      icon: Icons.payments_rounded,
-    );
-    if (ok != true) return;
-    setState(() => _payingOut = true);
-    try {
-      await ref.read(monthlyReviewRepositoryProvider).markPaid(
-            summary.id,
-            actorId: scope.userId,
-            actorName: scope.userName,
-          );
-      ref.invalidate(monthlyReviewListProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.monthlyReviewPaid)),
-        );
-      }
-    } catch (e) {
-      // Show the server's reason — "not signed off yet", "2 KRAs have no
-      // management rating yet (…)" — rather than a generic failure.
-      if (mounted) {
-        final reason = e is ApiError && e.message.isNotEmpty
-            ? e.message
-            : AppStrings.monthlyReviewActionFailed;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(reason), duration: const Duration(seconds: 8)),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _payingOut = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -579,19 +534,12 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                     ),
                 ],
               ),
-              _PayoutControl(
-                // Corroborated by a score — a "Paid" badge on a review nobody
-                // ever rated reads as money already gone.
-                paid: summary.payoutSettled,
-                // null = payable now. Anything else is shown as a reason
-                // rather than as an absent button, except the two blockers
-                // about the viewer, which no action on this review clears.
-                blocker: role == null
-                    ? MarkPaidBlocker.notPayoutRole
-                    : summary.markPaidBlockerFor(role!, userId: userId),
-                busy: _payingOut,
-                onMarkPaid: _markPaid,
-              ),
+              // Payout state, read-only. The incentive is calculated per
+              // month and PAID PER QUARTER, so a month is not something anyone
+              // settles on its own any more — the quarterly KRA sheet's payout
+              // card does it for the whole quarter. The badge stays because a
+              // settled month still has to look settled here.
+              if (summary.payoutSettled) const _PaidBadge(),
               Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             ],
           ),
@@ -601,110 +549,41 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
   }
 }
 
-/// The incentive-payout affordance on a review tile: a green "Paid" check once
-/// settled, or — for Accounts/Finance, after the management review — a tappable
-/// check to settle it. Nothing at all when neither applies, so ordinary tiles
-/// are unchanged.
-/// The sentence shown for a blocker the viewer can wait out, or null for the
-/// ones that draw no control at all.
+/// A settled month, shown and not acted on.
 ///
-/// Top-level and public so the mapping can be tested without standing up the
-/// whole dashboard: the strings are the entire point of the control, and a
-/// blocker that silently maps to null is the old vanishing button again.
-String? markPaidBlockerMessage(MarkPaidBlocker blocker) {
-  switch (blocker) {
-    // Facts about the VIEWER, not the review: no waiting changes them, and a
-    // greyed control on every row of someone who can never pay is noise.
-    case MarkPaidBlocker.notPayoutRole:
-    case MarkPaidBlocker.ownReview:
-    // Settled reviews are the Paid badge's job, handled before this.
-    case MarkPaidBlocker.alreadyPaid:
-      return null;
-    case MarkPaidBlocker.monthNotEnded:
-      return AppStrings.monthlyReviewMarkPaidMonthNotEnded;
-    case MarkPaidBlocker.managementNotDone:
-      return AppStrings.monthlyReviewMarkPaidManagementNotDone;
-    case MarkPaidBlocker.notSignedOff:
-      return AppStrings.monthlyReviewMarkPaidNotSignedOff;
-  }
-}
-
-class _PayoutControl extends StatelessWidget {
-  final bool paid;
-
-  /// What stands between this review and a settled incentive, or null when
-  /// nothing does.
-  final MarkPaidBlocker? blocker;
-  final bool busy;
-  final VoidCallback onMarkPaid;
-  const _PayoutControl({
-    required this.paid,
-    required this.blocker,
-    required this.busy,
-    required this.onMarkPaid,
-  });
+/// The payout itself moved to the quarter: the incentive is calculated per
+/// month but handed over per quarter, so settling one month on its own was
+/// never a real act — it could leave a quarter part paid. The quarterly KRA
+/// sheet's payout card settles all three together; this badge only reports
+/// what already happened.
+class _PaidBadge extends StatelessWidget {
+  const _PaidBadge();
 
   @override
   Widget build(BuildContext context) {
-    if (paid) {
-      return Padding(
-        padding: const EdgeInsets.only(left: 6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(20),
-            border:
-                Border.all(color: AppColors.success.withValues(alpha: 0.35)),
-          ),
-          child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle_rounded,
-                size: 14, color: AppColors.success),
-            SizedBox(width: 4),
-            Text(AppStrings.monthlyReviewPaidBadge,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.success)),
-          ]),
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
         ),
-      );
-    }
-    final blocking = blocker;
-    if (blocking != null) {
-      final reason = markPaidBlockerMessage(blocking);
-      if (reason == null) return const SizedBox.shrink();
-      // Greyed, but still tappable. A truly disabled IconButton swallows the
-      // tap, and on a touch device a tooltip alone needs a long-press nobody
-      // discovers — so the tap is what delivers the reason.
-      return IconButton(
-        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(reason), duration: const Duration(seconds: 6)),
-        ),
-        tooltip: reason,
-        visualDensity: VisualDensity.compact,
-        icon: Icon(Icons.check_circle_outline_rounded,
-            color: AppColors.textMuted.withValues(alpha: 0.6)),
-      );
-    }
-    return IconButton(
-      onPressed: busy ? null : onMarkPaid,
-      tooltip: AppStrings.monthlyReviewMarkPaidTooltip,
-      visualDensity: VisualDensity.compact,
-      icon: busy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                valueColor: AlwaysStoppedAnimation(AppColors.success),
-              ),
-            )
-          : const Icon(Icons.check_circle_outline_rounded,
-              color: AppColors.success),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
+          SizedBox(width: 4),
+          Text(AppStrings.monthlyReviewPaidBadge,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.success)),
+        ]),
+      ),
     );
   }
 }
+
 
 class _DashboardSkeleton extends StatelessWidget {
   const _DashboardSkeleton();

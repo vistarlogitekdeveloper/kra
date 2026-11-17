@@ -56,8 +56,30 @@ abstract class MonthlyReviewRepository {
 
   /// Marks payout on [reviewId] paid and advances to
   /// [ReviewStage.completed].
+  ///
+  /// The PRIMITIVE, not the action a user takes. The incentive is calculated
+  /// per month and paid per quarter, so the app settles quarters —
+  /// see [markQuarterPaid]. This stays because the server's unit is still the
+  /// month and the quarter is built out of it.
   Future<MonthlyReview> markPaid(
     String reviewId, {
+    required String actorId,
+    required String actorName,
+  });
+
+  /// Settles a whole quarter: every id in [reviewIds] is marked paid together
+  /// or none is.
+  ///
+  /// One call rather than a loop over [markPaid] on purpose. Three separate
+  /// calls can leave a quarter half settled when the third is refused — and a
+  /// refusal is the normal case, since a month that is still running or not
+  /// signed off blocks the quarter. The server runs the per-month gates on
+  /// every id first and writes them in one transaction.
+  ///
+  /// Pass only the months that are not already paid; already-paid ones are
+  /// skipped server-side so a part-settled quarter can still be completed.
+  Future<void> markQuarterPaid(
+    List<String> reviewIds, {
     required String actorId,
     required String actorName,
   });

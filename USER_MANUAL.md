@@ -177,6 +177,26 @@ Read-only summaries:
 - Incentive payout summary for any closed cycle.
 - **Audit Log** (`/hr/reports/audit-log`) — paginated, filterable by actor / action / entity type / date range. The forensic trail.
 
+### 4.7.1 Settling an incentive
+
+The incentive is **calculated per month and paid per quarter**, so it is
+settled a quarter at a time, from the **Payout this quarter** card at the
+bottom of an employee's Quarterly KRA Sheet (HR → Reviews → tap an employee).
+
+- The card shows the working: each month's own incentive × that month's final
+  average, added up. Only management ratings count; a KRA management has not
+  rated counts as 0.
+- **Mark quarter paid** settles every month in the quarter in one action —
+  all of them or none.
+- Accounts (`FINANCE`) and HR Admin may settle; plain HR may not, and nobody
+  settles their own sheet.
+- When the quarter is not payable yet, the card says which month is blocking
+  and what clears it — a month still running, a month management has not rated,
+  or a month without **Save & Lock**. A KRA with no management rating is
+  refused by the server, which names the month and the KRA.
+- The Reviews workspace shows a **Paid** badge per month afterwards. It is a
+  read-out, not an action: months are never settled individually.
+
 ### 4.8 Bulk Setup `/hr/bulk-setup`
 
 A guided wizard for setting up a new cycle: pick the cycle, pick locations/roles, auto-assign templates, send notifications. Useful at the start of a quarter.

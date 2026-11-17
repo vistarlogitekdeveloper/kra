@@ -304,6 +304,26 @@ class MockMonthlyReviewRepository implements MonthlyReviewRepository {
   }
 
   @override
+  Future<void> markQuarterPaid(
+    List<String> reviewIds, {
+    required String actorId,
+    required String actorName,
+  }) async {
+    // In-memory stand-in for the server's one-transaction settle: every month
+    // is checked before any is written, so a refusal leaves the quarter
+    // untouched the way the API does.
+    for (final id in reviewIds) {
+      final review = await getReview(id);
+      if (review.currentStage != ReviewStage.incentivePayout) {
+        throw StateError('Review is not awaiting payout');
+      }
+    }
+    for (final id in reviewIds) {
+      await markPaid(id, actorId: actorId, actorName: actorName);
+    }
+  }
+
+  @override
   Future<MonthlyReview> saveStageScores(
     String reviewId,
     ReviewStage stage, {
