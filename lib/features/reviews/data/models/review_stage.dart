@@ -1,4 +1,3 @@
-import '../../../../core/constants/feature_flags.dart';
 import '../../../auth/data/models/user.dart';
 
 /// Stages of a single monthly review.
@@ -199,22 +198,16 @@ enum ReviewStage {
         // to be the same seat as the HR rater: HR would otherwise approve its
         // own input.
         //
-        // Two documented exceptions to that separation, both deliberate:
-        //  * HR_ADMIN, until the backend's employees enum accepts
-        //    `MANAGEMENT` — nobody can be assigned it today, and gating on it
-        //    alone would leave this stage with no eligible actor at all. Turning
-        //    on [FeatureFlags.roleTiers] withdraws this one.
-        //  * SUPER_ADMIN, which holds every seat in the app on purpose and so
-        //    CAN approve its own HR rating. It is the cross-organisation
-        //    operator account, not a seat in anyone's review, and it is not
-        //    withdrawn by [FeatureFlags.roleTiers].
-        return FeatureFlags.roleTiers
-            ? const {UserRole.management, UserRole.superAdmin}
-            : const {
-                UserRole.management,
-                UserRole.hrAdmin,
-                UserRole.superAdmin,
-              };
+        // MANAGEMENT only — as the main role or an extra one (the people who
+        // sign off are HR admins who also hold Management; [User.effectiveRoles]
+        // counts both). HR_ADMIN held it too until November 2026; the server's
+        // ACTOR_ROLES.MANAGEMENT_REVIEW is ['MANAGEMENT'] and refuses a plain
+        // HR admin, so offering the cells to one would only produce a 403.
+        //
+        // SUPER_ADMIN holds every seat in the app on purpose and so CAN approve
+        // its own HR rating. It is the cross-organisation operator account,
+        // not a seat in anyone's review.
+        return const {UserRole.management, UserRole.superAdmin};
       case ReviewStage.incentivePayout:
         // NOT plain HR. The server's ACTOR_ROLES.INCENTIVE_PAYOUT is
         // ['FINANCE', 'HR_ADMIN'] (plus SUPER_ADMIN through its role

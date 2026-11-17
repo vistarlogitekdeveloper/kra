@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vistar_app/core/constants/feature_flags.dart';
 import 'package:vistar_app/features/auth/data/models/user.dart';
 import 'package:vistar_app/features/reviews/data/models/review_stage.dart';
 
@@ -83,16 +82,25 @@ void main() {
             UserRole.bdManager,
             UserRole.warehouseMgr,
           ]));
-      // Management sign-off belongs to the management tier. HR_ADMIN shares it
-      // ONLY while the backend cannot store MANAGEMENT — gating on a role
-      // nobody can hold would leave the stage with no actor at all.
+      // Management sign-off belongs to MANAGEMENT alone (and SUPER_ADMIN).
+      // HR_ADMIN lost it in November 2026: the server refuses a plain HR
+      // admin, and the people who sign off hold Management as an extra role.
       expect(ReviewStage.managementReview.actorRoles,
-          contains(UserRole.management));
+          {UserRole.management, UserRole.superAdmin});
       expect(
         ReviewStage.managementReview.actorRoles.contains(UserRole.hrAdmin),
-        !FeatureFlags.roleTiers,
-        reason: 'HR must lose the sign-off seat once MANAGEMENT is assignable',
+        isFalse,
+        reason: 'HR must not sign off the incentive it feeds',
       );
+      // The real holders: HR admins with Management as an EXTRA role. The
+      // multi-role check counts it; an HR admin without it is refused.
+      expect(
+        ReviewStage.managementReview
+            .isActionableByAny({UserRole.hrAdmin, UserRole.management}),
+        isTrue,
+      );
+      expect(ReviewStage.managementReview.isActionableByAny({UserRole.hrAdmin}),
+          isFalse);
       // A reporting manager never gets management review, whatever happens.
       expect(ReviewStage.managementReview.actorRoles,
           isNot(contains(UserRole.manager)));
