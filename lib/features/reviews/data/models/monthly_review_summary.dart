@@ -455,10 +455,63 @@ class MonthlyReviewSummary {
   /// check. The server also requires every KRA to carry a management rating
   /// and refuses with the reason if one does not.
   bool canMarkPaidBy(UserRole role, {String? userId, DateTime? now}) =>
-      managementReviewDone &&
-      managementLockedAt != null &&
-      monthEndedAt(now ?? DateTime.now()) &&
-      !payoutPaid &&
-      (userId == null || userId != employeeId) &&
-      ReviewStage.incentivePayout.actorRoles.contains(role);
+      markPaidBlockerFor(role, userId: userId, now: now) == null;
+
+  /// WHY [role] cannot settle this incentive right now, or null when they can.
+  ///
+  /// The same rules as [canMarkPaidBy], kept as one expression so the UI can
+  /// say what is missing instead of hiding the control and leaving the user to
+  /// guess. A hidden button is indistinguishable from a feature that does not
+  /// exist — which is exactly how this was reported.
+  ///
+  /// Order matters: the first unmet condition is the one worth naming, and the
+  /// earliest step in the month's life comes first (the month has to end
+  /// before management can sign it off). [MarkPaidBlocker.notPayoutRole] and
+  /// [MarkPaidBlocker.ownReview] are facts about the VIEWER rather than the
+  /// review, so the UI shows no control at all for those — nothing the user
+  /// does to this review could change them.
+  MarkPaidBlocker? markPaidBlockerFor(
+    UserRole role, {
+    String? userId,
+    DateTime? now,
+  }) {
+    if (!ReviewStage.incentivePayout.actorRoles.contains(role)) {
+      return MarkPaidBlocker.notPayoutRole;
+    }
+    if (userId != null && userId == employeeId) {
+      return MarkPaidBlocker.ownReview;
+    }
+    if (payoutPaid) return MarkPaidBlocker.alreadyPaid;
+    if (!monthEndedAt(now ?? DateTime.now())) {
+      return MarkPaidBlocker.monthNotEnded;
+    }
+    if (!managementReviewDone) return MarkPaidBlocker.managementNotDone;
+    if (managementLockedAt == null) return MarkPaidBlocker.notSignedOff;
+    return null;
+  }
+}
+
+/// Why an incentive cannot be marked paid yet.
+///
+/// The client's half of the answer. The server adds one more that cannot be
+/// known from a summary — every KRA must carry a management rating — and
+/// refuses with that reason on the call itself.
+enum MarkPaidBlocker {
+  /// The viewer holds no payout seat (Accounts / HR admin / super admin).
+  notPayoutRole,
+
+  /// The viewer is the employee being paid. Nobody settles their own incentive.
+  ownReview,
+
+  /// Already settled — the tile shows a Paid badge instead.
+  alreadyPaid,
+
+  /// The rated month is still running; it cannot be paid while in progress.
+  monthNotEnded,
+
+  /// Management has not rated yet.
+  managementNotDone,
+
+  /// Management rated but has not committed it with Save & Lock.
+  notSignedOff,
 }

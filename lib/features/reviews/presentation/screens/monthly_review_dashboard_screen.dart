@@ -583,8 +583,12 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
                 // Corroborated by a score — a "Paid" badge on a review nobody
                 // ever rated reads as money already gone.
                 paid: summary.payoutSettled,
-                canMarkPaid: role != null &&
-                    summary.canMarkPaidBy(role!, userId: userId),
+                // null = payable now. Anything else is shown as a reason
+                // rather than as an absent button, except the two blockers
+                // about the viewer, which no action on this review clears.
+                blocker: role == null
+                    ? MarkPaidBlocker.notPayoutRole
+                    : summary.markPaidBlockerFor(role!, userId: userId),
                 busy: _payingOut,
                 onMarkPaid: _markPaid,
               ),
@@ -601,14 +605,41 @@ class _ReviewTileState extends ConsumerState<_ReviewTile> {
 /// settled, or — for Accounts/Finance, after the management review — a tappable
 /// check to settle it. Nothing at all when neither applies, so ordinary tiles
 /// are unchanged.
+/// The sentence shown for a blocker the viewer can wait out, or null for the
+/// ones that draw no control at all.
+///
+/// Top-level and public so the mapping can be tested without standing up the
+/// whole dashboard: the strings are the entire point of the control, and a
+/// blocker that silently maps to null is the old vanishing button again.
+String? markPaidBlockerMessage(MarkPaidBlocker blocker) {
+  switch (blocker) {
+    // Facts about the VIEWER, not the review: no waiting changes them, and a
+    // greyed control on every row of someone who can never pay is noise.
+    case MarkPaidBlocker.notPayoutRole:
+    case MarkPaidBlocker.ownReview:
+    // Settled reviews are the Paid badge's job, handled before this.
+    case MarkPaidBlocker.alreadyPaid:
+      return null;
+    case MarkPaidBlocker.monthNotEnded:
+      return AppStrings.monthlyReviewMarkPaidMonthNotEnded;
+    case MarkPaidBlocker.managementNotDone:
+      return AppStrings.monthlyReviewMarkPaidManagementNotDone;
+    case MarkPaidBlocker.notSignedOff:
+      return AppStrings.monthlyReviewMarkPaidNotSignedOff;
+  }
+}
+
 class _PayoutControl extends StatelessWidget {
   final bool paid;
-  final bool canMarkPaid;
+
+  /// What stands between this review and a settled incentive, or null when
+  /// nothing does.
+  final MarkPaidBlocker? blocker;
   final bool busy;
   final VoidCallback onMarkPaid;
   const _PayoutControl({
     required this.paid,
-    required this.canMarkPaid,
+    required this.blocker,
     required this.busy,
     required this.onMarkPaid,
   });
@@ -639,7 +670,23 @@ class _PayoutControl extends StatelessWidget {
         ),
       );
     }
-    if (!canMarkPaid) return const SizedBox.shrink();
+    final blocking = blocker;
+    if (blocking != null) {
+      final reason = markPaidBlockerMessage(blocking);
+      if (reason == null) return const SizedBox.shrink();
+      // Greyed, but still tappable. A truly disabled IconButton swallows the
+      // tap, and on a touch device a tooltip alone needs a long-press nobody
+      // discovers — so the tap is what delivers the reason.
+      return IconButton(
+        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(reason), duration: const Duration(seconds: 6)),
+        ),
+        tooltip: reason,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(Icons.check_circle_outline_rounded,
+            color: AppColors.textMuted.withValues(alpha: 0.6)),
+      );
+    }
     return IconButton(
       onPressed: busy ? null : onMarkPaid,
       tooltip: AppStrings.monthlyReviewMarkPaidTooltip,

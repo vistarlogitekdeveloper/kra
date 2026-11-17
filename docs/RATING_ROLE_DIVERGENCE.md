@@ -22,7 +22,7 @@ those on `employee_id` / `manager_id`, so its role lists there are dead code.
 | `ACCOUNT_HR_RATING` | HR, HR_ADMIN, SUPER_ADMIN | HR_ADMIN, HR | SUPER_ADMIN missing — **fixed by `install_rating_roles.mjs`** |
 | `FINANCE_RATING` | FINANCE, HR_ADMIN, SUPER_ADMIN | FINANCE | SUPER_ADMIN **fixed**; HR_ADMIN **open, see below** |
 | `MANAGEMENT_REVIEW` | MANAGEMENT, HR_ADMIN¹, SUPER_ADMIN | ADMIN, HR_ADMIN | MANAGEMENT + SUPER_ADMIN missing — **fixed** |
-| `INCENTIVE_PAYOUT` | FINANCE, HR, HR_ADMIN, SUPER_ADMIN | FINANCE, HR_ADMIN, HR | SUPER_ADMIN missing — **fixed** |
+| `INCENTIVE_PAYOUT` | FINANCE, HR_ADMIN, SUPER_ADMIN | FINANCE, HR_ADMIN | SUPER_ADMIN missing — **fixed**; HR **closed 2026-11-17, see below** |
 
 ¹ `HR_ADMIN` only while `FeatureFlags.roleTiers` is off, which is the default.
 
@@ -36,6 +36,21 @@ The `ADMIN_ONLY` review flow **ends** on `MANAGEMENT_REVIEW`. A `MANAGEMENT`
 user was offered "Save & Lock" and refused by the server, so the flow had no
 final step at all — which read as "the new flow is broken" long after the
 client-side dead-lock was fixed.
+
+## Closed: plain HR on INCENTIVE_PAYOUT
+
+The 2026-09-09 measurement recorded the server as `FINANCE, HR_ADMIN, HR`. It is
+now `['FINANCE', 'HR_ADMIN']`, with a comment saying why: *"Not plain HR: the
+app presents HR as review-only, and the payout reminders go to FINANCE and
+HR_ADMIN alone (queries.payoutRecipients)."* So the server narrowed and the
+register went stale.
+
+That left an HR user with a rendered **Mark incentive paid** button and a
+`403 Role HR cannot mark payout.` on tap — this class's worst outcome, on the
+one action that moves money. Closed by **narrowing the client** to match:
+`hr` is out of `incentivePayout.actorRoles`. Widening the server was the wrong
+direction here, because the exclusion is a stated product decision backed by
+who the payout reminders are addressed to, not an oversight.
 
 ## Still open: HR_ADMIN on FINANCE_RATING
 

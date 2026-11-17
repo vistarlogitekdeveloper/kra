@@ -1252,6 +1252,23 @@ class AppStrings {
   static const String monthlyReviewMarkPaidConfirmMessage =
       'Confirm the incentive payout has been settled. This finalizes the '
       'review and can\'t be undone.';
+  // ───── Why an incentive cannot be paid yet ─────
+  //
+  // The payout control used to vanish whenever a condition was unmet, so "not
+  // payable yet" and "this app cannot mark incentives paid" looked identical.
+  // Each line names the blocker AND what clears it, because the person reading
+  // it is usually not the person who can clear it — Accounts waits on
+  // management, not on itself.
+  static const String monthlyReviewMarkPaidMonthNotEnded =
+      'This month is still running. It can be paid once the month is over and '
+      'management has signed it off.';
+  static const String monthlyReviewMarkPaidManagementNotDone =
+      'Waiting on the management review. It can be paid once management has '
+      'rated every KRA and signed the month off.';
+  static const String monthlyReviewMarkPaidNotSignedOff =
+      'Management has not signed this month off yet (Save & Lock). It can be '
+      'paid after that.';
+
   static const String monthlyReviewActionFailed =
       'Could not complete the action. Please try again.';
   static const String monthlyReviewProjectedPayout = 'Projected payout';

@@ -128,9 +128,13 @@ void main() {
       );
       expect(s.managementReviewDone, isTrue);
       expect(s.canMarkPaidBy(UserRole.finance), isTrue);
-      // HR / HR-admin are payout actors too.
-      expect(s.canMarkPaidBy(UserRole.hr), isTrue);
+      // HR-admin holds the payout seat as well.
       expect(s.canMarkPaidBy(UserRole.hrAdmin), isTrue);
+      // Plain HR does NOT, and this is the assertion that matters: the server
+      // refuses it (ACTOR_ROLES.INCENTIVE_PAYOUT is FINANCE + HR_ADMIN), so
+      // offering the button here produced a 403 on tap.
+      expect(s.canMarkPaidBy(UserRole.hr), isFalse);
+      expect(s.markPaidBlockerFor(UserRole.hr), MarkPaidBlocker.notPayoutRole);
     });
 
     test('not markable without management Save & Lock, even with a management score',
@@ -209,6 +213,104 @@ void main() {
       );
       expect(s.payoutPaid, isTrue);
       expect(s.canMarkPaidBy(UserRole.finance), isFalse);
+    });
+
+    // Each refusal has to name itself. The control used to disappear whenever
+    // any of these was true, so "not payable yet" and "this app cannot mark
+    // incentives paid" looked exactly the same on screen.
+    group('says WHY it cannot be paid', () {
+      test('the month is still running', () {
+        final s = summary(
+          stage: ReviewStage.managementReview,
+          status: StageStatus.submitted,
+          managementLockedAt: locked,
+        );
+        expect(
+          s.markPaidBlockerFor(UserRole.finance,
+              now: DateTime.utc(2026, 6, 30, 18, 29)),
+          MarkPaidBlocker.monthNotEnded,
+        );
+      });
+
+      test('management has not rated', () {
+        final s = summary(
+          stage: ReviewStage.reportingManagerRating,
+          status: StageStatus.inProgress,
+        );
+        expect(s.markPaidBlockerFor(UserRole.finance),
+            MarkPaidBlocker.managementNotDone);
+      });
+
+      test('management rated but did not Save & Lock', () {
+        final s = summary(
+          stage: ReviewStage.managementReview,
+          status: StageStatus.submitted,
+        );
+        expect(s.markPaidBlockerFor(UserRole.finance),
+            MarkPaidBlocker.notSignedOff);
+      });
+
+      test('already settled', () {
+        final s = summary(
+          stage: ReviewStage.completed,
+          status: StageStatus.submitted,
+          managementLockedAt: locked,
+          payoutStatus: PayoutStatus.paid,
+        );
+        expect(s.markPaidBlockerFor(UserRole.finance),
+            MarkPaidBlocker.alreadyPaid);
+      });
+
+      test('it is the viewer\'s own review', () {
+        final s = summary(
+          stage: ReviewStage.managementReview,
+          status: StageStatus.submitted,
+          managementLockedAt: locked,
+          employeeId: 'fin1',
+        );
+        expect(s.markPaidBlockerFor(UserRole.finance, userId: 'fin1'),
+            MarkPaidBlocker.ownReview);
+      });
+
+      test('nothing is blocking when it is payable', () {
+        final s = summary(
+          stage: ReviewStage.managementReview,
+          status: StageStatus.submitted,
+          managementLockedAt: locked,
+        );
+        expect(s.markPaidBlockerFor(UserRole.finance), isNull);
+      });
+
+      test('the blocker and the bool can never disagree', () {
+        // canMarkPaidBy is defined as "no blocker", so this holds by
+        // construction — asserted so a future edit cannot split them again
+        // and leave a button that renders but 403s.
+        final cases = [
+          summary(
+              stage: ReviewStage.managementReview,
+              status: StageStatus.submitted,
+              managementLockedAt: locked),
+          summary(
+              stage: ReviewStage.managementReview,
+              status: StageStatus.submitted),
+          summary(
+              stage: ReviewStage.reportingManagerRating,
+              status: StageStatus.inProgress),
+          summary(
+              stage: ReviewStage.completed,
+              status: StageStatus.submitted,
+              payoutStatus: PayoutStatus.paid),
+        ];
+        for (final s in cases) {
+          for (final role in UserRole.values) {
+            expect(
+              s.canMarkPaidBy(role, userId: 'someone'),
+              s.markPaidBlockerFor(role, userId: 'someone') == null,
+              reason: '${s.currentStage.name} / ${role.name}',
+            );
+          }
+        }
+      });
     });
   });
 
@@ -536,9 +638,10 @@ void main() {
           // MANAGEMENT — see FeatureFlags.roleTiers.
           if (!FeatureFlags.roleTiers) UserRole.hrAdmin,
         },
+        // Accounts and HR admin settle the incentive; plain HR is review-only
+        // and the server refuses it, so it gets no payout badge either.
         ReviewStage.incentivePayout: {
           UserRole.finance,
-          UserRole.hr,
           UserRole.hrAdmin,
           UserRole.superAdmin,
         },

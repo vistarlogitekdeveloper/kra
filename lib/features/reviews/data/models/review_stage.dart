@@ -216,9 +216,16 @@ enum ReviewStage {
                 UserRole.superAdmin,
               };
       case ReviewStage.incentivePayout:
+        // NOT plain HR. The server's ACTOR_ROLES.INCENTIVE_PAYOUT is
+        // ['FINANCE', 'HR_ADMIN'] (plus SUPER_ADMIN through its role
+        // hierarchy) and says so deliberately: the app presents HR as
+        // review-only, and the payout reminders go to Accounts and HR admin
+        // alone. Listing HR here only produced the worst outcome of the
+        // divergence class — a visible "Mark incentive paid" button and a
+        // `403 Role HR cannot mark payout.` on tap. See
+        // docs/RATING_ROLE_DIVERGENCE.md.
         return const {
           UserRole.finance,
-          UserRole.hr,
           UserRole.hrAdmin,
           UserRole.superAdmin,
         };

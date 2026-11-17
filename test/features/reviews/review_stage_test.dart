@@ -68,8 +68,13 @@ void main() {
       // seat too, since one UserRole can't say "HR Admin AND Accounts".
       expect(ReviewStage.financeRating.actorRoles,
           containsAll([UserRole.finance, UserRole.hrAdmin]));
+      // Payout is Accounts + HR admin (+ super admin), matching the server's
+      // ACTOR_ROLES.INCENTIVE_PAYOUT. Plain HR is review-only and is refused
+      // there, so listing it here only bought a button that 403s.
       expect(ReviewStage.incentivePayout.actorRoles,
-          containsAll([UserRole.finance, UserRole.hr, UserRole.hrAdmin]));
+          containsAll([UserRole.finance, UserRole.hrAdmin]));
+      expect(
+          ReviewStage.incentivePayout.actorRoles, isNot(contains(UserRole.hr)));
       // Any manager-tier role gets a team roster, so all of them can rate.
       expect(
           ReviewStage.reportingManagerRating.actorRoles,
